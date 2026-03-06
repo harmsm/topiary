@@ -45,12 +45,12 @@ def test_integrated_single():
 
     T = toytree.rtree.rtree(50)
 
-    tree_data = list(T.idx_dict.keys())
+    tree_data = list(T.get_nodes())
     v1 = dict([(k,i) for i, k in enumerate(tree_data)])
     v2 = dict([(k,0) for i, k in enumerate(tree_data)])
 
-    T = T.set_node_values(feature="test_feature",values=v1)
-    T = T.set_node_values(feature="other_feature",values=v2)
+    T = T.set_node_data(feature="test_feature",data=v1)
+    T = T.set_node_data(feature="other_feature",data=v2)
 
     pt = topiary.draw.PrettyTree(T,tip_labels_align=True)
 
@@ -64,13 +64,15 @@ def test_integrated_gradient():
 
     T = toytree.rtree.rtree(50)
 
-    # Change in toytree api moved idx_dict to _idx_dict
-    if not hasattr(T,"idx_dict"):
-        T.idx_dict = T._idx_dict
+    node_list = list(T.get_nodes())
 
-    for n in T.idx_dict:
-        T.idx_dict[n].add_feature("test_feature",n)
-        T.idx_dict[n].add_feature("other_feature",len(T.idx_dict)-n)
+    T.set_node_data(feature="test_feature",
+                    data=range(len(node_list)),
+                    inplace=True)
+    
+    T.set_node_data(feature="other_feature",
+                    data=range(len(node_list),0,-1),
+                    inplace=True)
 
     pt = topiary.draw.PrettyTree(T,tip_labels_align=True)
 
@@ -85,13 +87,14 @@ def test_integrated_categories():
 
     T = toytree.rtree.rtree(50)
 
-    # Change in toytree api moved idx_dict to _idx_dict
-    if not hasattr(T,"idx_dict"):
-        T.idx_dict = T._idx_dict
+    node_list = list(T.get_nodes())
 
-    for n in T.idx_dict:
-        T.idx_dict[n].add_feature("test_feature",np.random.choice(["A","B","C","D"]))
-        T.idx_dict[n].add_feature("other_feature",len(T.idx_dict)-n)
+    T.set_node_data(feature="test_feature",
+                    data=np.random.choice(["A","B","C","D"],len(node_list)),
+                    inplace=True)
+    T.set_node_data(feature="other_feature",
+                    data=[len(node_list)-n for n in range(len(node_list))],
+                    inplace=True)
 
     pt = topiary.draw.PrettyTree(T,tip_labels_align=True)
 

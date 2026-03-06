@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Running flake8"
-flake_test=`flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
+flake_test=`flake8 src/topiary tests --count --select=E9,F63,F7,F82 --show-source --statistics`
 if [[ "${flake_test}" != 0 ]]; then
     echo "flake failed"
     exit
@@ -14,10 +14,10 @@ mkdir reports/coverage
 mkdir reports/badges
 
 echo "Running flake8, aggressive"
-flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics > reports/flake.txt
+flake8 src/topiary tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics > reports/flake.txt
 
 echo "Checking for test file completeness"
-./tests/completeness_crawler.py topiary tests bin/ > reports/completeness-crawler.txt
+./tests/completeness_crawler.py src/topiary tests > reports/completeness-crawler.txt
 grep MISSING reports/completeness-crawler.txt
 
 echo "Running coverage.py"

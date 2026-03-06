@@ -88,7 +88,7 @@ class PrettyTree:
         # Load tree and give pretty tip names
 
         # Convert tree into a toytree tree from ete3,
-        if issubclass(type(T),toytree.Toytree.ToyTree):
+        if issubclass(type(T),toytree.ToyTree):
             self._tT = T.copy()
         else:
             # Convert to a toytree
@@ -97,16 +97,22 @@ class PrettyTree:
         # Rename tree.name entries according to name_dict
         if name_dict is not None:
             if not issubclass(type(name_dict),dict):
-                err = "name_dict shouold be a dictionary mapping uid to pretty\n"
+                err = "name_dict should be a dictionary mapping uid to pretty\n"
                 err += "tip names.\n"
                 raise ValueError(err)
 
-            for idx in self._tT.idx_dict:
-                name = self._tT.idx_dict[idx].name
+            new_names = []
+            for node in self._tT.get_nodes():
+            
+                name = node.name
                 try:
-                    self._tT.idx_dict[idx].name = name_dict[name]
+                    new_names.append(name_dict[name])
                 except KeyError:
-                    pass
+                    new_names.append(name)
+
+            self._tT.set_node_data(feature=name,
+                                   data=np.array(new_names),
+                                   inplace=True)
 
         # ----------------------------------------------------------------------
         # Artwork parameters
@@ -331,12 +337,12 @@ class PrettyTree:
         """
 
         # Create mask with nodes to get
-        idx = np.array(list(self._tT.idx_dict.keys()),dtype=int)
+        idx = np.array([node.idx for node in self.tT.get_nodes()],dtype=int)
         leaf_mask = []
         root_mask = []
-        for k in self._tT.idx_dict:
-            leaf_mask.append(self._tT.idx_dict[k].is_leaf())
-            root_mask.append(self._tT.idx_dict[k].is_root())
+        for node in self._tT.get_nodes():
+            leaf_mask.append(node.is_leaf())
+            root_mask.append(node.is_root())
 
         leaf_mask = np.array(leaf_mask,dtype=bool)
         anc_mask = np.logical_not(leaf_mask)
@@ -379,7 +385,7 @@ class PrettyTree:
                 prop = []
                 for i in idx[mask]:
 
-                    node = self._tT.idx_dict[i]
+                    node = self._tT[i]
                     if p_label not in node.features:
                         prop.append(None)
                         continue
@@ -438,7 +444,7 @@ class PrettyTree:
             draw the root node
         scatter_style : dict, optional
             dictionary specifying how to draw the nodes. valid keys are "shape",
-            "mstyle","angle","label", and "lstyle". see toyplot Markers
+            "style","angle","label", and "lstyle". see toyplot Markers
             documentation for description of values.
         palette : toyplot.color.Palette, optional
             custom toyplot palette. if specified, use this palette rather than
@@ -457,30 +463,28 @@ class PrettyTree:
         plot_leaves = check.check_bool(plot_leaves,"plot_leaves")
         plot_root = check.check_bool(plot_root,"plot_root")
 
-        # Get x, y, and property values
-        x, y, prop_dict = self._get_node_values(plot_ancestors,
-                                                plot_leaves,
-                                                plot_root,
-                                                property_label)
-
-        # Get property from prop_dict
-        if prop_dict is None:
-            prop = np.ones(len(x),dtype=float)
-        else:
-            prop = prop_dict[property_label]
+        if property_label is not None:
+            if property_label in self._tT.features:
+                prop = np.array(self._tT.get_node_data(property_label))
+            else:
+                err = f"property_label {property_label} is not a tree feature\n"
+                raise ValueError(err)
 
         # If no nodes, return self
         if len(prop) == 0:
             return self
 
+        # get number of nodes
+        num_nodes = len(prop)
+
         # Do not plot anything with "None" entry
         good_mask = np.array([p is not None for p in prop],dtype=bool)
-        x = x[good_mask]
-        y = y[good_mask]
+
         prop = prop[good_mask]
+        all_node_indexer = np.arange(num_nodes,dtype=int)[good_mask]
 
         # Don't plot if there are no nodes to plot
-        if len(x) == 0:
+        if np.sum(good_mask) == 0:
             return self
 
         # Check the property span arg
@@ -515,9 +519,8 @@ class PrettyTree:
         if issubclass(type(color),dict):
             keys = list(color.keys())
             good_mask = np.array([p in keys for p in prop],dtype=bool)
-            x = x[good_mask]
-            y = y[good_mask]
             prop = prop[good_mask]
+            all_node_indexer = all_node_indexer[good_mask]
 
         cm, cm_span = construct_colormap(color,prop,prop_span,palette)
 
@@ -532,6 +535,7 @@ class PrettyTree:
         sizes = []
         colors = []
         for p in prop:
+            
             try:
                 sizes.append(sm(p))
             except (KeyError,ValueError):
@@ -544,23 +548,39 @@ class PrettyTree:
 
         keep_mask = np.logical_and(np.array([s is not None for s in sizes],dtype=bool),
                                    np.array([c is not None for c in colors],dtype=bool))
-
-        x = x[keep_mask]
-        y = y[keep_mask]
+        
         sizes = np.array(sizes)[keep_mask]
         colors = np.array(colors)[keep_mask]
+
+        all_node_indexer = all_node_indexer[keep_mask]
 
         # Default scatter style dictionary
         if scatter_style is None:
             stroke_width = self._stroke_width*0.375
             scatter_style = {"marker":"o",
-                             "mstyle":{"stroke": "black",
-                                       "stroke-width":stroke_width}}
-            
-        # Only plot if there there are nodes to plot. 
-        if len(x) > 0:
+                             "style":{"stroke": "black",
+                                      "stroke-width":stroke_width}}
+        
+        # Create a mask. toytree uses a mask where nodes to plot are False
+        plot_mask = np.ones(num_nodes,dtype=bool)
+        plot_mask[all_node_indexer] = 0
+        
+        tmp_sizes = np.zeros(len(plot_mask),dtype=float)
+        tmp_sizes[plot_mask] = sizes[:]
+        tmp_colors = np.array([None for _ in range(len(plot_mask))])
+        tmp_colors[plot_mask] = colors[:]
 
-            self._tree_ax.scatterplot(x,y,size=sizes,color=colors,**scatter_style)
+        tmp_sizes = sizes[:]
+        tmp_colors = colors[:]
+
+        # Only plot if there there are nodes to plot. 
+        if np.sum(keep_mask) > 0:
+
+            self._tT.annotate.add_node_markers(axes=self._tree_ax,
+                                               size=tmp_sizes,
+                                               color=tmp_colors,
+                                               mask=plot_mask,
+                                               **scatter_style)
 
             # If there was a property label, record that we plotted it for legend
             # construction.
@@ -740,19 +760,13 @@ class PrettyTree:
             err += "of fields as requested property_labels.\n\n"
             raise ValueError(err)
 
-        # Actually pull out x, y, and properties
-        x, y, prop_dict = self._get_node_values(plot_ancestors,
-                                                plot_leaves,
-                                                plot_root,
-                                                property_labels)
-
-        # Offset in x and y
-        x = x + dx
-        y = y + dy
-
-        good_mask = []
+        # Get property values
+        prop_dict = {}
+        for var in var_list:
+            prop_dict[var] = self._tT.get_node_data(var)
 
         # Apply formatting string to the property values extracted
+        good_mask = []
         to_write = []
         to_zip = [prop_dict[var] for var in var_list]
         for v in zip(*to_zip):
@@ -794,17 +808,18 @@ class PrettyTree:
                 new_string = re.sub("999999","",new_string)
 
             good_mask.append(True)
-
             to_write.append(new_string)
 
         good_mask = np.array(good_mask,dtype=bool)
         to_write = np.array(to_write)
 
         # Actually write labels
-        self._tree_ax.text(x[good_mask],
-                           y[good_mask],
-                           to_write[good_mask],
-                           style=text_style)
+        self._tT.annotate.add_node_labels(axes=self._tree_ax,
+                                          labels=to_write,
+                                          xshift=dx,
+                                          yshift=dy,
+                                          style=text_style,
+                                          mask=np.logical_not(good_mask))
 
         return self
 
@@ -995,6 +1010,8 @@ class PrettyTree:
 
                 # Construct a style for this specific marker
                 m_style = copy.deepcopy(marker_style)
+                value = m_style.pop("style")
+                m_style["mstyle"] = value
                 m_style["label"] = p
                 m_style["mstyle"]["fill"] = cm(span[i])
 

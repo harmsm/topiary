@@ -3,15 +3,14 @@ Functions and classes for plotting toytree trees.
 """
 
 import topiary
-import ete3
 import toytree
 import toyplot
 
 import numpy as np
+import pandas as pd
+
 import re
-import os
 import copy
-import glob
 
 def _protect_name(name):
     """
@@ -237,8 +236,6 @@ def create_name_dict(df,tip_columns=None,separator="|",disambiguate=True):
     return uid_to_name
 
 
-
-
 def ete3_to_toytree(T):
     """
     Generate a toytree.tree instance from an ete3.Tree instance. Copies over
@@ -268,21 +265,23 @@ def ete3_to_toytree(T):
     tT = toytree.tree(to_write_T.write())
 
     # Clean up names that toytree read in
-    for k in tT.idx_dict:
-        name = _deprotect_name(tT.idx_dict[k].name)
-        tT.idx_dict[k].add_feature("name",name)
+    names_df = tT.get_node_data(feature="name")
+    for idx in names_df.index:
+        names_df.loc[idx] = _deprotect_name(names_df[idx])
+    tT.set_node_data(feature="name",data=names_df,inplace=True)
 
     # Map nodes unambiguously by descendant leaf names
     # toytree
     tT_node_dict = {}
-    for k in tT.idx_dict:
-        tT_leaves = tT.idx_dict[k].get_leaf_names()
+    for node in tT.get_nodes():
+        tT_leaves = node.get_leaf_names()
         tT_leaves.sort()
         tT_leaves = tuple(tT_leaves)
-        tT_node_dict[tT_leaves] = tT.idx_dict[k]
+        tT_node_dict[tT_leaves] = node
 
     # ete3.Tree
     T_node_dict = {}
+    all_features = []
     for node in T.traverse():
         T_leaves = node.get_leaf_names()
         T_leaves = [_deprotect_name(t) for t in T_leaves]
@@ -290,26 +289,45 @@ def ete3_to_toytree(T):
         T_leaves = tuple(T_leaves)
         T_node_dict[T_leaves] = node
 
-    # We can now map between toytree and ete3.Trees based on their shared keys.
-    for node in tT_node_dict:
+        all_features.extend(node.features)
 
+    # Create list of all unique features seen on any node in ete3 tree
+    all_features = list(set(all_features))
+
+    # Create dictionary to hold all features for conversion to a dataframe
+    out = dict([(f,[]) for f in all_features])
+
+    # We can now map between toytree and ete3.Trees based on their shared keys.
+    #node_idx = []
+    for node in tT_node_dict:
+        
         # Get equivalent toytree and ete3 nodes
         tT_node = tT_node_dict[node]
         T_node = T_node_dict[node]
 
-        # Copy all features from ete3 node to toytree node
-        for f in T_node.features:
+        # Record node index in toytree instance
+        #node_idx.append(tT_node.idx)
 
+        # Go through all features in the ete3 tree
+        for f in all_features:
+    
             # Manually added features and name will have format __dict__[key].
             # Reserved features (dist, support, minimally) have format
             # __dict__[_key].
-            try:
-                value = T_node.__dict__[f]
-            except KeyError:
-                value = T_node.__dict__[f"_{f}"]
 
-            # Add as feature to toytree Tree
-            tT_node.add_feature(f,value)
+            if f in T_node.__dict__:
+                value = T_node.__dict__[f]
+            elif f"_{f}" in T_node.__dict__:
+                value = T_node.__dict__[f"_{f}"]
+            else:
+                value = None
+
+            # Record value
+            out[f].append(value)
+
+    # Now set each feature
+    for f in out:
+        tT.set_node_data(feature=f,data=out[f],inplace=True)
 
     return tT
 

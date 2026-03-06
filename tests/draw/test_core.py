@@ -95,8 +95,7 @@ def test_ete3_to_toytree():
     expected_dist = dict([(a,1.0) for a in string.ascii_uppercase[:7]])
     expected_dist["B"] = 4.0
     expected_dist["D"] = 0.5
-    for n in tT.idx_dict:
-        node = tT.idx_dict[n]
+    for node in tT.get_nodes():
         if node.is_leaf():
             name = node.name
             assert expected_dist[name] == node.dist
@@ -111,8 +110,7 @@ def test_ete3_to_toytree():
     expected_dist["D"] = 0.5
     expected_support = {"AB":99,"CD":100,"CDE":75,"ABCDE":80,"FG":90,"ABCDEFG":75}
 
-    for n in tT.idx_dict:
-        node = tT.idx_dict[n]
+    for node in tT.get_nodes():
         if node.is_leaf():
             name = node.name
             assert expected_dist[name] == node.dist
@@ -131,8 +129,7 @@ def test_ete3_to_toytree():
     expected_dist["B"] = 4.0
     expected_dist["D"] = 0.5
 
-    for n in tT.idx_dict:
-        node = tT.idx_dict[n]
+    for node in tT.get_nodes():
         if not node.is_leaf():
             leaves = node.get_leaf_names()
             leaves.sort()
@@ -152,10 +149,7 @@ def test_ete3_to_toytree():
     expected_dist["D"] = 0.5
 
     tT = ete3_to_toytree(T)
-    for n in tT.idx_dict:
-
-        node = tT.idx_dict[n]
-
+    for node in tT.get_nodes():
         leaves = node.get_leaf_names()
         leaves.sort()
         key = "".join(leaves)

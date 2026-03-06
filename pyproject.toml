@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "topiary-asr"
+dynamic = ["version"]
+description = "Python framework for doing ancestral sequence reconstruction."
+readme = "README.md"
+requires-python = ">=3.8.0"
+license = { text = "MIT" }
+authors = [{ name = "Michael J. Harms", email = "harmsm@protonmail.com" }]
+keywords = [
+  "phylogenetics",
+  "ancestral sequence reconstruction",
+  "ASR",
+  "bioinformatics",
+  "protein",
+  "evolutionary biochemistry",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "numpy",
+  "pandas",
+  "xlrd",
+  "openpyxl",
+  "matplotlib",
+  "biopython",
+  "tqdm",
+  "ete3",
+  "dendropy",
+  "toytree>=3.0",
+  "opentree",
+]
+
+[project.urls]
+Homepage = "https://github.com/harmslab/topiary"
+
+[project.optional-dependencies]
+dev = ["pytest", "flake8", "coverage"]
+
+[project.scripts]
+topiary-alignment-to-ancestors = "topiary.cli_scripts.alignment_to_ancestors:main"
+topiary-bootstrap-reconcile = "topiary.cli_scripts.bootstrap_reconcile:main"
+topiary-check-installed = "topiary.cli_scripts.check_installed:main"
+topiary-create-report = "topiary.cli_scripts.create_report:main"
+topiary-fasta-into-dataframe = "topiary.cli_scripts.fasta_into_dataframe:main"
+topiary-seed-to-alignment = "topiary.cli_scripts.seed_to_alignment:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "topiary.__version__.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+topiary = ["reports/assets/*"]
+
+[tool.pytest.ini_options]
+filterwarnings = ["ignore:invalid escape sequence:DeprecationWarning"]

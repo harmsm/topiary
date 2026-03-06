@@ -4,6 +4,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - pip
   - numpy
   - pandas
   - xlrd
@@ -14,13 +15,11 @@ dependencies:
   - ete3
   - dendropy
   - toytree
-  - pastml
   #- openmpi  # [not win]
   #- blast    # [not win]
   #- muscle   # [not win]
   #- generax  # [not win]
   #- raxml-ng # [not win]
   #- mpi4py   # [not win]
-  - pip
   - pip:
     - opentree

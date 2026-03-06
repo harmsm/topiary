@@ -42,14 +42,12 @@ jobs:
       run: |
         # platform specific packages
         conda install -c conda-forge -c bioconda "muscle>=5.0" "raxml-ng==1.1" "generax>=2.0" "blast>=2.2"
-        python -m pip install mpi4py
-        python -m pip install . -vv -r requirements.txt
+        python -m pip install .[dev] -vv
 
     - name: run flake8
       shell: bash -l {0}
       run: |
-        conda install flake8
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/topiary tests --count --select=E9,F63,F7,F82 --show-source --statistics
 
     - name: run pytest
       shell: bash -l {0}
@@ -82,13 +80,12 @@ jobs:
     - name: install topiary
       shell: pwsh
       run: |
-        python -m pip install . -vv -r requirements.txt
+        python -m pip install .[dev] -vv
 
     - name: run flake8
       shell: pwsh
       run: |
-        conda install flake8
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/topiary tests --count --select=E9,F63,F7,F82 --show-source --statistics
 
     - name: run pytest
       shell: pwsh

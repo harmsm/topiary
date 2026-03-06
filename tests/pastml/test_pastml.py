@@ -1,8 +1,6 @@
-
-import pytest
-
+import os
+import tempfile
 from topiary.pastml import get_ancestral_gaps
-
 import ete3
 
 import numpy as np
@@ -50,3 +48,4 @@ def test_get_ancestral_gaps(tmpdir):
 
     for k in expected:
         assert np.array_equal(gapping[k],expected[k])
+

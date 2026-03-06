@@ -231,5 +231,4 @@ Required libraries
   + `muscle >= 5.0 <muscle-download_>`_
   + `GeneRax >= 2.0 <generax-download_>`_
   + `RAxML-NG >= 1.1 <raxml-ng-download_>`_
-  + `pastml <pastml-link_>`_
   + `python-opentree <opentree-link_>`_
