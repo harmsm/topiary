@@ -47,7 +47,8 @@ dependencies = [
 Homepage = "https://github.com/harmslab/topiary"
 
 [project.optional-dependencies]
-dev = ["pytest", "flake8", "coverage"]
+test = ["coverage", "flake8", "pytest", "genbadge", "pytest-mock"]
+docs = ["pydata-sphinx-theme"]
 
 [project.scripts]
 topiary-alignment-to-ancestors = "topiary.cli_scripts.alignment_to_ancestors:main"

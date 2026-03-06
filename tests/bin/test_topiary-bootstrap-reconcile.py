@@ -22,7 +22,7 @@ def test_main(small_phylo,tmpdir):
 
     # Get location of binary
     location = os.path.dirname(os.path.realpath(__file__))
-    test_bin = os.path.join(location,"..","..","bin","topiary-bootstrap-reconcile")
+    test_bin = "topiary-bootstrap-reconcile"
     base_cmd = [test_bin]
 
     # Should run but fail because no arguments

@@ -561,17 +561,13 @@ class PrettyTree:
                              "style":{"stroke": "black",
                                       "stroke-width":stroke_width}}
         
-        # Create a mask. toytree uses a mask where nodes to plot are False
         plot_mask = np.ones(num_nodes,dtype=bool)
         plot_mask[all_node_indexer] = 0
         
-        tmp_sizes = np.zeros(len(plot_mask),dtype=float)
-        tmp_sizes[plot_mask] = sizes[:]
-        tmp_colors = np.array([None for _ in range(len(plot_mask))])
-        tmp_colors[plot_mask] = colors[:]
-
-        tmp_sizes = sizes[:]
-        tmp_colors = colors[:]
+        tmp_sizes = np.zeros(num_nodes, dtype=float)
+        tmp_sizes[~plot_mask] = sizes[:]
+        tmp_colors = np.array([None for _ in range(num_nodes)], dtype=object)
+        tmp_colors[~plot_mask] = colors[:]
 
         # Only plot if there there are nodes to plot. 
         if np.sum(keep_mask) > 0:

@@ -11,7 +11,7 @@ def test_main():
 
     # Get location of binary
     location = os.path.dirname(os.path.realpath(__file__))
-    test_bin = os.path.join(location,"..","..","bin","topiary-check-installed")
+    test_bin = "topiary-check-installed"
 
     if os.name == "nt":
         base_cmd = [sys.executable,test_bin]

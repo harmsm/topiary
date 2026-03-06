@@ -437,7 +437,8 @@ def column_to_bool(column,column_name):
     column = column.infer_objects()
 
     # If it's not a boolean column, try to turn into one
-    if not np.dtype(column.dtypes) is np.dtype(bool):
+    import pandas as pd
+    if not pd.api.types.is_bool_dtype(column):
 
         # Base message. If everything works great, let user know what
         # happened as warning. If things go awry, use as start of error

@@ -57,10 +57,15 @@ def _xml_file_to_records(xml_file):
     file_contents = _clean_xml(xml_file)
 
     # Now use Biopython to parse blast records
+    import xml.parsers.expat
     blast_records = []
     with io.StringIO(file_contents) as f:
-        for rec in NCBIXML.parse(f):
-            blast_records.append(rec)
+        try:
+            for rec in NCBIXML.parse(f):
+                blast_records.append(rec)
+        except (ValueError, xml.parsers.expat.ExpatError) as e:
+            err = f"\nCould not parse xml file '{os.path.basename(xml_file)}'. File may be corrupted or not valid BLAST XML.\n\n"
+            raise ValueError(err) from e
 
     return blast_records
 

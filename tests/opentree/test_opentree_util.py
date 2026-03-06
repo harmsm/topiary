@@ -120,7 +120,7 @@ def test_species_to_ott():
                                                       "Escherichia coli"])
     assert len(ott_list) == 3
     assert ott_list[0] == 212506
-    assert ott_list[1] is None
+    assert ott_list[1] == 19017
     assert ott_list[2] == 474506
 
     # This should work because we're inside cow-like things. OTT should realize
@@ -468,11 +468,11 @@ def test_sort_df_by_taxa(for_real_inference):
     # Drop recip_paralog column; should now sort on nickname
     input_df = df.copy()
     input_df = input_df.drop(columns=["recip_paralog"])
-    values = np.arange(len(input_df))
+    values = [str(x).zfill(3) for x in range(len(input_df))]
     np.random.shuffle(values)
     input_df.loc[:,"nickname"] = values
     new_df = sort_df_by_taxa(input_df,ref_ott="ott770315")
-    assert np.array_equal(new_df.loc[:,"nickname"],np.arange(len(input_df)))
+    assert np.array_equal(new_df.loc[:,"nickname"],[str(x).zfill(3) for x in range(len(input_df))])
 
     # Drop recip_paralog and nickname column; should now sort on name
     input_df = df.copy()
@@ -485,11 +485,11 @@ def test_sort_df_by_taxa(for_real_inference):
 
     # Short on custom paralog column
     input_df = df.copy()
-    values = np.arange(len(input_df))
+    values = [str(x).zfill(3) for x in range(len(input_df))]
     np.random.shuffle(values)
     input_df["rocket"] = values
     new_df = sort_df_by_taxa(input_df,paralog_column="rocket")
-    assert np.array_equal(new_df.loc[:,"rocket"],np.arange(len(input_df)))
+    assert np.array_equal(new_df.loc[:,"rocket"],[str(x).zfill(3) for x in range(len(input_df))])
 
     # Make sure it's paying attention to only_keepers
     input_df = df.copy()

@@ -27,7 +27,7 @@ def test_main(test_dataframes,tmpdir):
 
     # Get location of binary
     location = os.path.dirname(os.path.realpath(__file__))
-    test_bin = os.path.join(location,"..","..","bin","topiary-fasta-into-dataframe")
+    test_bin = "topiary-fasta-into-dataframe"
 
     if os.name == "nt":
         base_cmd = [sys.executable,test_bin]
