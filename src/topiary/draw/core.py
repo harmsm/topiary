@@ -17,7 +17,10 @@ def _protect_name(name):
     Protect a name going into a newick string.
     """
 
-    new_name = re.sub(" ","%20",name)
+    if name is None:
+        return ""
+
+    new_name = re.sub(" ","%20",str(name))
     return f"'{new_name}'"
 
 def _deprotect_name(name):
@@ -25,7 +28,10 @@ def _deprotect_name(name):
     Invert _protect_name for bringing name out of newick string.
     """
 
-    return re.sub("%20"," ",name).strip("'")
+    if name is None:
+        return ""
+
+    return re.sub("%20"," ",str(name)).strip("'")
 
 def color_to_css(color):
     """
@@ -236,15 +242,16 @@ def create_name_dict(df,tip_columns=None,separator="|",disambiguate=True):
     return uid_to_name
 
 
-def ete3_to_toytree(T):
+def ete4_to_toytree(T):
     """
-    Generate a toytree.tree instance from an ete3.Tree instance. Copies over
+    Convert an ete4 tree into a toytree tree.
+ instance from an ete4.Tree instance. Copies over
     branch lengths, labels, and features.
 
     Parameters
     ----------
-    T : ete3.Tree
-        ete3.Tree to be converted
+    T : ete4.Tree
+        ete4.Tree to be converted
 
     Returns
     -------
@@ -252,17 +259,22 @@ def ete3_to_toytree(T):
         converted toytree.tree
     """
 
-    all_leaf_names = list(T.get_leaf_names())
+    all_leaf_names = list(T.leaf_names())
     if len(set(all_leaf_names)) != len(all_leaf_names):
-        err = "\nete3_to_toytree requires each leaf have a unique name.\n\n"
+        err = "\nete4_to_toytree requires each leaf have a unique name.\n\n"
         raise ValueError(err)
 
     # Write out a tree with names protected (quotes, spaces removed, etc.)
-    to_write_T = copy.deepcopy(T)
+    to_write_T = T.copy()
     for node in to_write_T.traverse():
         node.name = _protect_name(node.name)
+        if node.dist is None:
+            node.dist = 0.0
+        if node.support is None:
+            node.support = 1.0
 
-    tT = toytree.tree(to_write_T.write())
+    newick_text = to_write_T.write()
+    tT = toytree.tree(newick_text)
 
     # Clean up names that toytree read in
     names_df = tT.get_node_data(feature="name")
@@ -274,53 +286,45 @@ def ete3_to_toytree(T):
     # toytree
     tT_node_dict = {}
     for node in tT.get_nodes():
-        tT_leaves = node.get_leaf_names()
+        tT_leaves = [_deprotect_name(l) for l in node.get_leaf_names()]
         tT_leaves.sort()
         tT_leaves = tuple(tT_leaves)
         tT_node_dict[tT_leaves] = node
 
-    # ete3.Tree
+    # ete4.Tree
     T_node_dict = {}
     all_features = []
     for node in T.traverse():
-        T_leaves = node.get_leaf_names()
-        T_leaves = [_deprotect_name(t) for t in T_leaves]
+        T_leaves = list(node.leaf_names())
         T_leaves.sort()
         T_leaves = tuple(T_leaves)
         T_node_dict[T_leaves] = node
 
-        all_features.extend(node.features)
+        all_features.extend(list(node.props.keys()))
 
-    # Create list of all unique features seen on any node in ete3 tree
+    # Create list of all unique features seen on any node in ete4 tree
     all_features = list(set(all_features))
 
     # Create dictionary to hold all features for conversion to a dataframe
     out = dict([(f,[]) for f in all_features])
 
-    # We can now map between toytree and ete3.Trees based on their shared keys.
-    #node_idx = []
-    for node in tT_node_dict:
-        
-        # Get equivalent toytree and ete3 nodes
-        tT_node = tT_node_dict[node]
-        T_node = T_node_dict[node]
+    # We can now map between toytree and ete4.Trees based on their shared keys.
+    for node_key in tT_node_dict:
 
-        # Record node index in toytree instance
-        #node_idx.append(tT_node.idx)
+        # Get equivalent toytree and ete4 nodes
+        tT_node = tT_node_dict[node_key]
+        T_node = T_node_dict[node_key]
 
-        # Go through all features in the ete3 tree
+        # Go through all features in the ete4 tree
         for f in all_features:
     
-            # Manually added features and name will have format __dict__[key].
-            # Reserved features (dist, support, minimally) have format
-            # __dict__[_key].
-
-            if f in T_node.__dict__:
-                value = T_node.__dict__[f]
-            elif f"_{f}" in T_node.__dict__:
-                value = T_node.__dict__[f"_{f}"]
-            else:
-                value = None
+            # Try to get property using get_prop
+            value = T_node.get_prop(f)
+            if value is None:
+                if f == "support":
+                    value = 1.0
+                elif f == "dist":
+                    value = 0.0
 
             # Record value
             out[f].append(value)

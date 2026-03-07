@@ -12,7 +12,7 @@ import json
 import shutil
 import glob
 import pathlib
-import ete3
+import ete4 as ete
 import time
 
 def test_Supervisor(tiny_phylo,tmpdir):
@@ -238,9 +238,9 @@ def test_Supervisor_create_calc_dir(tiny_phylo,tmpdir):
     assert sv.model == "november"
     sv.finalize()
 
-    # Make sure we can pass in a gene tree as an ete3.Tree object
-    new_tree = ete3.Tree("((A,B),(C,D));")
-    sv.create_calc_dir("test6",calc_type="load_ete3",gene_tree=new_tree)
+    # Make sure we can pass in a gene tree as an ete.Tree object
+    new_tree = ete.Tree("((A,B),(C,D));")
+    sv.create_calc_dir("test6",calc_type="load_ete",gene_tree=new_tree)
     assert os.path.isfile(os.path.join(sv.input_dir,"gene-tree.newick"))
     assert sv.gene_tree == os.path.join(sv.input_dir,"gene-tree.newick")
 

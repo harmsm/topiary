@@ -1,11 +1,11 @@
 """
-Load a tree into an ete3 tree data structure.
+Load a tree into an ete4 tree data structure.
 """
 
 from topiary._private.check import check_bool
 
-import ete3
-from ete3 import Tree
+import ete4 as ete
+from ete4 import Tree
 import dendropy as dp
 
 import glob
@@ -14,12 +14,12 @@ import re
 
 def read_tree(tree,fmt=None):
     """
-    Load a tree into an ete3 tree data structure.
+    Load a tree into an ete4 tree data structure.
 
     Parameters
     ----------
-    tree : ete3.Tree or dendropy.Tree or str
-        some sort of tree. can be an ete3.Tree (returns self), a dendropy Tree
+    tree : ete4.Tree or dendropy.Tree or str
+        some sort of tree. can be an ete4.Tree (returns self), a dendropy Tree
         (converts to newick and drops root), a newick file or a newick string.
     fmt : int or None
         format for reading tree from newick. 0-9 or 100. (See Notes for what
@@ -28,14 +28,14 @@ def read_tree(tree,fmt=None):
 
     Returns
     -------
-    tree : ete3.Tree
-        an ete3 tree object.
+    tree : ete4.Tree
+        an ete4 tree object.
 
     Notes
     -----
-    `fmt` number is read directly by ete3. See their documentation for how these
-    are read (http://etetoolkit.org/docs/latest/tutorial/tutorial_trees.html#reading-and-writing-newick-trees).
-    As of ETE3.1.1, these numbers mean:
+    `fmt` number is read directly by ete4. See their documentation for how these
+    are read (https://etetoolkit.github.io/ete/tutorial/tutorial_trees.html).
+    As of ETE4.4.0, these numbers mean:
 
     + 0: flexible with support values
     + 1: flexible with internal node names
@@ -51,8 +51,8 @@ def read_tree(tree,fmt=None):
 
     """
 
-    # Already an ete3 tree.
-    if issubclass(type(tree),ete3.TreeNode):
+    # Already an ete4 tree.
+    if isinstance(tree,ete.Tree):
         return tree
 
     # Convert dendropy tree into newick (drop root)
@@ -65,7 +65,7 @@ def read_tree(tree,fmt=None):
 
         try:
             t = Tree(tree)
-        except ete3.parser.newick.NewickError:
+        except Exception:
 
             # Try all possible formats now, in succession
             w = "\n\nCould not parse tree without format string. Going to try different\n"
@@ -78,14 +78,13 @@ def read_tree(tree,fmt=None):
             t = None
             for f in formats:
                 try:
-                    t = Tree(tree,format=f)
+                    t = Tree(tree,parser=f)
                     w = f"\n\nSuccessfully parsed tree with format style {f}.\n"
-                    w += "Please see ete3 documentation for details:\n\n"
-                    w += "http://etetoolkit.org/docs/latest/tutorial/tutorial_trees.html#reading-and-writing-newick-trees\n\n"
+                    w += "Please see ete4 documentation for details.\n\n"
                     print(w)
                     break
 
-                except ete3.parser.newick.NewickError:
+                except Exception:
                     continue
 
             if t is None:
@@ -94,7 +93,7 @@ def read_tree(tree,fmt=None):
 
     else:
         # Try a conversion with the specified format
-        t = Tree(tree,format=fmt)
+        t = Tree(tree,parser=fmt)
 
     return t
 
@@ -105,9 +104,9 @@ def _map_tree_to_tree(T1,T2):
 
     Parameters
     ----------
-    T1 : ete3.Tree or toytree.tree
+    T1 : ete4.Tree or toytree.tree
         one tree to compare
-    T2 : ete3.Tree or toytree.tree
+    T2 : ete4.Tree or toytree.tree
         second tree to compare
 
     Returns
@@ -120,14 +119,14 @@ def _map_tree_to_tree(T1,T2):
         list of nodes from T2 that are not in T1
     """
 
-    def _ete3_node_dict(T):
+    def _ete4_node_dict(T):
         """
-        Create dictionary keying ete3 tree nodes to tuple of descendants.
+        Create dictionary keying ete4 tree nodes to tuple of descendants.
         """
 
         node_dict = {}
         for node in T.traverse():
-            leaves = node.get_leaf_names()
+            leaves = node.leaf_names()
             leaves = [t for t in leaves]
             leaves.sort()
             leaves = tuple(leaves)
@@ -150,14 +149,14 @@ def _map_tree_to_tree(T1,T2):
         return node_dict
 
     # Construct dictionary keying node to tuple of descendants for T1
-    if issubclass(type(T1),ete3.Tree):
-        T1_node_dict = _ete3_node_dict(T1)
+    if isinstance(T1,ete.Tree):
+        T1_node_dict = _ete4_node_dict(T1)
     else:
         T1_node_dict = _toytree_node_dict(T1)
 
     # Construct dictionary keying node to tuple of descendants for T2
-    if issubclass(type(T2),ete3.Tree):
-        T2_node_dict = _ete3_node_dict(T2)
+    if isinstance(T2,ete.Tree):
+        T2_node_dict = _ete4_node_dict(T2)
     else:
         T2_node_dict = _toytree_node_dict(T2)
 
@@ -191,15 +190,15 @@ def load_trees(directory=None,
                T_anc_pp=None,
                T_event=None):
     """
-    Generate an ete3 tree with features 'event', 'anc_pp', 'anc_label',
+    Generate an ete4 tree with features 'event', 'anc_pp', 'anc_label',
     and 'bs_support' on internal nodes. This information is read from the input
-    ete3 trees or the specified topiary output directory. The tree is rooted
+    ete4 trees or the specified topiary output directory. The tree is rooted
     using T_event. If this tree is not specified, the midpoint root is used.
-    Trees are read from the directory first, followed by any ete3 trees
+    Trees are read from the directory first, followed by any ete4 trees
     specified as arguments. (This allows the user to override trees from the
     directory if desired). If no trees are passed in, returns None.
 
-    Warning: this will modify input ete3 trees as it works on the trees
+    Warning: this will modify input ete4 trees as it works on the trees
     rather than copies.
 
     Parameters
@@ -211,25 +210,25 @@ def load_trees(directory=None,
         what type of trees to plot from the directory. should be "reconciled"
         or "gene". If None, looks for reconciled trees. If it finds any, these
         prefix = "reconciled"
-    T_clean : ete3.Tree, optional
+    T_clean : ete4.Tree, optional
         clean tree (leaf labels and branch lengths, nothing else). Stored as
         {}-tree.newick in output directories.
-    T_support : ete3.Tree, optional
+    T_support : ete4.Tree, optional
         support tree (leaf labels, branch lengths, supports). Stored as
         {}-tree_supports.newick in output directories.
-    T_anc_label : ete3.Tree, optional
+    T_anc_label : ete4.Tree, optional
         ancestor label tree (leaf labels, branch lengths, internal names)
         Stored as {}-tree_anc-label.newick.
-    T_anc_pp : ete3.Tree, optional
+    T_anc_pp : ete4.Tree, optional
         ancestor posterior probability tree (leaf labels, branch lengths,
         posterior probabilities as supports) Stored as {}-tree_anc-pp.newick.
-    T_event : ete3.Tree, optional
+    T_event : ete4.Tree, optional
         tree with reconciliation events as internal labels (leaf labels,
         branch lengths, event labels). Stored as reconciled-tree_events.newick
 
     Returns
     -------
-    merged_tree : ete3.Tree or None
+    merged_tree : ete4.Tree or None
         rooted tree with features on internal nodes. Return None if no trees
         are passed in.
     """
@@ -250,31 +249,31 @@ def load_trees(directory=None,
 
         if T_clean is None:
             try:
-                T_clean = ete3.Tree(to_path[f"{prefix}-tree.newick"],format=0)
+                T_clean = Tree(to_path[f"{prefix}-tree.newick"],parser=0)
             except KeyError:
                 pass
 
         if T_support is None:
             try:
-                T_support = ete3.Tree(to_path[f"{prefix}-tree_supports.newick"],format=0)
+                T_support = Tree(to_path[f"{prefix}-tree_supports.newick"],parser=0)
             except KeyError:
                 pass
 
         if T_event is None:
             try:
-                T_event = ete3.Tree(to_path[f"{prefix}-tree_events.newick"],format=1)
+                T_event = Tree(to_path[f"{prefix}-tree_events.newick"],parser=1)
             except KeyError:
                 pass
 
         if T_anc_label is None:
             try:
-                T_anc_label = ete3.Tree(to_path[f"{prefix}-tree_anc-label.newick"],format=1)
+                T_anc_label = Tree(to_path[f"{prefix}-tree_anc-label.newick"],parser=1)
             except KeyError:
                 pass
 
         if T_anc_pp is None:
             try:
-                T_anc_pp = ete3.Tree(to_path[f"{prefix}-tree_anc-pp.newick"],format=0)
+                T_anc_pp = Tree(to_path[f"{prefix}-tree_anc-pp.newick"],parser=0)
             except KeyError:
                 pass
 
@@ -289,12 +288,19 @@ def load_trees(directory=None,
         return None
 
     # Make sure all trees have the same descendants
-    ref_leaves = set(list(T_list[0].get_leaf_names()))
+    ref_leaves = set(list(T_list[0].leaf_names()))
     for T in T_list[1:]:
-        test_leaves = set(list(T.get_leaf_names()))
+        test_leaves = set(list(T.leaf_names()))
         if len(set(ref_leaves) - set(test_leaves)) != 0:
             err = "All trees must have the same leaves.\n"
             raise ValueError(err)
+
+    # Strip root node support properties as they cause ETE4 assertion errors during rooting
+    for T in T_list:
+        try:
+            T.root.del_prop("support")
+        except (AttributeError, KeyError):
+            pass
 
     # If we have an event tree, root all trees on that rooted tree
     if prefix == "reconciled":
@@ -306,8 +312,9 @@ def load_trees(directory=None,
 
         # Get left and right descendants of the root node
         root_on = []
-        for n in root_tree.get_tree_root().iter_descendants():
-            leaves = n.get_leaf_names()
+        for n in root_tree.root.descendants():
+            leaves = n.leaf_names()
+            leaves = list(leaves)
             leaves.sort()
             root_on.append(tuple(leaves))
             if len(root_on) == 2:
@@ -315,8 +322,22 @@ def load_trees(directory=None,
 
     # If not a reconciled tree, do midpoint rooting using first tree in list.
     else:
-        root_on = [T_list[0].get_midpoint_outgroup().get_leaf_names()]
-        root_on.append(list(set(T_list[0].get_leaf_names()) - set(root_on[0])))
+        # ete4 midpoint rooting changes tree in place and doesn't return outgroup easily
+        # but we can get it from children if we root it.
+        # We must do this on a COPY because set_midpoint_outgroup resolves multifurcations
+        # permanently, causing topology mismatches down the line.
+        tmp_T = T_list[0].copy()
+        try:
+            tmp_T.root.del_prop("support")
+        except (AttributeError, KeyError):
+            pass
+        tmp_T.set_midpoint_outgroup()
+        
+        root_on = []
+        for n in tmp_T.children:
+            leaves = list(n.leaf_names())
+            leaves.sort()
+            root_on.append(tuple(leaves))
 
     # For each tree...
     for T in T_list:
@@ -327,8 +348,8 @@ def load_trees(directory=None,
 
         # Get MRCA for descendants of left and right from event root
         T.unroot()
-        left = T.get_common_ancestor(root_on[0])
-        right = T.get_common_ancestor(root_on[1])
+        left = T.common_ancestor(root_on[0])
+        right = T.common_ancestor(root_on[1])
 
         # If there is only one descendant on one lineage, left and right
         # will be the exact same node. Set the single descendant, rather
@@ -344,20 +365,30 @@ def load_trees(directory=None,
 
         # Try setting left, then right outgroup.
         try:
-            T.set_outgroup(left)
-        except ete3.coretype.tree.TreeError:
-            T.set_outgroup(right)
+            if not left.is_root:
+                T.set_outgroup(left)
+            elif not right.is_root:
+                T.set_outgroup(right)
+        except (ete.TreeError,AssertionError) as e:
+            print(f"Failed left outgroup for {T}: {e}")
+            try:
+                if not right.is_root:
+                    T.set_outgroup(right)
+                elif not left.is_root:
+                    T.set_outgroup(left)
+            except (ete.TreeError,AssertionError) as e2:
+                print(f"Failed right outgroup for {T}: {e2}")
 
     # Make new tree from first tree in list. This will be our output tree.
     out_tree = T_list[0].copy()
     for n in out_tree.traverse():
 
         # Create empty features
-        if not n.is_leaf():
-            n.add_feature("event",None)
-            n.add_feature("anc_pp",None)
-            n.add_feature("anc_label",None)
-            n.add_feature("bs_support",None)
+        if not n.is_leaf:
+            n.add_prop("event",None)
+            n.add_prop("anc_pp",None)
+            n.add_prop("anc_label",None)
+            n.add_prop("bs_support",None)
 
 
     # features_to_load maps trees with information to copy (keys) to what
@@ -382,6 +413,9 @@ def load_trees(directory=None,
         # identical between trees and uniquely identified by their descendants
         shared, T_alone, out_alone = _map_tree_to_tree(T,out_tree)
         if len(T_alone) > 0 or len(out_alone) > 0:
+            print(f"Topology mismatch during {out_feature}!")
+            print(f"T_alone: {[list(n.leaf_names()) for n in T_alone]}")
+            print(f"out_alone: {[list(n.leaf_names()) for n in out_alone]}")
             err = "Cannot merge trees with different topologies.\n"
             raise ValueError(err)
 
@@ -394,26 +428,25 @@ def load_trees(directory=None,
             out_node = s[1]
 
             # If internal
-            if not out_node.is_leaf():
+            if not out_node.is_leaf:
 
                 # Get value from in
-                try:
-                    value = in_node.__dict__[in_feature]
-                except KeyError:
-                    value = in_node.__dict__[f"_{in_feature}"]
+                value = in_node.get_prop(in_feature)
+                if value is None:
+                    value = in_node.get_prop(f"_{in_feature}")
 
                 # small hack --> anc to a
-                if T is T_anc_label:
+                if T is T_anc_label and value is not None:
                     value = re.sub("anc","a",value)
 
                 # Add value to out
-                out_node.add_feature(out_feature,value)
+                out_node.add_prop(out_feature,value)
 
             # If root node, pull out anc_ if there.
-            if out_node.is_root():
+            if out_node.is_root:
                 if not root_allowed:
                     stash_values[out_feature] = value
-                    out_node.add_feature(out_feature,None)
+                    out_node.add_prop(out_feature,None)
 
 
     # Copy ancestor to correct node because displayed by rooting
@@ -422,12 +455,12 @@ def load_trees(directory=None,
         if stash_values["anc_label"] != "":
 
             for n in out_tree.traverse():
-                if n.is_leaf():
+                if n.is_leaf:
                     continue
 
-                if n.anc_label == "":
-                    n.add_feature("anc_label",stash_values["anc_label"])
-                    n.add_feature("anc_pp",stash_values["anc_pp"])
+                if n.get_prop("anc_label") == "":
+                    n.add_prop("anc_label",stash_values["anc_label"])
+                    n.add_prop("anc_pp",stash_values["anc_pp"])
 
     return out_tree
 
@@ -440,7 +473,7 @@ def write_trees(T,
                 bs_support=True,
                 event=True):
     """
-    Write out an ete3.Tree as a newick format. This function looks for features
+    Write out an ete.Tree as a newick format. This function looks for features
     set by :code:`load_trees` and then writes an individual tree out with each
     feature. The features are :code:`anc_pp`, :code:`anc_label`, :code:`bs_support`,
     and :code:`event`. This will write out trees for any of these features 
@@ -448,8 +481,8 @@ def write_trees(T,
 
     Parameters
     ----------
-    T : ete3.TreeNode
-        ete3 tree with information loaded into appropriate features. This is the
+    T : ete.TreeNode
+        ete tree with information loaded into appropriate features. This is the
         tree returned by :code:`load_trees`. 
     name_dict : dict
         name_dict : dict, optional
@@ -477,9 +510,8 @@ def write_trees(T,
     
     # --------------------------------------------------------------------------
     # Parameter sanity checking
-
-    if not issubclass(type(T),ete3.TreeNode):
-        err = "\nT must be an ete3.Tree instance\n\n"
+    if not isinstance(T,ete.Tree):
+        err = "\nT must be an ete4.Tree instance\n\n"
         raise ValueError(err)
 
     if name_dict is not None:
@@ -521,7 +553,7 @@ def write_trees(T,
     # If name dict is specified
     if name_dict is not None:
         for n in T.traverse():
-            if n.is_leaf():
+            if n.is_leaf:
                 n.name = name_dict[n.name]
 
     # --------------------------------------------------------------------------
@@ -531,53 +563,53 @@ def write_trees(T,
     if bs_support:
         write_bs_supports = False
         for n in T.traverse():
-            if not n.is_leaf():
-                if n.bs_support is not None:
-                    n.support = n.bs_support
+            if not n.is_leaf:
+                if n.get_prop("bs_support") is not None:
+                    n.support = n.get_prop("bs_support")
                     write_bs_supports = True
 
-        # format=2 --> all branches + leaf names + internal supports
+        # parser=2 --> all branches + leaf names + internal supports
         if write_bs_supports:
-            out_trees.append(T.write(format=2))
+            out_trees.append(T.write(parser=2))
 
     # event
     if event:
         write_events = False
         for n in T.traverse():
-            if not n.is_leaf():
-                if n.event is not None:
-                    n.name = n.event
+            if not n.is_leaf:
+                if n.get_prop("event") is not None:
+                    n.name = n.get_prop("event")
                     write_events = True
 
-        # format=3 --> all branches + all names
+        # parser=3 --> all branches + all names
         if write_events:
-            out_trees.append(T.write(format=3))
+            out_trees.append(T.write(parser=3))
 
     # anc_label
     if anc_label:
         write_anc_label = False
         for n in T.traverse():
-            if not n.is_leaf():
-                if n.anc_label is not None:
-                    n.name = n.anc_label
+            if not n.is_leaf:
+                if n.get_prop("anc_label") is not None:
+                    n.name = n.get_prop("anc_label")
                     write_anc_label = True
 
-        # format=3 --> all branches + all names
+        # parser=3 --> all branches + all names
         if write_anc_label:
-            out_trees.append(T.write(format=3))
+            out_trees.append(T.write(parser=3))
 
     # anc_pp
     if anc_pp:
         write_anc_pp = False
         for n in T.traverse():
-            if not n.is_leaf():
-                if n.anc_pp is not None:
-                    n.support = n.anc_pp
+            if not n.is_leaf:
+                if n.get_prop("anc_pp") is not None:
+                    n.support = n.get_prop("anc_pp")
                     write_anc_pp = True
 
-        # format=2 --> all branches + leaf names + internal supports
+        # parser=2 --> all branches + leaf names + internal supports
         if write_anc_pp:
-            out_trees.append(T.write(format=2))
+            out_trees.append(T.write(parser=2))
 
     # --------------------------------------------------------------------------
     # Finalize output

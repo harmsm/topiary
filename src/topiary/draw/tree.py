@@ -202,8 +202,8 @@ def tree(calculation,
             # Make sure node_size, whatever it is, works fine with event
             prop = []
             for n in T.traverse():
-                if not n.is_leaf():
-                    prop.append(n.event)
+                if not n.is_leaf:
+                    prop.append(n.get_prop("event"))
             prop = list(set(prop))
             sm, sm_span = construct_sizemap(node_size,prop)
 

@@ -26,8 +26,8 @@ def create_species_tree_card(supervisor,output_directory):
 
     ott_to_name = dict(zip(supervisor.df.ott,supervisor.df.species))
     for n in species_T.traverse():
-        if n.is_leaf():
-            n.species = ott_to_name[n.name]
+        if n.is_leaf:
+            n.add_prop("species",ott_to_name[n.name])
 
     shutil.copy(supervisor.species_tree,
                 os.path.join(output_directory,"species-tree.newick"))

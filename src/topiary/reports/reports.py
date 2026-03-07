@@ -184,7 +184,7 @@ def tree_report(tree_directory,
     # Load calculation into supervisor
     supervisor = Supervisor(tree_directory)
     
-    # Load trees in as an ete3 tree
+    # Load trees in as an ete4 tree
     T = load_trees(supervisor.output_dir,
                    prefix=supervisor.tree_prefix)
 
@@ -199,21 +199,18 @@ def tree_report(tree_directory,
     anc_dict = {}
     for n in T.traverse():
 
-        if not n.is_leaf():
+        if not n.is_leaf:
 
-            if n.anc_label is not None:
+            if hasattr(n, "anc_label") and n.anc_label is not None:
 
                 anc_name = f"anc{n.anc_label[1:]}"
                 anc_dict[anc_name] = {}
-                
-                for f in n.features:
-                    try:
-                        anc_dict[anc_name][f] = n.__dict__[f]
-                    except KeyError:
-                        anc_dict[anc_name][f] = n.__dict__[f"_{f}"]
+
+                for f in n.props.keys():
+                    anc_dict[anc_name][f] = n.get_prop(f)
 
                 # Get leaves for this ancestor
-                leaves = [l.name for l in n.get_leaves()]
+                leaves = list(n.leaf_names())
                 anc_dict[anc_name]["num_descendants"] = len(leaves)
 
                 # Get dataframe holding descendants of this ancestor

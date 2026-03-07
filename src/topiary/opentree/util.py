@@ -8,7 +8,7 @@ from topiary._private import check
 import opentree
 from opentree import OT, taxonomy_helpers
 import dendropy as dp
-import ete3
+import ete4 as ete
 
 import pandas as pd
 import numpy as np
@@ -229,7 +229,7 @@ def ott_to_species_tree(ott_list=None,species_list=None):
 
     Returns
     -------
-    species_tree : ete3.Tree or None
+    species_tree : ete4.Tree or None
         species tree. None if tree cannot be pulled down.
     results : dict
         dictionary with resolved, missing, not_resolved, and not_monophyletic
@@ -321,9 +321,9 @@ def ott_to_species_tree(ott_list=None,species_list=None):
         label = n.label.split("ott")[-1]
         n.label = f"ott{label}"
 
-    # Convert tree to ete3 tree.
-    final_tree = ete3.Tree(clean_tree.as_string(schema="newick",
-                                                suppress_rooting=True),format=9)
+    # Convert tree to ete tree.
+    final_tree = ete.Tree(clean_tree.as_string(schema="newick",
+                                               suppress_rooting=True),parser=9)
 
     # Arbitrarily resolve any polytomies
     final_tree.resolve_polytomy()
@@ -336,7 +336,7 @@ def ott_to_species_tree(ott_list=None,species_list=None):
         if n.support != 1:
             n.support = 1
 
-        if n.is_leaf():
+        if n.is_leaf:
             ott_seen.append(int(n.name[3:]))
 
     # Not seen in tree
@@ -522,8 +522,8 @@ def tree_to_taxa_order(T,ref_name=None):
 
     Parameters
     ----------
-    T : ete3.Tree
-        ete3.Tree with leaves that have meaningful .name element. (This function
+    T : ete.Tree
+        ete.Tree with leaves that have meaningful .name element. (This function
         does not check, but it really only makes sense if these all have unique
         values).
     ref_name : str, optional
@@ -540,15 +540,15 @@ def tree_to_taxa_order(T,ref_name=None):
     """
 
     if ref_name is None:
-        for n in T.get_leaves():
+        for n in T.leaves():
             ref_name = n.name
             break
 
-    node_list = T.get_leaves_by_name(ref_name)
+    node_list = list(T.search_nodes(name=ref_name))
 
     # No match -- grab a leaf randomly
     if len(node_list) == 0:
-        for n in T.get_leaves():
+        for n in T.leaves():
             node_list.append(n)
             w = f"\nNo leaf with name '{ref_name}'. Arbitrarily using leaf\n"
             w += f"'{n.name}'.\n"
@@ -564,7 +564,7 @@ def tree_to_taxa_order(T,ref_name=None):
         pass
 
     # Get all ancestors of leaf down to base ancestor.
-    for anc in node_list[0].get_ancestors():
+    for anc in node_list[0].ancestors():
         node_list.append(anc)
 
     # Loop through node_list getting descendants until all nodes are leaves
@@ -579,7 +579,7 @@ def tree_to_taxa_order(T,ref_name=None):
 
             # If the node is a leaf, check to see if we've already seen it
             # this pass. If not, append to new_node list
-            if n.is_leaf():
+            if n.is_leaf:
                 try:
                     leaves_seen[n]
                 except KeyError:
@@ -590,20 +590,20 @@ def tree_to_taxa_order(T,ref_name=None):
             # we need to do another pass
             else:
                 complete = False
-                desc = n.get_descendants()
+                desc = list(n.descendants())
 
                 # Decide order based on which descendants are leaves. If both
                 # are leaves, sort by name; if one is a leaf, put that one
                 # first. Otherwise, order is arbitrary
-                if desc[0].is_leaf():
-                    if desc[1].is_leaf():
+                if desc[0].is_leaf:
+                    if desc[1].is_leaf:
                         to_sort = [(desc[0].name,desc[0]),(desc[1].name,desc[1])]
                         to_sort.sort()
                         desc = [to_sort[0][1],to_sort[1][1]]
                     else:
                         desc = [desc[0],desc[1]]
                 else:
-                    if desc[1].is_leaf():
+                    if desc[1].is_leaf:
                         desc = [desc[1],desc[0]]
                     else:
                         pass
@@ -613,7 +613,7 @@ def tree_to_taxa_order(T,ref_name=None):
 
                     # Only a leaf if we haven't already seen it. If we have not
                     # seen it, append to new node list
-                    if d.is_leaf():
+                    if d.is_leaf:
                         try:
                             leaves_seen[d]
                         except KeyError:

@@ -5,7 +5,7 @@ Draw a species tree with tips labeled by species name.
 import topiary
 from .prettytree import PrettyTree
 
-import ete3
+import ete4 as ete
 
 
 def species_tree(species_tree,
@@ -22,8 +22,8 @@ def species_tree(species_tree,
 
     Parameters
     ----------
-    species_tree: ete3.Tree
-        ete3 tree object holding a species tree
+    species_tree: ete4.Tree
+        ete4 tree object holding a species tree
     output_file : str, optional
         output file to write tree. If running in a notebook, will return to
         notebook and write to this file. If running in a notebook but not
@@ -56,8 +56,8 @@ def species_tree(species_tree,
 
     name_dict = {}
     for n in species_tree.traverse():
-        if n.is_leaf():
-            name_dict[n.name] = n.species
+        if n.is_leaf:
+            name_dict[n.name] = n.get_prop("species")
 
     pt = PrettyTree(species_tree,
                     name_dict=name_dict,

@@ -6,7 +6,7 @@ from topiary.opentree.tree import df_to_species_tree
 import numpy as np
 import pandas as pd
 
-import ete3
+import ete4 as ete
 
 def test_df_to_species_tree(test_dataframes,df_with_species_not_resolvable):
 
@@ -16,14 +16,14 @@ def test_df_to_species_tree(test_dataframes,df_with_species_not_resolvable):
 
     # make sure the uid, ott, and species loaded correctly
     T, dropped = df_to_species_tree(df)
-    assert len(T.get_leaves()) == expected_num_leaves
-    tips = [n.ott for n in T.get_leaves()]
+    assert len(list(T.leaves())) == expected_num_leaves
+    tips = [n.get_prop("ott") for n in T.leaves()]
     tips.sort()
     ott_from_df = list(df.loc[:,"ott"])
     ott_from_df.sort()
     assert np.array_equal(tips,ott_from_df)
 
-    tips = [n.species for n in T.get_leaves()]
+    tips = [n.get_prop("species") for n in T.leaves()]
     tips.sort()
     from_df = list(df.loc[:,"species"])
     from_df.sort()
@@ -31,7 +31,7 @@ def test_df_to_species_tree(test_dataframes,df_with_species_not_resolvable):
 
     # uid will be lists of length one since all species are unique in input
     # dataframe
-    tips = [n.uid for n in T.get_leaves()]
+    tips = [n.get_prop("uid") for n in T.leaves()]
     for t in tips:
         assert(len(t)) == 1
     tips = [t[0] for t in tips]
@@ -52,7 +52,7 @@ def test_df_to_species_tree(test_dataframes,df_with_species_not_resolvable):
     T, dropped = df_to_species_tree(df_with_species_not_resolvable)
 
     assert len(dropped) == 1
-    assert len(list(T.get_leaves())) == 357
+    assert len(list(T.leaves())) == 357
 
     with pytest.raises(ValueError):
         T, dropped = df_to_species_tree(df_with_species_not_resolvable,

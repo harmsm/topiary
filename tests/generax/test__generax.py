@@ -7,7 +7,7 @@ from topiary.generax._generax import setup_generax
 from topiary.generax._generax import run_generax
 from topiary.generax._generax import GENERAX_BINARY
 
-import ete3
+import ete4 as ete
 
 import numpy as np
 import pandas as pd
@@ -38,8 +38,8 @@ def test__annotate_species_tree(generax_data,tmpdir):
 
     os.mkdir("test2")
 
-    T = ete3.Tree(species_tree)
-    for n in T.get_leaves():
+    T = ete.Tree(species_tree)
+    for n in T.leaves():
         n.name = "not_ott"
     with pytest.raises(ValueError):
         _annotate_species_tree(df,species_tree=T,out_dir="test2")
@@ -51,7 +51,7 @@ def test__get_link_dict():
 
     df = pd.DataFrame({"ott":["A","B","C","D"],
                        "uid":["0","1","2","3"]})
-    T = ete3.Tree("((0,1),(2,3));")
+    T = ete.Tree("((0,1),(2,3));")
 
     link_dict, uid_in_gene_tree = _get_link_dict(df,T)
     assert np.array_equal(link_dict["A"],["0"])
@@ -67,7 +67,7 @@ def test__get_link_dict():
 
     df = pd.DataFrame({"ott":["A","A","B","B"],
                        "uid":["0","1","2","3"]})
-    T = ete3.Tree("((0,1),(2,3));")
+    T = ete.Tree("((0,1),(2,3));")
 
     link_dict, uid_in_gene_tree = _get_link_dict(df,T)
     A = link_dict["A"]
@@ -84,7 +84,7 @@ def test__get_link_dict():
     # only one
     df = pd.DataFrame({"ott":["A","A","A","A"],
                        "uid":["0","1","2","3"]})
-    T = ete3.Tree("((0,1),(2,3));")
+    T = ete.Tree("((0,1),(2,3));")
 
     link_dict, uid_in_gene_tree = _get_link_dict(df,T)
     A = link_dict["A"]
@@ -99,7 +99,7 @@ def test__get_link_dict():
     # missing uid from tree
     df = pd.DataFrame({"ott":["A","A","B","B"],
                        "uid":["0","1","2","3"]})
-    T = ete3.Tree("((0,1),(2));")
+    T = ete.Tree("((0,1),(2));")
 
     link_dict, uid_in_gene_tree = _get_link_dict(df,T)
     A = link_dict["A"]
@@ -164,8 +164,8 @@ def test_setup_generax(generax_data,tmpdir):
     # make sure species tree has expecetd tips
     st_out = os.path.join(toy_out,"species_tree.newick")
     assert os.path.isfile(st_out)
-    T = ete3.Tree(st_out)
-    leaf_names = set(T.get_leaf_names())
+    T = ete.Tree(st_out)
+    leaf_names = set(T.leaf_names())
     expected = set(["ott276534","ott913930","ott542509","ott271571"])
     assert len(leaf_names - expected) == 0
 
@@ -479,24 +479,24 @@ def test_integrated_run_generax(generax_data,tmpdir):
     # a single duplication, six speciations, and no other evolutionary events
     reconcile_tree = os.path.join(run_directory,"result",
                                   "reconciliations","reconcile_events.newick")
-    T = ete3.Tree(reconcile_tree,format=1)
+    T = ete.Tree(reconcile_tree,parser=1)
 
     events = {}
     for n in T.traverse():
-        if not n.is_leaf():
+        if not n.is_leaf:
             try:
                 events[n.name] += 1
             except KeyError:
                 events[n.name] = 1
 
     # Assert correct topology is inferred
-    assert len(T.get_common_ancestor("humanAxxxx","lemurAxxxx").get_leaves()) == 2
-    assert len(T.get_common_ancestor("humanBxxxx","lemurBxxxx").get_leaves()) == 2
-    assert len(T.get_common_ancestor("mouseAxxxx","ratAxxxxxx").get_leaves()) == 2
-    assert len(T.get_common_ancestor("mouseBxxxx","ratBxxxxxx").get_leaves()) == 2
-    assert len(T.get_common_ancestor("humanAxxxx","lemurAxxxx","mouseAxxxx","ratAxxxxxx").get_leaves()) == 4
-    assert len(T.get_common_ancestor("humanBxxxx","lemurBxxxx","mouseBxxxx","ratBxxxxxx").get_leaves()) == 4
-    assert len(T.get_common_ancestor("humanAxxxx","humanBxxxx").get_leaves()) == 8
+    assert len(list(T.common_ancestor("humanAxxxx","lemurAxxxx").leaf_names())) == 2
+    assert len(list(T.common_ancestor("humanBxxxx","lemurBxxxx").leaf_names())) == 2
+    assert len(list(T.common_ancestor("mouseAxxxx","ratAxxxxxx").leaf_names())) == 2
+    assert len(list(T.common_ancestor("mouseBxxxx","ratBxxxxxx").leaf_names())) == 2
+    assert len(list(T.common_ancestor("humanAxxxx","lemurAxxxx","mouseAxxxx","ratAxxxxxx").leaf_names())) == 4
+    assert len(list(T.common_ancestor("humanBxxxx","lemurBxxxx","mouseBxxxx","ratBxxxxxx").leaf_names())) == 4
+    assert len(list(T.common_ancestor("humanAxxxx","humanBxxxx").leaf_names())) == 8
 
     # Assert correct events inferred
     assert len(events) == 2

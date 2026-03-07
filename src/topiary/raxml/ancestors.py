@@ -14,7 +14,8 @@ from topiary._private import run_cleanly
 
 from topiary.pastml import get_ancestral_gaps
 
-import ete3
+import ete4 as ete
+from ete4 import Tree
 
 import pandas as pd
 import numpy as np
@@ -63,11 +64,11 @@ def _make_ancestor_summary_trees(df,
     """
 
     # Create label trees
-    t_labeled = ete3.Tree(tree_file_with_labels,format=1)
+    t_labeled = Tree(tree_file_with_labels,parser=1)
 
     # Create output trees
-    t_out_label = ete3.Tree(tree_file_with_labels,format=1)
-    t_out_pp = ete3.Tree(tree_file_with_labels,format=1)
+    t_out_label = Tree(tree_file_with_labels,parser=1)
+    t_out_pp = Tree(tree_file_with_labels,parser=1)
 
     # Main iterator (over main labeled tree)
     input_label_iterator = t_labeled.traverse("preorder")
@@ -83,9 +84,15 @@ def _make_ancestor_summary_trees(df,
         pp_node = next(pp_iterator)
         label_node = next(label_iterator)
 
+        # ETE4 requires a dist attribute to write the tree, but RAxML-NG >1.2.0
+        # sometimes omits the dist for the root node.
+        for n in (label_node, pp_node):
+            if not hasattr(n, "dist") or n.dist is None:
+                n.dist = 0.0
+
         # See if this is a leaf and make sure the labeles
-        is_label_leaf = input_label_node.is_leaf()
-        is_pp_leaf = pp_node.is_leaf()
+        is_label_leaf = input_label_node.is_leaf
+        is_pp_leaf = pp_node.is_leaf
 
         # If at least one of the support or label nodes is a leaf...
         if is_label_leaf or is_pp_leaf:
@@ -110,10 +117,17 @@ def _make_ancestor_summary_trees(df,
         anc_name = re.sub("Node","anc",anc)
 
         label_node.name = anc_name
-        pp_node.support = avg_pp_dict[anc_name]
+        
+        # ete4 doesn't allow the root node to have branch properties like support
+        # when rerooting, but ETE4's write function will crash if format_root_node=True 
+        # and support is missing. We assign a dummy support and strip it later.
+        if pp_node.is_root:
+            pp_node.support = 0.0
+        else:
+            pp_node.support = avg_pp_dict[anc_name]
 
-    t_out_pp.write(format=2,format_root_node=True,outfile="tree_anc-pp.newick")
-    t_out_label.write(format=3,format_root_node=True,outfile="tree_anc-label.newick")
+    t_out_pp.write(parser=2,format_root_node=True,outfile="tree_anc-pp.newick")
+    t_out_label.write(parser=3,format_root_node=True,outfile="tree_anc-label.newick")
 
 def _get_bad_columns(phy_file):
     """
@@ -431,7 +445,6 @@ def _parse_raxml_anc_output(df,
 
     os.chdir(cwd)
 
-@run_cleanly
 def generate_ancestors(prev_calculation=None,
                        df=None,
                        model=None,
@@ -465,18 +478,19 @@ def generate_ancestors(prev_calculation=None,
     model : str, optional
         model (i.e. "LG+G8"). Will override model from `prev_calculation`
         if specified.
-    gene_tree : str or ete3.Tree or dendropy.Tree
-        gene_tree. Reconstruct ancestors on this tree. Will override gene_tree
-        from `prev_calculation` if specified. Should be newick with only leaf
-        names and branch lengths. If this an ete3 or dendropy tree, it will be
+    gene_tree : str or ete4.Tree or dendropy.Tree
+        gene_tree file for calculation (goes into input/gene-tree.newick).
+        If this an ete4 or dendropy tree, it will be
+     from `prev_calculation` if specified. Should be newick with only leaf
+        names and branch lengths. If this an ete4 or dendropy tree, it will be
         written out with leaf names and branch lengths; all other data will be
         dropped. NOTE: if reconciled_tree is specified OR is present in the
         prev_calculation, the reconciled tree will take precedence over this
         gene tree.
-    reconciled_tree : str or ete3.Tree or dendropy.Tree
+    reconciled_tree : str or ete4.Tree or dendropy.Tree
         reconciled_tree. Reconstruct ancestors on this tree. Will override
         reconciled_tree from `prev_calculation` if specified. Should be newick
-        with only leaf names and branch lengths. If this an ete3 or dendropy
+        with only leaf names and branch lengths. If this an ete4 or dendropy
         tree, it will be written out with leaf names and branch lengths; all
         other data will be dropped
     alt_cutoff : float, default=0.25

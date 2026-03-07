@@ -61,7 +61,7 @@ def _check_duplication(supervisor,T,p_column):
     ----------
     supervisor : topiary.Supervisor instance
         Supervisor with a calculation loaded
-    T : ete3.Tree
+    T : ete.Tree
         tree with elements loaded
     p_column : str
         column in supervisor dataframe holding paralog calls
@@ -89,8 +89,7 @@ def _check_duplication(supervisor,T,p_column):
     expected_duplications = len(expected_paralogs) - 1
 
     T_dup = T.copy()
-    for leaf in T_dup.get_leaves():
-        leaf.add_feature("num_duplications",0)
+    leaf_dups = {leaf: 0 for leaf in T_dup.leaves()}
 
     excess_duplications = {"ancestor":[],
                            "num_descendants":[]}
@@ -99,16 +98,17 @@ def _check_duplication(supervisor,T,p_column):
     duplication_count = 0
     for current_node in T_dup.traverse(strategy="levelorder"):
         
-        if not current_node.is_leaf():
-            
-            if current_node.__dict__["event"] == "D":
+        if not current_node.is_leaf:
+
+            if current_node.get_prop("event") == "D":
                 duplication_count += 1
-                for leaf in current_node.get_leaves():
-                    leaf.num_duplications += 1
-                
-                if leaf.num_duplications > expected_duplications:
-                    excess_duplications["ancestor"].append(current_node.anc_label)
-                    excess_duplications["num_descendants"].append(len(current_node.get_leaves()))
+                for leaf in current_node.leaves():
+                    leaf_dups[leaf] += 1
+
+                if leaf_dups[leaf] > expected_duplications:
+                    anc_label = current_node.anc_label if hasattr(current_node, "anc_label") else None
+                    excess_duplications["ancestor"].append(anc_label)
+                    excess_duplications["num_descendants"].append(len(list(current_node.leaves())))
     
     df = pd.DataFrame(excess_duplications)
     df = df.sort_values(by="num_descendants",ascending=False)
@@ -123,7 +123,7 @@ def create_duplications_card(supervisor,T,p_column):
     ----------
     supervisor : topiary.Supervisor instance
         supervisor with calculation loaded
-    T : ete3.Tree
+    T : ete.Tree
         tree with events loaded
     p_column : str
         column in supervisor.df that holds the paralogs calls

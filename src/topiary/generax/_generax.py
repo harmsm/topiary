@@ -28,7 +28,7 @@ def _annotate_species_tree(df,species_tree,out_dir):
 
     df : pandas.DataFrame
         topiary dataframe
-    species_tree : str or ete3.Tree or dendropy.tree, optional
+    species_tree : str or ete4.Tree or dendropy.tree, optional
         species_tree to clean up and annotate. if None, pull down from the
         Open Tree of Life database.
     """
@@ -43,25 +43,31 @@ def _annotate_species_tree(df,species_tree,out_dir):
         # Go across tree and set taxon names to ott, supports to 1, and branch
         # lengths to 1.
         for n in T.traverse():
-            if n.is_leaf():
-                n.name = copy.deepcopy(n.ott)
-            if n.dist != 1:
-                n.dist = 1
-            if n.support != 1:
-                n.support = 1
+            if n.is_leaf:
+                n.name = str(n.get_prop("ott"))
+            n.dist = 1.0
+            n.support = 1.0
 
     # Resolve polytomies and make sure all branch lenghts/supports have values
     T.resolve_polytomy()
 
+    # Make sure all nodes have dist and support (including those created by
+    # resolve_polytomy)
+    for n in T.traverse():
+        if n.dist is None:
+            n.dist = 1.0
+        if n.support is None:
+            n.support = 1.0
+
     # Make sure the leaves are formatted correctly
-    for n in T.get_leaves():
+    for n in T.leaves():
         if n.name[:3] != "ott":
             err = "\nspecies tree tips must have ott labels with format ottINTEGER\n\n"
             raise ValueError(err)
 
     # Write out species tree
     species_tree_out = os.path.join(out_dir,"species_tree.newick")
-    T.write(outfile=species_tree_out,format=5)
+    T.write(outfile=species_tree_out,parser=5)
 
 
 def _get_link_dict(df,gene_tree):
@@ -73,7 +79,7 @@ def _get_link_dict(df,gene_tree):
     ----------
     df : pandas.DataFrame
         topiary data frame
-    gene_tree : ete3.Tree
+    gene_tree : ete4.Tree
         gene_tree with uid as taxon names.
 
     Returns
@@ -91,11 +97,10 @@ def _get_link_dict(df,gene_tree):
         ott = df.loc[i,"ott"]
         uid_to_ott[uid] = ott
 
-    # For generating mapping file, record which uid are associated with
     # which ott in gene tree we are using
     uid_in_gene_tree = []
     link_dict = {}
-    for l in gene_tree.get_leaves():
+    for l in gene_tree.leaves():
 
         uid = l.name
         ott = uid_to_ott[uid]
@@ -125,8 +130,8 @@ def setup_generax(df,
     ----------
     df : pandas.DataFrame
         topiary data frame
-    gene_tree : ete3.Tree or dendropy.Tree or str
-        gene_tree with uid as taxon names. can be ete3 tree, dendropy tree, or
+    gene_tree : ete4.Tree or dendropy.Tree or str
+        gene_tree with uid as taxon names. can be ete4 tree, dendropy tree, or
         newick file.
     model : str
         phylogenetic model to use (should match model used to generate gene_tree)
@@ -164,7 +169,7 @@ def setup_generax(df,
     # Load gene tree, arbitrarily resolve polytomies, write out
     gene_tree = topiary.io.read_tree(gene_tree)
     gene_tree.resolve_polytomy()
-    gene_tree.write(outfile=os.path.join(out_dir,"gene_tree.newick"),format=5)
+    gene_tree.write(outfile=os.path.join(out_dir,"gene_tree.newick"),parser=5)
 
     # -------------------------------------------------------------------------
     # mapping_link

@@ -14,7 +14,7 @@ from topiary.raxml import RAXML_BINARY
 from topiary._private import Supervisor
 from topiary._private import mpi
 
-import ete3
+import ete4 as ete
 
 import pandas as pd
 
@@ -420,7 +420,7 @@ def test__build_replicate_dirs(small_phylo,tmpdir):
     trees = []
     with open(os.path.join(input_dir,"bootstrap_replicates","bs-trees.newick")) as f:
         for line in f:
-            T = ete3.Tree(line.strip(),format=0)
+            T = ete.Tree(line.strip(),parser=0)
             trees.append(T)
 
     ref_check = {}
@@ -440,7 +440,7 @@ def test__build_replicate_dirs(small_phylo,tmpdir):
         assert this_check["alignment.phy"] == alignments[i]
 
         # Make sure the gene trees are correctly brought in
-        T = ete3.Tree(this_check["gene_tree.newick"],format=0)
+        T = ete.Tree(this_check["gene_tree.newick"],parser=0)
         assert T.robinson_foulds(trees[i],unrooted_trees=True)[0] == 0
 
         for k in this_check:
@@ -702,15 +702,15 @@ def test_reconcile_bootstrap(small_phylo,tmpdir):
     for f in expected_files:
         assert os.path.isfile(os.path.join(output_dir,f))
 
-    new_T = ete3.Tree(os.path.join(output_dir,"reconciled-tree_supports.newick"),format=0)
-    old_T = ete3.Tree(reconciled_tree)
+    new_T = ete.Tree(os.path.join(output_dir,"reconciled-tree_supports.newick"),parser=0)
+    old_T = ete.Tree(reconciled_tree)
 
     # Topology should *not* have changed
     assert new_T.robinson_foulds(old_T,unrooted_trees=True)[0] == 0
 
     # Make sure it now has supports
     for n in new_T.traverse():
-        if not n.is_leaf():
+        if not n.is_leaf:
             print(n.support)
 
     os.chdir(current_dir)

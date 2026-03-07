@@ -37,7 +37,7 @@ dependencies = [
   "matplotlib",
   "biopython",
   "tqdm",
-  "ete3",
+  "ete4",
   "dendropy",
   "toytree>=3.0",
   "opentree",

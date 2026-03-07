@@ -8,8 +8,6 @@ from topiary.raxml.ancestors import generate_ancestors
 from topiary.raxml import RAXML_BINARY
 from topiary._private.interface import WrappedFunctionException
 
-import ete3
-
 import numpy as np
 
 import os
@@ -137,5 +135,5 @@ def test_generate_ancestors(tiny_phylo,tmpdir):
     kwargs["gene_tree"] = None
     kwargs["reconciled_tree"] = None
 
-    with pytest.raises(WrappedFunctionException):
+    with pytest.raises(ValueError):
         generate_ancestors(**kwargs)

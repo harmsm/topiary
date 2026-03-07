@@ -12,14 +12,14 @@ dependencies:
   - matplotlib
   - biopython
   - tqdm
-  - ete3
   - dendropy
   - toytree
-  #- openmpi  # [not win]
-  #- blast    # [not win]
-  #- muscle   # [not win]
-  #- generax  # [not win]
-  #- raxml-ng # [not win]
-  #- mpi4py   # [not win]
+  - blast>=2.2
+  - muscle>=5.0
+  - generax
+  - raxml-ng
+  - openmpi
+  - mpi4py
   - pip:
     - opentree
+    - ete4

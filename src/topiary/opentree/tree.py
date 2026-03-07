@@ -8,7 +8,7 @@ from .util import ott_to_species_tree
 
 from opentree import taxonomy_helpers
 import dendropy as dp
-import ete3
+import ete4 as ete
 
 import pandas as pd
 import numpy as np
@@ -17,7 +17,7 @@ import copy
 
 def df_to_species_tree(df,strict=False):
     """
-    Return an ete3 cladogram of species in tree. The leaves on the tree will
+    Return an ete cladogram of species in tree. The leaves on the tree will
     have the following features:
 
     + :code:`leaf.name`: ott as string
@@ -35,8 +35,8 @@ def df_to_species_tree(df,strict=False):
 
     Returns
     -------
-    species_tree : ete3.Tree
-        An ete3 tree with branch lengths of 1, supports of 1, and only
+    species_tree : ete4.Tree
+        An ete tree with branch lengths of 1, supports of 1, and only
         tip labels. Note: any polytomies are arbirarily resolved.
     dropped : list
         list of ott corresponding to dropped sequences
@@ -56,7 +56,7 @@ def df_to_species_tree(df,strict=False):
     # dictionary is keyed to different columns. Each of
     # those keys maps to a dictionary mapping ott to a tuple of values in that
     # column that have this ott. These will be attached as features to the
-    # leaf nodes in the final ete3 tree.
+    # leaf nodes in the final ete tree.
     to_get = ["species","ott","uid"]
     ott_to_df_columns = dict([(k,{}) for k in to_get])
     for k in to_get:
@@ -74,7 +74,7 @@ def df_to_species_tree(df,strict=False):
             except KeyError:
                 ott_to_df_columns[k][row.ott] = [row[k]]
 
-        # Convert to tuple for each of these, as ete3 requires features are
+        # Convert to tuple for each of these, as ete requires features are
         # hashable types.
         for o in ott_to_df_columns[k]:
             ott_to_df_columns[k][o] = tuple(ott_to_df_columns[k][o])
@@ -103,17 +103,17 @@ def df_to_species_tree(df,strict=False):
     for n in final_tree.traverse():
 
         # Give leaves species name as a feature
-        if n.is_leaf():
+        if n.is_leaf:
 
             name_key = str(copy.deepcopy(n.name))
 
-            n.add_feature("species",ott_to_df_columns["species"][name_key][0])
-            n.add_feature("ott",ott_to_df_columns["ott"][name_key][0])
-            n.add_feature("uid",ott_to_df_columns["uid"][name_key])
+            n.add_prop("species",ott_to_df_columns["species"][name_key][0])
+            n.add_prop("ott",ott_to_df_columns["ott"][name_key][0])
+            n.add_prop("uid",ott_to_df_columns["uid"][name_key])
 
-            n.name = copy.deepcopy(n.ott)
+            n.name = copy.deepcopy(n.get_prop("ott"))
 
-            ott_seen.append(n.ott)
+            ott_seen.append(n.get_prop("ott"))
 
     missing = results["not_resolved"]
     if len(missing) > 0:

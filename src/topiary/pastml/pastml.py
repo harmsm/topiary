@@ -6,10 +6,11 @@ available at https://github.com/evolbioinfo/pastml. When citing topiary, please
 cite the original pastml paper: https://doi.org/10.1093/molbev/msz131. 
 """
 
-import ete3
+import ete4 as ete
 
 import numpy as np
 import pandas as pd
+import topiary
 
 def _get_most_common_states(state_arrays):
     """
@@ -76,50 +77,55 @@ def get_ancestral_gaps(alignment_file,tree_file,prediction_method="DOWNPASS"):
         raise ValueError(f"Only prediction_method='DOWNPASS' is supported natively. Got {prediction_method}.")
 
     # Load the tree, keeping the internal node names
-    tree = ete3.Tree(tree_file,format=1)
+    print(f"DEBUG: Reading tree from {tree_file}")
+    with open(tree_file, "r") as f:
+        print(f"DEBUG: Newick start: {f.read(200)}")
+    tree = topiary.io.read_tree(tree_file)
+    print("DEBUG: Successfully read tree.")
+    
 
     # 1. Initialize states for each node
     # state array: shape (num_sites, 2), where [:, 0] is False state, [:, 1] is True state
     leaf_name_to_index = {name: i for i, name in enumerate(leaf_names)}
     
     for node in tree.traverse():
-        if node.is_leaf():
+        if node.is_leaf:
             idx = leaf_name_to_index[node.name]
-            node.ps_orig = np.zeros((num_sites, 2), dtype=np.bool_)
-            node.ps_orig[:, 0] = ~char_matrix[idx, :]
-            node.ps_orig[:, 1] = char_matrix[idx, :]
+            node.add_prop("ps_orig", np.zeros((num_sites, 2), dtype=np.bool_))
+            node.get_prop("ps_orig")[:, 0] = ~char_matrix[idx, :]
+            node.get_prop("ps_orig")[:, 1] = char_matrix[idx, :]
         else:
-            node.ps_orig = np.ones((num_sites, 2), dtype=np.bool_)
+            node.add_prop("ps_orig", np.ones((num_sites, 2), dtype=np.bool_))
         
-        node.ps_bu = np.copy(node.ps_orig)
-        node.ps_preset = np.copy(node.ps_orig)
+        node.add_prop("ps_bu", np.copy(node.get_prop("ps_orig")))
+        node.add_prop("ps_preset", np.copy(node.get_prop("ps_orig")))
 
     # 2. UPPASS
     for node in tree.traverse('postorder'):
-        if not node.is_leaf():
-            children_states = _get_most_common_states([child.ps_bu for child in node.children])
-            state_intersection = node.ps_bu & children_states
+        if not node.is_leaf:
+            children_states = _get_most_common_states([child.get_prop("ps_bu") for child in node.children])
+            state_intersection = node.get_prop("ps_bu") & children_states
             has_intersection = state_intersection.any(axis=1, keepdims=True)
-            node.ps_bu = np.where(has_intersection, state_intersection, node.ps_bu)
+            node.add_prop("ps_bu", np.where(has_intersection, state_intersection, node.get_prop("ps_bu")))
 
     # 3. DOWNPASS
     for node in tree.traverse('preorder'):
-        if node.is_root():
-            node.ps_up = np.ones((num_sites, 2), dtype=np.bool_)
+        if node.is_root:
+            node.add_prop("ps_up", np.ones((num_sites, 2), dtype=np.bool_))
         else:
-            state_arrays = [node.up.ps_up] + [sibling.ps_bu for sibling in node.up.children if sibling != node]
-            node.ps_up = _get_most_common_states(state_arrays)
+            state_arrays = [node.up.get_prop("ps_up")] + [sibling.get_prop("ps_bu") for sibling in node.up.children if sibling != node]
+            node.add_prop("ps_up", _get_most_common_states(state_arrays))
             
-        if not node.is_leaf():
-            state_arrays = [node.ps_up] + [child.ps_bu for child in node.children]
+        if not node.is_leaf:
+            state_arrays = [node.get_prop("ps_up")] + [child.get_prop("ps_bu") for child in node.children]
             down_up_states = _get_most_common_states(state_arrays)
         else:
-            down_up_states = node.ps_up
+            down_up_states = node.get_prop("ps_up")
             
-        preset_states = node.ps_preset
+        preset_states = node.get_prop("ps_preset")
         state_intersection = down_up_states & preset_states
         has_intersection = state_intersection.any(axis=1, keepdims=True)
-        node.ps_final = np.where(has_intersection, state_intersection, preset_states)
+        node.add_prop("ps_final", np.where(has_intersection, state_intersection, preset_states))
 
     # 4. Extract results
     gap_anc_dict = {}
@@ -128,7 +134,7 @@ def get_ancestral_gaps(alignment_file,tree_file,prediction_method="DOWNPASS"):
             continue
 
         # Convert state array back to list of True, False, None
-        final_state = node.ps_final
+        final_state = node.get_prop("ps_final")
         
         is_false = final_state[:, 0] & ~final_state[:, 1]
         is_true = ~final_state[:, 0] & final_state[:, 1]

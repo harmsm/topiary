@@ -17,7 +17,7 @@ from topiary.generax._generax import setup_generax
 from topiary.generax._generax import run_generax
 from topiary.generax._generax import GENERAX_BINARY
 
-import ete3
+import ete4 as ete
 
 from tqdm.auto import tqdm
 
@@ -378,7 +378,7 @@ def _build_replicate_dirs(df,
     trees = []
     with open(tree_files) as f:
         for line in f:
-            trees.append(ete3.Tree(line.strip()))
+            trees.append(ete.Tree(line.strip()))
 
     # Sanity check on number of trees vs number of alignments
     if len(trees) != len(alignment_files):
@@ -609,17 +609,17 @@ def reconcile_bootstrap(df,
     model : str, optional
         model (i.e. "LG+G8"). Will override model from `prev_calculation`
         if specified.
-    gene_tree : str, ete3.Tree, dendropy.tree, optional
+    gene_tree : str, ete4.Tree, dendropy.tree, optional
         gene tree file for calculation. Will override tree in `prev_calculation`.
-        If this an ete3 or dendropy tree, it will be written out with leaf
+        If this an ete4 or dendropy tree, it will be written out with leaf
         names and branch lengths; all other data will be dropped.
-    species_tree : str, ete3.Tree, dendropy.tree, optional
+    species_tree : str, ete4.Tree, dendropy.tree, optional
         species tree file for calculation. Will override tree in `prev_calculation`.
-        If this an ete3 or dendropy tree, it will be written out with leaf
+        If this an ete4 or dendropy tree, it will be written out with leaf
         names; all other data will be dropped.
-    reconciled_tree : str, ete3.Tree, dendropy.tree, optional
+    reconciled_tree : str, ete4.Tree, dendropy.tree, optional
         reconciled tree file for calculation. Will override tree in `prev_calculation`.
-        If this an ete3 or dendropy tree, it will be written out with leaf
+        If this an ete4 or dendropy tree, it will be written out with leaf
         names; all other data will be dropped.
     allow_horizontal_transfer : bool, default=True
         whether to allow horizontal transfer during reconciliation. If True, use

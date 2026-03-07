@@ -7,7 +7,7 @@ import topiary
 from topiary.quality import score_alignment
 from topiary._private import check
 
-import ete3
+import ete4 as ete
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ def _prep_species_tree(df,paralog_column):
     df : pandas.DataFrame
         dataframe with organisms who cannot be placed on the current synthetic
         tree set to keep = False
-    annotated_species_tree : ete3.Tree
+    annotated_species_tree : ete.Tree
     """
 
     if paralog_column not in df.columns:
@@ -55,13 +55,14 @@ def _prep_species_tree(df,paralog_column):
     bad_mask = np.logical_not(pd.isnull(df[paralog_column]))
     all_paralogs = list(set(df.loc[bad_mask,paralog_column]))
     paralogs_seen = dict([(p,[]) for p in all_paralogs])
-    for leaf in species_tree.get_leaves():
-        leaf.paralogs = copy.deepcopy(paralogs_seen)
+    for leaf in species_tree.leaves():
+        leaf.add_prop("paralogs",copy.deepcopy(paralogs_seen))
 
-        this_df = df.loc[df.loc[:,"uid"].isin(leaf.uid),:]
+        this_uid = leaf.get_prop("uid")
+        this_df = df.loc[df.loc[:,"uid"].isin(this_uid),:]
         for i in range(len(this_df)):
             idx = this_df.index[i]
-            leaf.paralogs[this_df.loc[idx,paralog_column]].append(this_df.loc[idx,"uid"])
+            leaf.get_prop("paralogs")[this_df.loc[idx,paralog_column]].append(this_df.loc[idx,"uid"])
 
     return df, species_tree
 
@@ -72,7 +73,7 @@ def _even_paralog_budgeting(T,overall_budget):
 
     Parameters
     ----------
-    T : ete3.Tree
+    T : ete.Tree
         tree with leaves that have the `paralogs` dictionary holding lists of
         uid with paralog names as keys. Assumes all branch lengths are identical.
     overall_budget : int
@@ -86,14 +87,14 @@ def _even_paralog_budgeting(T,overall_budget):
 
     # Get all unique paralogs in the tree
     paralogs = []
-    for leaf in T.get_leaves():
-        paralogs.extend(list(leaf.paralogs.keys()))
+    for leaf in T.leaves():
+        paralogs.extend(list(leaf.get_prop("paralogs").keys()))
     paralogs = list(set(paralogs))
 
     paralog_counts = dict([(p,0) for p in paralogs])
-    for leaf in T.get_leaves():
+    for leaf in T.leaves():
         for p in paralogs:
-            paralog_counts[p] += len(leaf.paralogs[p])
+            paralog_counts[p] += len(leaf.get_prop("paralogs")[p])
 
     paralog_budget = {}
     fx = 1.0/(len(paralogs))
@@ -117,7 +118,7 @@ def _weighted_paralog_budgeting(T,overall_budget):
 
     Parameters
     ----------
-    T : ete3.Tree
+    T : ete.Tree
         tree with leaves that have the `paralogs` dictionary holding lists of
         uid with paralog names as keys. Assumes all branch lengths are identical.
     overall_budget : int
@@ -146,20 +147,27 @@ def _weighted_paralog_budgeting(T,overall_budget):
 
     # Get all unique paralogs in the tree
     paralogs = []
-    for leaf in T.get_leaves():
-        paralogs.extend(list(leaf.paralogs.keys()))
+    for leaf in T.leaves():
+        paralogs.extend(list(leaf.get_prop("paralogs").keys()))
     paralogs = list(set(paralogs))
 
     # Figure out a weighted total for each paralog.
     paralog_counts = dict([(p,0) for p in paralogs])
     paralog_weights = dict([(p,0) for p in paralogs])
-    anc = T.get_common_ancestor(T.get_leaves())
-    for leaf in T.get_leaves():
-        distance = leaf.get_distance(anc)
+
+    # Make sure all nodes have distances. Function assumes all branch lengths
+    # are identical.
+    for node in T.traverse():
+        if node.dist is None:
+            node.dist = 1.0
+
+    anc = T.common_ancestor(*T.leaves())
+    for leaf in T.leaves():
+        distance = T.get_distance(leaf,anc)
         weight = np.power(0.5,distance)
 
         for p in paralogs:
-            num_p = len(leaf.paralogs[p])
+            num_p = len(leaf.get_prop("paralogs")[p])
             paralog_counts[p] += num_p
             paralog_weights[p] += num_p*weight
 
@@ -242,14 +250,14 @@ def _get_sequence_budgets(T,total_budget):
 
     Parameters
     ----------
-    T : ete3.Tree
+    T : ete.Tree
         tree with `sequences` list associated with each node.
     total_budget : int
         total number of sequences to budget over the whole tree
 
     Returns
     -------
-    T : ete3.Tree
+    T : ete.Tree
         input tree updated with .budget and .num_seq attributes
     """
 
@@ -265,11 +273,11 @@ def _get_sequence_budgets(T,total_budget):
             # This is the root. Record the total budget available and continue
             if num_sister_clades == 0:
 
-                current_node.num_seq = sum([len(l.sequences) for l in current_node.get_leaves()])
+                current_node.add_prop("num_seq",sum([len(l.get_prop("sequences")) for l in current_node.leaves()]))
 
-                if total_budget > current_node.num_seq:
-                    total_budget = current_node.num_seq
-                current_node.budget = total_budget
+                if total_budget > current_node.get_prop("num_seq"):
+                    total_budget = current_node.get_prop("num_seq")
+                current_node.add_prop("budget",total_budget)
 
                 continue
             else:
@@ -277,32 +285,32 @@ def _get_sequence_budgets(T,total_budget):
                 raise ValueError(err)
 
         # If we've already visited this split, don't do anything
-        if hasattr(current_node,"budget") and hasattr(sister_node,"budget"):
+        if "budget" in current_node.props and "budget" in sister_node.props:
             continue
 
         # Get available budget from parent of current split
-        parent_node = T.get_common_ancestor(current_node,sister_node)
-        avail_budget = parent_node.budget
+        parent_node = T.common_ancestor(current_node,sister_node)
+        avail_budget = parent_node.get_prop("budget")
 
         # Get the number of sequences down the current and sister splits
-        current_seq = sum([len(l.sequences) for l in current_node.get_leaves()])
-        current_node.num_seq = current_seq
+        current_seq = sum([len(l.get_prop("sequences")) for l in current_node.leaves()])
+        current_node.add_prop("num_seq",current_seq)
 
-        sister_seq = sum([len(l.sequences) for l in sister_node.get_leaves()])
-        sister_node.num_seq = sister_seq
+        sister_seq = sum([len(l.get_prop("sequences")) for l in sister_node.leaves()])
+        sister_node.add_prop("num_seq",sister_seq)
 
         # Only one sequence in the budget. Only assign if there is only one sequence
         # left. Otherwise, set to 0.
         if avail_budget == 1:
             if current_seq == 1 and sister_seq == 0:
-                current_node.budget = 1
-                sister_node.budget = 0
+                current_node.add_prop("budget",1)
+                sister_node.add_prop("budget",0)
             elif current_seq == 0 and sister_seq == 1:
-                current_node.budget = 0
-                sister_node.budget = 1
+                current_node.add_prop("budget",0)
+                sister_node.add_prop("budget",1)
             else:
-                current_node.budget = 0
-                sister_node.budget = 0
+                current_node.add_prop("budget",0)
+                sister_node.add_prop("budget",0)
 
         # Try to partition the budget
         else:
@@ -345,8 +353,8 @@ def _get_sequence_budgets(T,total_budget):
                         sister_budget += remainder
 
             # Assign the allocated budgets to the node
-            current_node.budget = current_budget
-            sister_node.budget = sister_budget
+            current_node.add_prop("budget",current_budget)
+            sister_node.add_prop("budget",sister_budget)
 
     return T
 
@@ -358,14 +366,14 @@ def _even_merge_blocks(T,merge_block_size):
 
     Parameters
     ----------
-    T : ete3.Tree
+    T : ete.Tree
         tree with budgets and num_seq annotated on all nodes
 
     Returns
     -------
     merge_blocks : list
         list of blocks to merge with the following form
-        [(len(list_of_uid_to_merge),list_of_uid_to_merge,ete3_node_from_merge),
+        [(len(list_of_uid_to_merge),list_of_uid_to_merge,ete_node_from_merge),
          ...]
     """
 
@@ -381,13 +389,13 @@ def _even_merge_blocks(T,merge_block_size):
         # Root
         if num_sister_clades == 0:
 
-            current_node.in_block = False
+            current_node.add_prop("in_block",False)
 
             # Set root to not in_block to start
-            if current_node.num_seq <= merge_block_size:
-                uid = [leaf.sequences for leaf in current_node.get_leaves()]
+            if current_node.get_prop("num_seq") <= merge_block_size:
+                uid = [leaf.get_prop("sequences") for leaf in current_node.leaves()]
                 uid_blocks.append((uid,current_node))
-                current_node.in_block = True
+                current_node.add_prop("in_block",True)
 
             continue
 
@@ -400,38 +408,38 @@ def _even_merge_blocks(T,merge_block_size):
             raise ValueError(err)
 
         # If we've already visited this split, don't do anything
-        if hasattr(current_node,"in_block") and hasattr(sister_node,"in_block"):
+        if "in_block" in current_node.props and "in_block" in sister_node.props:
             continue
 
         # Get whether we are already in a merge block from the parent
-        parent_node = T.get_common_ancestor(current_node,sister_node)
-        in_block = parent_node.in_block
+        parent_node = T.common_ancestor(current_node,sister_node)
+        in_block = parent_node.get_prop("in_block")
 
         # If we're already in a block, record this
         if in_block:
-            current_node.in_block = True
-            sister_node.in_block = True
+            current_node.add_prop("in_block",True)
+            sister_node.add_prop("in_block",True)
             continue
         else:
-            current_node.in_block = False
-            sister_node.in_block = False
+            current_node.add_prop("in_block",False)
+            sister_node.add_prop("in_block",False)
 
         # If the number of descendants of current node is <= merge block size,
         # merge it.
-        if not current_node.in_block:
-            if current_node.num_seq <= merge_block_size or current_node.is_leaf():
-                uid = [leaf.sequences for leaf in current_node.get_leaves()]
+        if not current_node.get_prop("in_block"):
+            if current_node.get_prop("num_seq") <= merge_block_size or current_node.is_leaf:
+                uid = [leaf.get_prop("sequences") for leaf in current_node.leaves()]
                 uid_blocks.append((uid,current_node))
-                current_node.in_block = True
+                current_node.add_prop("in_block",True)
 
 
         # If the number of descendants of sister node is <= merge block size,
         # merge it.
-        if not sister_node.in_block:
-            if sister_node.num_seq <= merge_block_size or sister_node.is_leaf():
-                uid = [leaf.sequences for leaf in sister_node.get_leaves()]
+        if not sister_node.get_prop("in_block"):
+            if sister_node.get_prop("num_seq") <= merge_block_size or sister_node.is_leaf:
+                uid = [leaf.get_prop("sequences") for leaf in sister_node.leaves()]
                 uid_blocks.append((uid,sister_node))
-                sister_node.in_block = True
+                sister_node.add_prop("in_block",True)
 
     # Assemble final blocks from sub blocks
     final_uid_blocks = []
@@ -453,14 +461,14 @@ def _taxonomic_merge_blocks(T):
 
     Parameters
     ----------
-    T : ete3.Tree
+    T : ete.Tree
         tree with budgets and num_seq annotated on all nodes
 
     Returns
     -------
     merge_blocks : list
         list of blocks to merge with the following form
-        [(budget_for_merge,list_of_uid_to_merge,ete3_node_from_merge),
+        [(budget_for_merge,list_of_uid_to_merge,ete_node_from_merge),
          ...]
     """
 
@@ -468,52 +476,52 @@ def _taxonomic_merge_blocks(T):
     T = T.copy()
 
     merge_blocks = []
-    for counter, leaf in enumerate(T.get_leaves()):
+    for counter, leaf in enumerate(T.leaves()):
 
         # Already placed into a merge block
-        if leaf.budget == -1:
+        if leaf.get_prop("budget") == -1:
             continue
 
         # If we have enough budget to take every sequence on this leaf...
-        if leaf.num_seq <= leaf.budget:
+        if leaf.get_prop("num_seq") <= leaf.get_prop("budget"):
 
             # No sequences -- don't do anything
-            if leaf.num_seq == 0:
+            if leaf.get_prop("num_seq") == 0:
                 continue
 
             # Record that we want to keep all sequences on this leaf. Put into
             # a merge block that that has the same number of output sequences
             # as we ask to merge.
-            merge_uid = list(leaf.sequences)
+            merge_uid = list(leaf.get_prop("sequences"))
             merge_blocks.append((len(merge_uid),merge_uid,leaf))
-            leaf.budget = -1
+            leaf.add_prop("budget",-1)
 
         # We're taking a subset of the sequences on this leaf
         else:
 
             # if the budget is greater than zero, merge the sequences on this
             # leaf into a block of size leaf.buddet
-            if leaf.budget > 0:
-                merge_uid = list(leaf.sequences)
-                merge_blocks.append((leaf.budget,merge_uid,leaf))
-                leaf.budget = -1
+            if leaf.get_prop("budget") > 0:
+                merge_uid = list(leaf.get_prop("sequences"))
+                merge_blocks.append((leaf.get_prop("budget"),merge_uid,leaf))
+                leaf.add_prop("budget",-1)
 
             # If the budget is zero, we need to go down the tree to find
             # a group of leaves to merge
             else:
 
-                for anc in leaf.get_ancestors():
+                for anc in leaf.ancestors():
 
                     # If we hit an ancestor with a non-zero budget, merge all of
                     # its descendants.
-                    if anc.budget > 0:
+                    if anc.get_prop("budget") > 0:
 
-                        budget = anc.budget
+                        budget = anc.get_prop("budget")
                         merge_uid = []
 
                         # Go through the leaves that descend from this ancestor
-                        for m in anc.get_leaves():
-                            if m.budget == -1:
+                        for m in anc.leaves():
+                            if m.get_prop("budget") == -1:
                                 err = "We hit a descendant leaf of that\n"
                                 err += "has already been placed into a merge. This\n"
                                 err += "should not be possible for a monophyletic\n"
@@ -522,8 +530,8 @@ def _taxonomic_merge_blocks(T):
 
                             # Get uid to merge and set budget of this leaf to
                             # -1 -- now merged
-                            merge_uid.extend(m.sequences)
-                            m.budget = -1
+                            merge_uid.extend(m.get_prop("sequences"))
+                            m.add_prop("budget",-1)
 
                         merge_blocks.append((budget,merge_uid,anc))
 
@@ -571,7 +579,7 @@ def get_merge_blocks(df,
     merge_blocks : dict
         dictionary keyed to paralog names taken from paralog_column. Values are
         lists of blocks to merge with the following form
-        [(budget_for_merge,list_of_uid_to_merge,ete3_leaf_this_came_from),...]
+        [(budget_for_merge,list_of_uid_to_merge,ete_leaf_this_came_from),...]
     """
 
     # --------------------------------------------------------------------------
@@ -626,9 +634,9 @@ def get_merge_blocks(df,
 
         # Create a tree that has only paralog p in it
         T = species_tree.copy()
-        for leaf in T.get_leaves():
-            leaf.sequences = tuple(leaf.paralogs[p])
-            leaf.name = f"{leaf.name} ({len(leaf.sequences)})"
+        for leaf in T.leaves():
+            leaf.add_prop("sequences",tuple(leaf.get_prop("paralogs")[p]))
+            leaf.name = f"{leaf.name} ({len(leaf.get_prop("sequences"))})"
 
         # Figure out how to distribute the total budget across the tree
         T = _get_sequence_budgets(T,paralog_budget[p])

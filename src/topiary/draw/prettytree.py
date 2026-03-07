@@ -6,9 +6,10 @@ import topiary
 from topiary.draw.core import construct_colormap
 from topiary.draw.core import construct_sizemap
 from topiary.draw.core import get_round_to
-from topiary.draw.core import ete3_to_toytree
+from topiary.draw.core import ete4_to_toytree
 from topiary.draw.core import parse_position_string
 from topiary.draw.core import color_to_css
+import ete4 as ete
 import topiary._private.check as check
 
 import toytree
@@ -29,7 +30,7 @@ class PrettyTree:
 
     Parameters
     ----------
-    T : ete3.Tree or dp.Tree or toytree.tree or newick
+    T : ete4.Tree or dp.Tree or toytree.tree or newick
         tree to draw. We *strongly* recommend this tree have uid as its
         tip labels to avoid mangled trees. If you want to assign prettier
         names to the tips, pass in name_dict.
@@ -87,12 +88,14 @@ class PrettyTree:
         # ----------------------------------------------------------------------
         # Load tree and give pretty tip names
 
-        # Convert tree into a toytree tree from ete3,
-        if issubclass(type(T),toytree.ToyTree):
+        # Convert tree into a toytree tree from ete4,
+        if isinstance(T,toytree.ToyTree):
             self._tT = T.copy()
+        elif isinstance(T,ete.Tree):
+            self._tT = ete4_to_toytree(T)
         else:
             # Convert to a toytree
-            self._tT = ete3_to_toytree(topiary.io.read_tree(T))
+            self._tT = ete4_to_toytree(topiary.io.read_tree(T))
 
         # Rename tree.name entries according to name_dict
         if name_dict is not None:
@@ -390,10 +393,9 @@ class PrettyTree:
                         prop.append(None)
                         continue
 
-                    try:
-                        prop.append(self._tT.idx_dict[i].__dict__[f"_{p_label}"])
-                    except KeyError:
-                        prop.append(self._tT.idx_dict[i].__dict__[f"{p_label}"])
+                    # Try to get feature
+                    value = self._tT.idx_dict[i].get_prop(p_label)
+                    prop.append(value)
 
                 all_props[p_label] = np.array(prop)
 

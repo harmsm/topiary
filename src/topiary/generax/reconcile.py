@@ -52,17 +52,17 @@ def reconcile(prev_calculation=None,
     model : str, optional
         model (i.e. "LG+G8"). Will override model from `prev_calculation`
         if specified.
-    gene_tree : str, ete3.Tree, dendropy.tree, optional
+    gene_tree : str, ete4.Tree, dendropy.tree, optional
         gene tree file for calculation. Will override tree in `prev_calculation`.
-        If this an ete3 or dendropy tree, it will be written out with leaf
+        If this an ete4 or dendropy tree, it will be written out with leaf
         names and branch lengths; all other data will be dropped.
-    species_tree : str, ete3.Tree, dendropy.tree, optional
+    species_tree : str, ete4.Tree, dendropy.tree, optional
         species tree file for calculation. Will override tree in `prev_calculation`.
-        If this an ete3 or dendropy tree, it will be written out with leaf
+        If this an ete4 or dendropy tree, it will be written out with leaf
         names; all other data will be dropped.
-    reconciled_tree : str, ete3.Tree, dendropy.tree, optional
+    reconciled_tree : str, ete4.Tree, dendropy.tree, optional
         reconciled tree file for calculation. Will override tree in `prev_calculation`.
-        If this an ete3 or dendropy tree, it will be written out with leaf
+        If this an ete4 or dendropy tree, it will be written out with leaf
         names; all other data will be dropped. NOTE: this is required if
         bootstrap = True.
     allow_horizontal_transfer : bool, optional
@@ -163,7 +163,7 @@ def reconcile(prev_calculation=None,
     if supervisor.species_tree is None:
         species_tree, dropped = topiary.df_to_species_tree(supervisor.df)
         species_tree_out = os.path.join(supervisor.input_dir,"species-tree.newick")
-        species_tree.write(outfile=species_tree_out,format=5)
+        species_tree.write(outfile=species_tree_out,parser=5)
         supervisor.update("species_tree",species_tree_out)
 
     allow_ht = supervisor.run_parameters["allow_horizontal_transfer"]

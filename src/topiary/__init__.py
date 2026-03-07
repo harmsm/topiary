@@ -1,6 +1,6 @@
 """
 A python framework for doing ancestral sequence reconstruction using
-pandas dataframes and ete3 trees as the primary data structures.
+pandas dataframes and ete4 trees as the primary data structures.
 """
 __author__ = "Michael J. Harms"
 

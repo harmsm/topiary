@@ -41,11 +41,11 @@ def generate_bootstraps(prev_calculation=None,
     model : str, optional
         model (i.e. "LG+G8"). Will override model from `prev_calculation`
         if specified.
-    gene_tree : str or ete3.Tree or dendropy.Tree
-        gene_tree. Used as starting point for calculation. Will override tree
-        from `prev_calculation` if specified. Should be newick with only leaf names
-        and branch lengths. If this an ete3 or dendropy tree, it will be written
-        out with leaf names and branch lengths; all other data will be dropped
+    gene_tree : str or ete4.Tree or dendropy.Tree
+        gene_tree file for calculation (goes into input/gene-tree.newick).
+        If this an ete4 or dendropy tree, it will be written
+        out with leaf names and branch lengths; all other data will be dropped.
+        Will override tree from `prev_calculation` if specified.
     calc_dir : str, default="ml_bootstrap"
         directory in which to do calculation.
     overwrite : bool, default=False

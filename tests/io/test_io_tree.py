@@ -43,7 +43,7 @@ def test_write_trees(small_phylo,tmpdir):
     split_trees = newick.split(";")[:-1]
     assert len(split_trees) == 3
     
-    expected = ["100","a10","0.997959"]
+    expected = ["100","a10","1"]
     for i in range(3):
         last_value = split_trees[i].split(")")[-2].split(":")[0]
         assert last_value == expected[i]
@@ -123,7 +123,7 @@ def test_write_trees(small_phylo,tmpdir):
     # Build simple name_dict
     name_dict = {}
     for n in T.traverse():
-        if n.is_leaf():
+        if n.is_leaf:
             name_dict[n.name] = re.sub("x","Y",n.name)
     
     # Make sure replacement happened

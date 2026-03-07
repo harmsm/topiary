@@ -38,10 +38,9 @@ def generate_ml_tree(prev_calculation=None,
     model : str, optional
         model (i.e. "LG+G8"). Will override model from `prev_calculation`
         if specified.
-    gene_tree : str or ete3.Tree or dendropy.Tree
-        gene_tree. Used as starting point for calculation. Will override tree
-        from `prev_calculation` if specified. Should be newick with only leaf names
-        and branch lengths. If this an ete3 or dendropy tree, it will be written
+    gene_tree : str or ete4.Tree or dendropy.Tree
+        gene_tree file for calculation (goes into input/gene-tree.newick).
+        If this an ete4 or dendorpy tree, it will be written
         out with leaf names and branch lengths; all other data will be dropped
     calc_dir : str, default="ml_tree"
         calculation directory. Will be created.

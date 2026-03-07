@@ -3,7 +3,7 @@ import pytest
 
 import topiary
 import topiary.draw.prettytree as prettytree
-import ete3
+import ete4 as ete
 
 import toytree
 import numpy as np
@@ -16,9 +16,9 @@ def test_PrettyTree():
     pt = prettytree.PrettyTree(T=tree)
     assert pt.tT.ntips == 7
 
-    # read as ete3 tree
+    # read as ete tree
     tree = "(((A:1.0,B:4.0)AB:1.0,((C:1.0,D:1.0)CD:1.0,E:1.0)CDE:1.0)ABCDE:1.0,(F:1.0,G:1.0)FG)ABCDEFG;"
-    T = ete3.Tree(tree,format=1)
+    T = ete.Tree(tree,parser=1)
     pt = prettytree.PrettyTree(T=tree)
     assert pt.tT.ntips == 7
 

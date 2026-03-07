@@ -215,17 +215,17 @@ class Supervisor:
         df : pandas.DataFrame or str, optional
             dataframe to use for calculation (goes into input/dataframe.csv).
             Overwrites whatever came from previous directory.
-        gene_tree : str, ete3.Tree, dendropy.tree, optional
+        gene_tree : str, ete4.Tree, dendropy.tree, optional
             gene_tree file for calculation (goes into input/gene-tree.newick).
-            If this an ete3 or dendropy tree, it will be written out with leaf
+            If this an ete4 or dendropy tree, it will be written out with leaf
             names and branch lengths; all other data will be dropped.
-        species_tree : str, ete3.Tree, dendropy.tree, optional
+        species_tree : str, ete4.Tree, dendropy.tree, optional
             species_tree file for calculation (goes into input/species-tree.newick).
-            If this an ete3 or dendropy tree, it will be written out with leaf
+            If this an ete4 or dendropy tree, it will be written out with leaf
             names; all other data will be dropped.
-        reconciled_tree : str, ete3.Tree, dendropy.tree, optional
+        reconciled_tree : str, ete4.Tree, dendropy.tree, optional
             species_tree file for calculation (goes into input/reconciled-tree.newick).
-            If this an ete3 or dendropy tree, it will be written out with leaf
+            If this an ete4 or dendropy tree, it will be written out with leaf
             names; all other data will be dropped.
         model : str, optional
             phylogenetic model recognized by raxml and generax
@@ -311,7 +311,7 @@ class Supervisor:
                 if os.path.isfile(str(tree)):
                     shutil.copy(tree,out_tree)
                 else:
-                    T.write(outfile=out_tree,format=5)
+                    T.write(outfile=out_tree,parser=1)
 
                 self._run_parameters["_".join(tree_names[i].split("-"))] = out_tree
 

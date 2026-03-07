@@ -7,7 +7,7 @@ from topiary._private import check
 from topiary._private import threads
 from topiary._private import interface
 
-from Bio import pairwise2
+from Bio.Align import PairwiseAligner
 
 import pandas as pd
 import numpy as np
@@ -166,7 +166,7 @@ def _construct_args(sequence_array,
 
     return kwargs_list, num_threads
 
-def _compare_seqs(A_seq,B_seq,A_qual,B_qual,cutoff,discard_key=False):
+def _compare_seqs(A_seq,B_seq,A_qual,B_qual,cutoff,discard_key=False,aligner=None):
     """
     Compare sequence A and B based on alignment. If the sequences are
     similar within cutoff, compare A_stats and B_stats and take the sequence
@@ -198,7 +198,15 @@ def _compare_seqs(A_seq,B_seq,A_qual,B_qual,cutoff,discard_key=False):
     """
 
     # Get a normalized score: matches/len(shortest)
-    score = pairwise2.align.localxx(A_seq,B_seq,score_only=True)
+    if aligner is None:
+        aligner = PairwiseAligner()
+        aligner.mode = "local"
+        aligner.match_score = 1
+        aligner.mismatch_score = 0
+        aligner.open_gap_score = 0
+        aligner.extend_gap_score = 0
+
+    score = aligner.score(A_seq,B_seq)
     norm = score/np.min((len(A_seq),len(B_seq)))
 
     # If sequence similarity is less than the cutoff, keep both
@@ -271,6 +279,13 @@ def _redundancy_thread_function(i_block,
         lock controls access to keep_array
     """
 
+    aligner = PairwiseAligner()
+    aligner.mode = "local"
+    aligner.match_score = 1
+    aligner.mismatch_score = 0
+    aligner.open_gap_score = 0
+    aligner.extend_gap_score = 0
+
     # Loop over block in i
     for i in range(i_block[0],i_block[1]):
 
@@ -295,7 +310,8 @@ def _redundancy_thread_function(i_block,
                                            quality_array[i],
                                            quality_array[j],
                                            cutoff,
-                                           discard_key=discard_key)
+                                           discard_key=discard_key,
+                                           aligner=aligner)
 
             # Both false
             if not i_keep and not j_keep:

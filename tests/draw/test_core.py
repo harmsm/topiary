@@ -2,7 +2,7 @@
 import pytest
 
 import topiary
-from topiary.draw.core import ete3_to_toytree
+from topiary.draw.core import ete4_to_toytree
 from topiary.draw.core import construct_colormap, construct_sizemap
 from topiary.draw.core import create_name_dict
 from topiary.draw.core import _protect_name, _deprotect_name, color_to_css
@@ -10,7 +10,7 @@ from topiary.draw.core import get_round_to
 from topiary.draw.core import parse_position_string
 from topiary.draw.core import parse_span_color
 
-import ete3
+import ete4 as ete
 import toyplot
 
 import numpy as np
@@ -74,23 +74,23 @@ def test_get_round_to():
     assert get_round_to(-1.12,total_requested=2) == 1
     assert get_round_to(-1.12,total_requested=1) == 0
 
-def test_ete3_to_toytree():
+def test_ete4_to_toytree():
 
     # Should work; no interesting data loaded
     tree = "(((A,B),((C,D),E)),(F,G));"
-    T = ete3.Tree(tree)
-    tT = ete3_to_toytree(T)
+    T = ete.Tree(tree)
+    tT = ete4_to_toytree(T)
 
     # Duplicate taxon name
     tree = "(((A,A),((C,D),E)),(F,G));"
     with pytest.raises(ValueError):
-        T = ete3.Tree(tree)
-        tT = ete3_to_toytree(T)
+        T = ete.Tree(tree)
+        tT = ete4_to_toytree(T)
 
     # Make sure we're loading dist correctly
     tree = "(((A:1.0,B:4.0):1.0,((C:1.0,D:0.5):1.0,E:1.0):1.0):1.0,(F:1.0,G:1.0));"
-    T = ete3.Tree(tree)
-    tT = ete3_to_toytree(T)
+    T = ete.Tree(tree)
+    tT = ete4_to_toytree(T)
 
     expected_dist = dict([(a,1.0) for a in string.ascii_uppercase[:7]])
     expected_dist["B"] = 4.0
@@ -102,8 +102,8 @@ def test_ete3_to_toytree():
 
     # Make sure we're loading dist and support correctly
     tree = "(((A:1.0,B:4.0)99:1.0,((C:1.0,D:0.5)100:1.0,E:1.0)75:1.0)80:1.0,(F:1.0,G:1.0)90)75;"
-    T = ete3.Tree(tree)
-    tT = ete3_to_toytree(T)
+    T = ete.Tree(tree)
+    tT = ete4_to_toytree(T)
 
     expected_dist = dict([(a,1.0) for a in string.ascii_uppercase[:7]])
     expected_dist["B"] = 4.0
@@ -122,8 +122,8 @@ def test_ete3_to_toytree():
 
     # Make sure we're loading dist and custom names correctly
     tree = "(((A:1.0,B:4.0)AB:1.0,((C:1.0,D:1.0)CD:1.0,E:1.0)CDE:1.0)ABCDE:1.0,(F:1.0,G:1.0)FG)ABCDEFG;"
-    T = ete3.Tree(tree,format=1)
-    tT = ete3_to_toytree(T)
+    T = ete.Tree(tree,parser=1)
+    tT = ete4_to_toytree(T)
 
     expected_dist = dict([(a,1.0) for a in string.ascii_uppercase[:7]])
     expected_dist["B"] = 4.0
@@ -138,17 +138,18 @@ def test_ete3_to_toytree():
 
     # Make sure we're loading custom fields correctly
     tree = "(((A:1.0,B:4.0)99:1.0,((C:1.0,D:0.5)100:1.0,E:1.0)75:1.0)80:1.0,(F:1.0,G:1.0)90)75;"
-    T = ete3.Tree(tree)
+    T = ete.Tree(tree)
     for i, node in enumerate(T.traverse()):
-        leaves = node.get_leaf_names()
+        leaves = node.leaf_names()
+        leaves = list(leaves)
         leaves.sort()
-        node.add_feature("test_feature","".join(leaves))
+        node.add_prop("test_feature","".join(leaves))
 
     expected_dist = dict([(a,1.0) for a in string.ascii_uppercase[:7]])
     expected_dist["B"] = 4.0
     expected_dist["D"] = 0.5
 
-    tT = ete3_to_toytree(T)
+    tT = ete4_to_toytree(T)
     for node in tT.get_nodes():
         leaves = node.get_leaf_names()
         leaves.sort()
@@ -164,8 +165,8 @@ def test_ete3_to_toytree():
 
     # Make sure we can handel spaces in taxon names correctly
     tree = "((('A name':1.0,'B name':4.0):1.0,((C:1.0,D:0.5):1.0,E:1.0):1.0):1.0,(F:1.0,G:1.0));"
-    T = ete3.Tree(tree)
-    tT = ete3_to_toytree(T)
+    T = ete.Tree(tree)
+    tT = ete4_to_toytree(T)
 
 
 def test_construct_colormap():

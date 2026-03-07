@@ -1,7 +1,7 @@
 import os
 import tempfile
 from topiary.pastml import get_ancestral_gaps
-import ete3
+import ete4 as ete
 
 import numpy as np
 import os
@@ -35,12 +35,12 @@ def test_get_ancestral_gaps(tmpdir):
     f.close()
 
     tree = "(((AAAAAAAAAA,BBBBBBBBBB)AB,(CCCCCCCCCC,DDDDDDDDDD)CD)ABCD,(EEEEEEEEEE,FFFFFFFFFF)EF)ABCDEF;"
-    T = ete3.Tree(tree,format=8)
-    T.write(outfile=tree_file,format=8)
+    with open(tree_file, "w") as f:
+        f.write(tree)
 
     gapping = get_ancestral_gaps(ali_file,tree_file)
 
-    expected = {'': [False, True, False, False, None, None, True, False, None],
+    expected = {'ABCDEF': [False, True, False, False, None, None, True, False, None],
                 'ABCD': [False, True, False, False, False, True, True, False, None],
                 'AB': [False, True, True, False, False, True, True, False, None],
                 'CD': [False, True, False, True, False, True, True, False, None],

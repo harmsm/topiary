@@ -6,7 +6,7 @@ from topiary.generax._reconcile_no_bootstrap import reconcile_no_bootstrap
 from topiary.generax._generax import GENERAX_BINARY
 from topiary._private import Supervisor
 
-import ete3
+import ete4 as ete
 
 import os
 
@@ -50,9 +50,9 @@ def test_reconcile_no_bootstrap(generax_data,tmpdir):
 
     assert os.path.isdir(os.path.join(supervisor.output_dir,"reconciliations"))
 
-    output_T = ete3.Tree(os.path.join(supervisor.output_dir,"reconciled-tree.newick"),format=0)
-    input_T = ete3.Tree(os.path.join(supervisor.input_dir,"gene-tree.newick"))
-    correct_T = ete3.Tree(os.path.join(input_dir,"tree.newick"),format=0)
+    output_T = ete.Tree(os.path.join(supervisor.output_dir,"reconciled-tree.newick"),parser=0)
+    input_T = ete.Tree(os.path.join(supervisor.input_dir,"gene-tree.newick"))
+    correct_T = ete.Tree(os.path.join(input_dir,"tree.newick"),parser=0)
 
     # Toplogy should have changed to be correct
     assert output_T.robinson_foulds(input_T,unrooted_trees=True)[0] != 0

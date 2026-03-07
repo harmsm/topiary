@@ -8,7 +8,7 @@ from topiary.opentree.util import ott_to_species_tree
 from topiary.opentree.util import tree_to_taxa_order
 from topiary.opentree.util import sort_df_by_taxa
 
-import ete3
+import ete4 as ete
 
 import pandas as pd
 import numpy as np
@@ -141,7 +141,7 @@ def test_ott_to_species_tree():
     input_ott = [770315,276534,565131,356221]
 
     T, results = ott_to_species_tree(input_ott)
-    assert issubclass(type(T),ete3.Tree)
+    assert issubclass(type(T),ete.Tree)
     assert issubclass(type(results),dict)
     seen = list(results["resolved"])
     sent_in = input_ott[:]
@@ -154,7 +154,7 @@ def test_ott_to_species_tree():
     assert len(results["not_monophyletic"]) == 0
 
     off_tree = []
-    for n in T.get_leaves():
+    for n in T.leaves():
         off_tree.append(int(n.name[3:]))
     off_tree.sort()
     assert np.array_equal(off_tree,sent_in)
@@ -170,7 +170,7 @@ def test_ott_to_species_tree():
     assert np.array_equal(seen,sent_in[:-1])
 
     off_tree = []
-    for n in T.get_leaves():
+    for n in T.leaves():
         off_tree.append(int(n.name[3:]))
     off_tree.sort()
     assert np.array_equal(off_tree,sent_in[:-1])
@@ -200,7 +200,7 @@ def test_ott_to_species_tree():
     assert np.array_equal(seen,sent_in)
 
     off_tree = []
-    for n in T.get_leaves():
+    for n in T.leaves():
         off_tree.append(int(n.name[3:]))
     off_tree.sort()
     assert np.array_equal(off_tree,sent_in)
@@ -422,7 +422,7 @@ def test_ott_to_mrca():
 
 def test_tree_to_taxa_order():
 
-    T = ete3.Tree("((((A,B),(C,D)),Q),(H,(E,F)));")
+    T = ete.Tree("((((A,B),(C,D)),Q),(H,(E,F)));")
     out_order = tree_to_taxa_order(T,ref_name="H")
     assert np.array_equal(out_order[:4],["H","E","F","Q"])
 
