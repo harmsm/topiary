@@ -104,20 +104,6 @@ Installation
 
 See the :ref:`installation<installation-doc>` page.
 
-.. commenting ...
-
-  topiary can be easily installed with conda.
-
-  .. code-block:: shell-session
-
-    conda create -n topiary topiary-asr -c bioconda
-    conda activate topiary
-
-  Windows users and silicon macOS users will need to manually install
-  `muscle <muscle-download_>`_ and `blast <blast-download_>`_.
-
-  For full installation instructions, see the :ref:`installation<installation-doc>` page.
-
 Short protocol
 ==============
 

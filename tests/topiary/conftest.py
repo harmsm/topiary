@@ -95,7 +95,7 @@ def get_files(base_dir):
     """
 
     containing_dir = os.path.dirname(os.path.realpath(__file__))
-    starting_dir = os.path.abspath(os.path.join(containing_dir,base_dir))
+    starting_dir = os.path.abspath(os.path.join(containing_dir,"..",base_dir))
 
     base_length = len(starting_dir.split(os.sep))
 
@@ -273,7 +273,7 @@ def ncbi_lines():
     """
     A list of generic ncbi lines.
     """
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     filename = os.path.join(dir,"data","ncbi_lines","ncbi-lines-file.txt")
 
     lines = []
@@ -306,7 +306,7 @@ def recip_blast_hit_dfs():
 
     def _load(prefix):
 
-        dir = os.path.dirname(os.path.realpath(__file__))
+        dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
         files = glob.glob(os.path.join(dir,
                                        "data",
                                        "recip_blast",
@@ -327,7 +327,7 @@ def test_dataframes():
     A dictionary holding dataframes of varying sorts of badness to test parser.
     """
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     search_string = os.path.join(dir,"data","test_dataframes","*.csv")
 
     df_dict = {}
@@ -344,7 +344,7 @@ def programs():
     Dictionary holding paths pointing to programs to run.
     """
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","programs"))
     files = os.listdir(base_dir)
 
@@ -360,7 +360,7 @@ def xml():
     Dictionary holding paths pointing to ncbi style xml files.
     """
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","xml"))
     files = os.listdir(base_dir)
 
@@ -376,7 +376,7 @@ def user_xml_files():
     Dictionary holding paths pointing to ncbi style xml files.
     """
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","xml","user-xml-files"))
     json_file = os.path.join(base_dir,"index.json")
 
@@ -398,7 +398,7 @@ def ncbi_blast_server_output():
     These csv files are output from topiary.ncbi.blast.ncbi._thread_manager
     """
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","ncbi-blast-server-output"))
 
     files = glob.glob(os.path.join(base_dir,"*.csv"))
@@ -416,7 +416,7 @@ def local_blast_output():
     These csv files are output from topiary.ncbi._blast_blast._thread_manager
     """
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","local-blast-output"))
 
     files = glob.glob(os.path.join(base_dir,"*.csv"))
@@ -431,7 +431,7 @@ def local_blast_output():
 @pytest.fixture(scope="module")
 def seed_dataframes():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","seed-dataframes"))
     files = os.listdir(base_dir)
 
@@ -446,7 +446,7 @@ def seed_dataframes():
 @pytest.fixture(scope="module")
 def user_seed_dataframes():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,
                                             "data",
                                             "seed-dataframes",
@@ -466,7 +466,7 @@ def user_seed_dataframes():
 @pytest.fixture(scope="module")
 def esummary_assembly_records():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","ncbi-assembly-esummary-output"))
     json_files = glob.glob(os.path.join(base_dir,"*.json"))
 
@@ -482,7 +482,7 @@ def esummary_assembly_records():
 @pytest.fixture(scope="module")
 def make_blast_db_files():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","make_blast_db_files"))
     files = glob.glob(os.path.join(base_dir,"*"))
 
@@ -496,7 +496,7 @@ def make_blast_db_files():
 @pytest.fixture(scope="module")
 def for_real_inference():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     base_dir = os.path.abspath(os.path.join(dir,"data","for-real-inference"))
     files = glob.glob(os.path.join(base_dir,"*"))
 
@@ -510,7 +510,7 @@ def for_real_inference():
 @pytest.fixture(scope="module")
 def df_with_species_not_resolvable():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     df_file = os.path.abspath(os.path.join(dir,"data","test_dataframes","df-with-species-not-resolvable.csv"))
     df = pd.read_csv(df_file)
 
@@ -519,7 +519,7 @@ def df_with_species_not_resolvable():
 @pytest.fixture(scope="module")
 def ftp_test_files():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
     base_dir = os.path.abspath(os.path.join(dir,"data","ftp"))
     files = glob.glob(os.path.join(base_dir,"*"))
@@ -534,7 +534,7 @@ def ftp_test_files():
 @pytest.fixture(scope="module")
 def generax_data():
 
-    dir = os.path.dirname(os.path.realpath(__file__))
+    dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
     base_dir = os.path.abspath(os.path.join(dir,"data","generax"))
     files = glob.glob(os.path.join(base_dir,"*"))

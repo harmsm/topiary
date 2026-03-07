@@ -196,7 +196,7 @@ def completeness_crawler(code_dir,test_dir,bin_dir=None):
 
         # topiary.blah.yo.function -> tests.blah.test_yo.test_function
         chunks = a.split(".")
-        chunks[0] = "tests"
+        chunks[0] = "tests.topiary"
 
         # Is previous chunk a class? If so, combine into single test with name
         # test_ClassName_method. Trim chunks back so repeated_modules bit works

@@ -20,7 +20,6 @@
 .. _`miniconda-link` : https://docs.conda.io/en/latest/miniconda.html
 .. _`conda-link` : https://docs.conda.io/en/latest/
 .. _`conda-setenv-variables` : https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#setting-environment-variables
-.. _`windows-path` : https://stackoverflow.com/questions/44272416/how-to-add-a-folder-to-path-environment-variable-in-windows-10-with-screensho
 .. _`nix-path` : https://opensource.com/article/17/6/set-path-linux
 
 .. _`matplotlib-link` : https://matplotlib.org
