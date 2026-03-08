@@ -16,7 +16,7 @@ dependencies:
   - toytree
   - blast>=2.2
   - muscle>=5.0
-  - openmpi
+  - openmpi<5
   - mpi4py
   - pip:
     - opentree

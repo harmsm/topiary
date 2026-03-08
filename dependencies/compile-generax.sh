@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -rf generax.git
+
 # Download repo and submodules
 git clone git@github.com:harmslab/generax.git
 cd generax
@@ -8,7 +10,7 @@ git submodule update --init --recursive
 # Build binary
 mkdir build
 cd build
-cmake ..
+cmake -DUSE_MPI=ON ..
 make -j 4
 
 # Copy binary to final location

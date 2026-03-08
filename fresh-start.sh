@@ -1,4 +1,9 @@
 
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "This script should be run as 'source fresh-start.sh', not 'bash fresh-start.sh'."
+    exit
+fi
+
 # wipe local builds
 rm -rf build/
 for x in `find . -iname "__pycache__"`; do rm -rf $x; done
@@ -19,3 +24,6 @@ conda activate topiary
 cd dependencies
 bash compile-generax.sh
 bash compile-raxml-ng.sh
+
+#return to start
+cd ..
