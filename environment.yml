@@ -16,8 +16,6 @@ dependencies:
   - toytree
   - blast>=2.2
   - muscle>=5.0
-  - generax
-  - raxml-ng
   - openmpi
   - mpi4py
   - pip:
