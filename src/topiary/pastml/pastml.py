@@ -77,13 +77,8 @@ def get_ancestral_gaps(alignment_file,tree_file,prediction_method="DOWNPASS"):
         raise ValueError(f"Only prediction_method='DOWNPASS' is supported natively. Got {prediction_method}.")
 
     # Load the tree, keeping the internal node names
-    print(f"DEBUG: Reading tree from {tree_file}")
-    with open(tree_file, "r") as f:
-        print(f"DEBUG: Newick start: {f.read(200)}")
     tree = topiary.io.read_tree(tree_file)
-    print("DEBUG: Successfully read tree.")
     
-
     # 1. Initialize states for each node
     # state array: shape (num_sites, 2), where [:, 0] is False state, [:, 1] is True state
     leaf_name_to_index = {name: i for i, name in enumerate(leaf_names)}

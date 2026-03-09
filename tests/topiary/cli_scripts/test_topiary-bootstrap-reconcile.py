@@ -42,11 +42,10 @@ def test_main(small_phylo,tmpdir):
     ret = subprocess.run(cmd)
     assert ret.returncode != 0
 
-    # should fail because more threads than replicates
+    # should work because more threads than replicates, which is now dealt with
+    # gracefully
     cmd.append("10")
-    ret = subprocess.run(cmd)
-    assert ret.returncode != 0
-
+    
     # This should run
     cmd[-1] = "2"
 

@@ -144,11 +144,10 @@ def bootstrap_reconcile(previous_run_dir,
                                                 "bootstrap_replicates",
                                                 "*.phy")))
     if num_threads > num_replicates:
-        err = f"The number of requested threads (slots: {num_threads}) is\n"
-        err += f"greater than the number of bootstrap replicates ({num_replicates}).\n"
-        err += f"Please restart the calculation requesting no more than {num_replicates} slots.\n\n"
-        os.chdir("..")
-        raise ValueError(err)
+        print(f"\nWARNING: The number of requested threads (slots: {num_threads}) is\n"
+              f"greater than the number of bootstrap replicates ({num_replicates}).\n"
+              f"Dropping the number of threads to {num_replicates} to match.\n", flush=True)
+        num_threads = num_replicates
 
 
     # Try to get a time estimate from supervisor stack

@@ -52,9 +52,12 @@ def get_num_threads(num_threads,manual_num_cores=None):
         num_cores = manual_num_cores
     else:
         try:
-            num_cores = mp.cpu_count()
-        except NotImplementedError:
-            num_cores = os.cpu_count()
+            num_cores = len(os.sched_getaffinity(0))
+        except AttributeError:
+            try:
+                num_cores = mp.cpu_count()
+            except NotImplementedError:
+                num_cores = os.cpu_count()
 
         # If we can't figure it out, revert to 1
         if num_cores is None:
