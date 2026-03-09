@@ -135,7 +135,11 @@ def check_raxml(binary=None):
     """
 
     def _version_slicer(ret):
-        return ret.stdout.decode().strip().split("\n")[0].split()[2]
+        lines = ret.stdout.decode().split("\n")
+        for line in lines:
+            if line.startswith("RAxML-NG v."):
+                return line.split()[2].strip()
+        return None
 
     if binary is None:
         binary = "raxml-ng"
