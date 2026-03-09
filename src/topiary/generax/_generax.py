@@ -384,8 +384,14 @@ def run_generax(run_directory,
                          suppress_output=suppress_output,
                          write_to_script=write_to_script)
     except RuntimeError as e:
-        if supervisor is not None:
-            supervisor.finalize(successful=False)
-        raise RuntimeError from e
+        # MPI can sometimes throw a warning and a non-zero exit code
+        # even if the underlying program finished successfully.
+        result_tree = os.path.join(run_directory, "result", "results", "reconcile", "geneTree.newick")
+        if os.path.isfile(result_tree):
+            pass # ignore error since results were generated
+        else:
+            if supervisor is not None:
+                supervisor.finalize(successful=False)
+            raise RuntimeError from e
 
     return " ".join(cmd)

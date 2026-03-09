@@ -260,11 +260,14 @@ def _generax_thread_function(replicate_dir,
         f.write(ret.stderr.decode())
         f.close()
 
-        # If failure, raise a RuntimeError
+        # If failure (non-zero return code), check if result tree was actually
+        # generated. MPI can sometimes throw a warning and a non-zero exit code
+        # even if the underlying program finished successfully.
         if ret.returncode != 0:
-            err = f"\ngenerax crashed in directory {d}. Writing stderr and\n"
-            err += "stdout there.\n\n"
-            raise RuntimeError(err)
+            if not os.path.isfile(result_tree):
+                err = f"\ngenerax crashed in directory {d}. Writing stderr and\n"
+                err += "stdout there.\n\n"
+                raise RuntimeError(err)
 
         # Grab result tree
         f = open(result_tree,'r')
