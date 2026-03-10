@@ -113,7 +113,16 @@ def check_generax(binary=None):
     if binary is None:
         binary = "generax"
 
-    return _version_checker([binary],_version_slicer)
+    path, version = _version_checker([binary],_version_slicer)
+    
+    # If the binary is found but crashes, it may be because it was compiled
+    # natively with OpenMPI on a SLURM cluster and requires mpirun to execute.
+    if version == (-1, -1, -1):
+        _, mpi_version = _version_checker(["mpirun", "-np", "1", binary], _version_slicer)
+        if mpi_version != (-2, -2, -2) and mpi_version != (-1, -1, -1):
+            version = mpi_version
+
+    return path, version
 
 
 def check_raxml(binary=None):
@@ -144,7 +153,16 @@ def check_raxml(binary=None):
     if binary is None:
         binary = "raxml-ng"
 
-    return _version_checker([binary],_version_slicer)
+    path, version = _version_checker([binary],_version_slicer)
+    
+    # If the binary is found but crashes, it may be because it was compiled
+    # natively with OpenMPI on a SLURM cluster and requires mpirun to execute.
+    if version == (-1, -1, -1):
+        _, mpi_version = _version_checker(["mpirun", "-np", "1", binary], _version_slicer)
+        if mpi_version != (-2, -2, -2) and mpi_version != (-1, -1, -1):
+            version = mpi_version
+
+    return path, version
 
 
 def check_blastp(binary=None):

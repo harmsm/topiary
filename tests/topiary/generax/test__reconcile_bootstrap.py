@@ -97,16 +97,16 @@ def test__progress_bar(small_phylo,tmpdir):
     # Put completed in all directories
     for g in glob.glob(os.path.join("test2","0*")):
 
+        # Clean up running so it's strictly completed
+        if os.path.isfile(os.path.join(g,"running")):
+            os.remove(os.path.join(g,"running"))
+
         # Turn running into completed
         if not os.path.isfile(os.path.join(g,"completed")):
             pathlib.Path(os.path.join(g,"completed")).touch()
 
     # Add timeout loop in case it takes a moment to finish
-    start_time = time.time()
-    while (time.time() - start_time) < 6:
-        if not status_bar.is_alive():
-            break
-        time.sleep(0.2)
+    status_bar.join(timeout=6)
 
     # Should have completed because we wrote "skipped" and "complete" into all
     # directories
