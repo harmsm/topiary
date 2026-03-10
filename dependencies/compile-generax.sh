@@ -1,6 +1,10 @@
 #!/bin/bash
 
-rm -rf generax.git
+rm -rf generax
+
+# to compile on a cluster, add a line like this one. In a SLURM environment, 
+# run module spider mpi to find the correct openmpi/gcc binaries.
+#module load mpi/gcc/13.1.0/openmpi/4.1.6
 
 # Download repo and submodules
 git clone git@github.com:harmslab/generax.git

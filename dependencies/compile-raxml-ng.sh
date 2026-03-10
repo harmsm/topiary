@@ -10,7 +10,7 @@ git submodule update --init --recursive
 # Build binary
 mkdir build
 cd build
-cmake -DUSE_MPI=ON ..
+cmake ..
 make -j 4
 
 # Copy binary to final location
