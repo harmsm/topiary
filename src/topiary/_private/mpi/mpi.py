@@ -23,11 +23,15 @@ def get_mpi_env():
     """
     env = os.environ.copy()
     
-    # Strip SLURM/MPI environment variables that try to attach mpirun to the 
-    # encompassing SLURM job/step (which fails when done asynchronously).
+    # Strip SLURM_STEP and PMI environment variables. We must KEEP core SLURM 
+    # variables (like SLURM_JOB_ID, SLURM_NODELIST) so OpenMPI knows to use the 
+    # slurm PLM rather than falling back to SSH, but we strip step-specific and 
+    # PMI variables to avoid namespace collisions between concurrent mpirun calls.
     for key in list(env.keys()):
         key_upper = key.upper()
-        if key_upper.startswith("SLURM_") or key_upper.startswith("PMI"):
+        if key_upper.startswith("PMI"):
+            del env[key]
+        elif key_upper.startswith("SLURM_STEP"):
             del env[key]
             
     return env
