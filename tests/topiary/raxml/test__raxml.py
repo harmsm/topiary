@@ -93,7 +93,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["run_directory"] = "test1"
     run_raxml(**kwargs)
     output = _read_log_file("test1")
-    assert output == f"{raxml_binary} --threads 1"
+    assert output == f"{raxml_binary} --threads auto{{1}}"
 
     # test binary. both tests for bad binary catch and that function is
     # actually reading binary argument
@@ -121,7 +121,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["alignment_file"] = alignment
     run_raxml(**kwargs)
     output = _read_log_file("test2")
-    assert output == f"{raxml_binary} --msa alignment.phy --threads 1"
+    assert output == f"{raxml_binary} --msa alignment.phy --threads auto{{1}}"
     assert os.path.isfile(os.path.join("test2","alignment.phy"))
 
     # Send in tree only
@@ -130,7 +130,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["tree_file"] = gene_tree
     run_raxml(**kwargs)
     output = _read_log_file("test3")
-    assert output == f"{raxml_binary} --tree tree.newick --threads 1"
+    assert output == f"{raxml_binary} --tree tree.newick --threads auto{{1}}"
     assert os.path.isfile(os.path.join("test3","tree.newick"))
 
     # Send in other_files only
@@ -139,7 +139,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["other_files"] = [df,species_tree]
     run_raxml(**kwargs)
     output = _read_log_file("test4")
-    assert output == f"{raxml_binary} --threads 1"
+    assert output == f"{raxml_binary} --threads auto{{1}}"
     assert os.path.isfile(os.path.join("test4","dataframe.csv"))
     assert os.path.isfile(os.path.join("test4","species-tree.newick"))
 
@@ -149,7 +149,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["algorithm"] = "--somealgorithm"
     run_raxml(**kwargs)
     output = _read_log_file("test5")
-    assert output == f"{raxml_binary} --somealgorithm --threads 1"
+    assert output == f"{raxml_binary} --somealgorithm --threads auto{{1}}"
 
     # Send in model only
     kwargs = copy.deepcopy(kwargs_template)
@@ -157,7 +157,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["model"] = "PRETEND_MODEL"
     run_raxml(**kwargs)
     output = _read_log_file("test6")
-    assert output == f"{raxml_binary} --model PRETEND_MODEL --threads 1"
+    assert output == f"{raxml_binary} --model PRETEND_MODEL --threads auto{{1}}"
 
     # Send in algorithm, alignment, tree, model
     kwargs = copy.deepcopy(kwargs_template)
@@ -168,7 +168,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["model"] = "PRETEND_MODEL"
     run_raxml(**kwargs)
     output = _read_log_file("test7")
-    assert output == f"{raxml_binary} --somealgorithm --msa alignment.phy --tree tree.newick --model PRETEND_MODEL --threads 1"
+    assert output == f"{raxml_binary} --somealgorithm --msa alignment.phy --tree tree.newick --model PRETEND_MODEL --threads auto{{1}}"
 
     assert os.path.isfile(os.path.join("test7","alignment.phy"))
     assert os.path.isfile(os.path.join("test7","tree.newick"))
@@ -182,7 +182,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     run_raxml(**kwargs)
     output = _read_log_file("test8")
     assert output.startswith(f"{raxml_binary} --seed ")
-    assert output[-11:] == "--threads 1"
+    assert output[-17:] == "--threads auto{1}"
     assert isinstance(int(output.split()[2]),int)
 
     # Make sure a seed is (not) being generated properly with False set
@@ -191,7 +191,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["seed"] = False
     run_raxml(**kwargs)
     output = _read_log_file("test9")
-    assert output == f"{raxml_binary} --threads 1"
+    assert output == f"{raxml_binary} --threads auto{{1}}"
 
     # Make sure a seed is being generated properly with actual value set
     kwargs = copy.deepcopy(kwargs_template)
@@ -199,7 +199,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["seed"] = 12345
     run_raxml(**kwargs)
     output = _read_log_file("test10")
-    assert output == f"{raxml_binary} --seed 12345 --threads 1"
+    assert output == f"{raxml_binary} --seed 12345 --threads auto{{1}}"
 
     # Make sure a seed is being generated set with integer-as-string sent in
     kwargs = copy.deepcopy(kwargs_template)
@@ -207,7 +207,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["seed"] = "12345"
     run_raxml(**kwargs)
     output = _read_log_file("test11")
-    assert output == f"{raxml_binary} --seed 12345 --threads 1"
+    assert output == f"{raxml_binary} --seed 12345 --threads auto{{1}}"
 
     # Make sure throws error on stupid seed
     kwargs = copy.deepcopy(kwargs_template)
@@ -236,7 +236,9 @@ def test_run_raxml(tiny_phylo,tmpdir):
     run_raxml(**kwargs)
     output = _read_log_file("test13")
     assert output.startswith(f"{raxml_binary} --threads ")
-    assert int(output.split()[-1]) > 0
+    thread_str = output.split()[-1]
+    assert thread_str.startswith("auto{") and thread_str.endswith("}")
+    assert int(thread_str[5:-1]) > 0
 
     # Specific number of threads
     kwargs = copy.deepcopy(kwargs_template)
@@ -244,7 +246,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["num_threads"] = 2
     run_raxml(**kwargs)
     output = _read_log_file("test14")
-    assert output == f"{raxml_binary} --threads 2"
+    assert output == f"{raxml_binary} --threads auto{{2}}"
 
     # Bad number of threads (this is tested by get_num_threads call, but
     # pretty important in this context; so check)
@@ -272,7 +274,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["num_threads"] = 2
     run_raxml(**kwargs)
     output = _read_log_file("test16")
-    assert output == f"{raxml_binary} --all --threads auto" + "{2}"
+    assert output == f"{raxml_binary} --all --threads auto{{2}}"
 
     kwargs = copy.deepcopy(kwargs_template)
     kwargs["run_directory"] = "test17"
@@ -280,7 +282,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["num_threads"] = 2
     run_raxml(**kwargs)
     output = _read_log_file("test17")
-    assert output == f"{raxml_binary} --search --threads auto" + "{2}"
+    assert output == f"{raxml_binary} --search --threads auto{{2}}"
 
     kwargs = copy.deepcopy(kwargs_template)
     kwargs["run_directory"] = "test18"
@@ -288,7 +290,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["num_threads"] = 2
     run_raxml(**kwargs)
     output = _read_log_file("test18")
-    assert output == f"{raxml_binary} --flagwithoutcrosstalk --threads 2"
+    assert output == f"{raxml_binary} --flagwithoutcrosstalk --threads auto{{2}}"
 
     # Custom args
     kwargs = copy.deepcopy(kwargs_template)
@@ -296,7 +298,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["other_args"] = ["other","args"]
     run_raxml(**kwargs)
     output = _read_log_file("test19")
-    assert output == f"{raxml_binary} --threads 1 other args"
+    assert output == f"{raxml_binary} --threads auto{{1}} other args"
 
     # Send in supervisor. run_raxml should start and stop the job, which will
     # appear in the run_parameters dictionary
@@ -309,7 +311,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
     kwargs["supervisor"] = sv
     run_raxml(**kwargs)
     output = _read_log_file(os.path.join("test20","working","test"))
-    assert output == f"{raxml_binary} --threads 1"
+    assert output == f"{raxml_binary} --threads auto{{1}}"
     assert os.path.isdir(sv.calc_dir)
 
     assert len(sv.run_parameters["events"]) == 1
@@ -321,7 +323,7 @@ def test_run_raxml(tiny_phylo,tmpdir):
 
     assert cmd[0] == f"{raxml_binary}"
     assert cmd[1] == "--threads"
-    assert cmd[2] == "1"
+    assert cmd[2] == "auto{1}"
 
     assert num_threads == 1
 

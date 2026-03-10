@@ -9,6 +9,29 @@ import os
 from topiary._private.environment import load_env_variable
 from topiary._private.check import check_int
 
+def get_mpi_env():
+    """
+    Get a copy of the current os.environ stripped of variables that can 
+    conflict with mpirun. This is particularly important for SLURM HPC 
+    environments where multiple mpirun instances launched via python 
+    multiprocessing can collide.
+
+    Returns
+    -------
+    env : dict
+        environment dictionary suitable for passing to subprocess.run
+    """
+    env = os.environ.copy()
+    
+    # Strip SLURM/MPI environment variables that try to attach mpirun to the 
+    # encompassing SLURM job/step (which fails when done asynchronously).
+    for key in list(env.keys()):
+        key_upper = key.upper()
+        if key_upper.startswith("SLURM_") or key_upper.startswith("PMI"):
+            del env[key]
+            
+    return env
+
 def get_hosts(num_slots):
     """
     Get the hosts allocated by the job manager by running a script with mpirun
@@ -25,7 +48,7 @@ def get_hosts(num_slots):
     python = sys.executable
 
     ret = subprocess.run(["mpirun","-np",f"{num_slots}",python,script],
-                          capture_output=True)
+                          capture_output=True, env=get_mpi_env())
     if ret.returncode == 0:
         stdout = ret.stdout.decode()
         hosts = [s.strip() for s in stdout.split("\n") if s.strip() != ""]

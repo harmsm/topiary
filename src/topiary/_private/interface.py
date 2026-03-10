@@ -11,6 +11,8 @@ import shutil
 import multiprocessing as mp
 import functools
 
+from topiary._private.mpi import get_mpi_env
+
 class WrappedFunctionException(Exception):
     pass
 
@@ -149,7 +151,7 @@ def copy_input_file(input_file,
 
     return os.path.abspath(out_file)
 
-def _follow_log_subproc_wrapper(cmd,stdout,queue):
+def _follow_log_subproc_wrapper(cmd,stdout,queue,env=None):
     """
     Wrap the subprocess.run call to allow multithreaded following of a log file.
 
@@ -161,13 +163,15 @@ def _follow_log_subproc_wrapper(cmd,stdout,queue):
         where to write standard output
     queue : multiprocessing.Queue
         multiprocessing queue to catch return value
+    env : dict, optional
+        environment variables to pass to subprocess.run
 
     Return
     ------
     None
     """
 
-    ret = subprocess.run(cmd,stdout=stdout)
+    ret = subprocess.run(cmd,stdout=stdout,env=env)
     queue.put(ret)
 
 def _follow_log_generator(f,queue):
@@ -290,7 +294,7 @@ def launch(cmd,
             capture_output = True
         else:
             capture_output = False
-        ret = subprocess.run(cmd,capture_output=capture_output)
+        ret = subprocess.run(cmd,capture_output=capture_output,env=get_mpi_env())
 
     # Otherwise, run on it's own thread and capture output to standard out
     else:
@@ -298,8 +302,15 @@ def launch(cmd,
         # Launch as a multiprocessing process that will return its output to a
         # multiprocessing queue.
         queue = mp.Queue()
+        
+        # pass get_mpi_env() to the worker thread via a wrapper if we wanted, 
+        # but the environment in the child process is inherited from this thread, 
+        # so simply let's wrap the subprocess in _follow_log_subproc_wrapper to use it.
+        # Actually, let's just let it inherit the env from main_process? 
+        # No, better: pass env to the wrapper.
+        
         main_process = mp.Process(target=_follow_log_subproc_wrapper,
-                                  args=(cmd,subprocess.PIPE,queue))
+                                  args=(cmd,subprocess.PIPE,queue,get_mpi_env()))
         main_process.start()
 
         # If queue is not empty, the job has finished and put its return value

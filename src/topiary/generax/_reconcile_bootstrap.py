@@ -10,6 +10,7 @@ from topiary._private import threads
 from topiary._private import mpi
 from topiary._private import run_cleanly
 from topiary._private.interface import rmtree
+from topiary._private.mpi import get_mpi_env
 
 from topiary.raxml._raxml import run_raxml
 from topiary.raxml import check_convergence
@@ -249,7 +250,7 @@ def _generax_thread_function(replicate_dir,
         cmd.extend(bash_cmd)
 
         # Launch as a subprocess
-        ret = subprocess.run(cmd,capture_output=True)
+        ret = subprocess.run(cmd,capture_output=True,env=get_mpi_env())
 
         # Write stdout and stderr
         f = open("stdout.log","w")
