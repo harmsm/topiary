@@ -198,8 +198,12 @@ def _generax_thread_function(replicate_dir,
     dirs.sort()
 
     # Construct a base mpirun command that the generax commands will be
-    # appended to
-    base_cmd = ["mpirun","--host",",".join(hosts)]
+    # appended to. If we are running purely on the local node, omit the --host 
+    # flag entirely to avoid OpenMPI attempting to SSH to localhost.
+    if all([h == "localhost" for h in hosts]):
+        base_cmd = ["mpirun", "-np", str(len(hosts))]
+    else:
+        base_cmd = ["mpirun","--host",",".join(hosts)]
 
     # Path to result tree within each directory
     result_tree = os.path.join("result","results","reconcile","geneTree.newick")

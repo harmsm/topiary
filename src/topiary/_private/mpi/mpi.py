@@ -23,15 +23,15 @@ def get_mpi_env():
     """
     env = os.environ.copy()
     
-    # Strip SLURM_STEP and PMI environment variables. We must KEEP core SLURM 
-    # variables (like SLURM_JOB_ID, SLURM_NODELIST) so OpenMPI knows to use the 
-    # slurm PLM rather than falling back to SSH, but we strip step-specific and 
-    # PMI variables to avoid namespace collisions between concurrent mpirun calls.
+    # Strip ALL SLURM and PMI environment variables. Conda OpenMPI is often 
+    # strictly incompatible with the host HPC's Slurm PMIx library, and keeping 
+    # Slurm variables causes `MPI_Init` to crash with "NULL communicator". By 
+    # stripping them all, we force OpenMPI to run natively. (If multi-node SSH 
+    # is blocked, this restricts execution to single-node allocations, but 
+    # avoids the crash).
     for key in list(env.keys()):
         key_upper = key.upper()
-        if key_upper.startswith("PMI"):
-            del env[key]
-        elif key_upper.startswith("SLURM_STEP"):
+        if key_upper.startswith("SLURM_") or key_upper.startswith("PMI"):
             del env[key]
             
     return env
@@ -55,8 +55,21 @@ def get_hosts(num_slots):
                           capture_output=True, env=get_mpi_env())
     if ret.returncode == 0:
         stdout = ret.stdout.decode()
-        hosts = [s.strip() for s in stdout.split("\n") if s.strip() != ""]
-        hosts.sort()
+        raw_hosts = [s.strip() for s in stdout.split("\n") if s.strip() != ""]
+        raw_hosts.sort()
+
+        # Check if the HPC's hostname is returned. If we are running on a 
+        # single-node allocation, we map the local hostname to "localhost" 
+        # to prevent OpenMPI from attempting to SSH to itself, which is 
+        # often explicitly blocked on compute nodes and crashes.
+        import socket
+        local_hostname = socket.gethostname().split(".")[0]
+        hosts = []
+        for h in raw_hosts:
+            if h.split(".")[0] == local_hostname or h == "localhost":
+                hosts.append("localhost")
+            else:
+                hosts.append(h)
     else:
         err = "Could not determine hosts. _get_hosts.py script returned:\n\n"
         err += f"stdout:\n\n{ret.stdout.decode()}\n\n"
