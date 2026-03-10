@@ -162,11 +162,9 @@ def run_raxml(run_directory,
         raise ValueError from e
 
 
-    if algorithm in ["--all","--search"]:
-        threads_arg = "auto{" + f"{num_threads:d}" + "}"
-    else:
-        threads_arg = f"{num_threads:d}"
-
+    # Let RAxML-NG automatically scale thread allocations based on the 
+    # dataset size to prevent oversubscription crashes on small datasets
+    threads_arg = "auto{" + f"{num_threads:d}" + "}"
     cmd.extend(["--threads",threads_arg])
 
     # Put on any custom args

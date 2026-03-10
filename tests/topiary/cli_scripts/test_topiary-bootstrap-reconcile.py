@@ -42,16 +42,10 @@ def test_main(small_phylo,tmpdir):
     ret = subprocess.run(cmd)
     assert ret.returncode != 0
 
-    # should work because more threads than replicates, which is now dealt with
-    # gracefully
+    # should work because more threads than replicates, which is now dealt with    
+    # gracefully (will drop to 2 threads since there are 2 replicates)
     cmd.append("10")
-    
-    # This should run
-    cmd[-1] = "2"
-
     ret = subprocess.run(cmd)
-    print(cmd)
-
     assert ret.returncode == 0
     assert os.getcwd() == os.path.join(tmpdir,"test0")
 
