@@ -6,6 +6,8 @@ import topiary
 import toytree
 import toyplot
 
+from topiary.io.tree import _ete4_node_dict, _toytree_node_dict
+
 import numpy as np
 import pandas as pd
 
@@ -284,22 +286,13 @@ def ete4_to_toytree(T):
 
     # Map nodes unambiguously by descendant leaf names
     # toytree
-    tT_node_dict = {}
-    for node in tT.get_nodes():
-        tT_leaves = [_deprotect_name(l) for l in node.get_leaf_names()]
-        tT_leaves.sort()
-        tT_leaves = tuple(tT_leaves)
-        tT_node_dict[tT_leaves] = node
+    tT_node_dict = _toytree_node_dict(tT,rooted=True)
 
     # ete4.Tree
-    T_node_dict = {}
+    T_node_dict = _ete4_node_dict(T,rooted=True)
+    
     all_features = []
     for node in T.traverse():
-        T_leaves = list(node.leaf_names())
-        T_leaves.sort()
-        T_leaves = tuple(T_leaves)
-        T_node_dict[T_leaves] = node
-
         all_features.extend(list(node.props.keys()))
 
     # Create list of all unique features seen on any node in ete4 tree
@@ -309,11 +302,36 @@ def ete4_to_toytree(T):
     out = dict([(f,[]) for f in all_features])
 
     # We can now map between toytree and ete4.Trees based on their shared keys.
-    for node_key in tT_node_dict:
+    # Note that nodes must have identical splits. We iterate over toytree nodes
+    # to ensure the output list matches the toytree node order and count.
+    
+    # Get all leaves in toytree for split calculation
+    tT_all_leaves = set(tT.get_tip_labels())
+    tT_ref_leaf = min(tT_all_leaves)
 
-        # Get equivalent toytree and ete4 nodes
-        tT_node = tT_node_dict[node_key]
-        T_node = T_node_dict[node_key]
+    for node in tT.get_nodes():
+        
+        # Calculate clade for this toytree node
+        d1 = set(node.get_leaf_names())
+        if d1 == tT_all_leaves:
+            split = ("ROOT",)
+        else:
+            split = tuple(sorted(list(d1)))
+
+        # Get equivalent ete4 node
+        try:
+            T_node = T_node_dict[split][0]
+        except KeyError:
+            # Fallback if split not found (should not happen if topologies are identical)
+            # We'll just continue and append default values
+            for f in all_features:
+                if f == "support":
+                    out[f].append(1.0)
+                elif f == "dist":
+                    out[f].append(0.0)
+                else:
+                    out[f].append(None)
+            continue
 
         # Go through all features in the ete4 tree
         for f in all_features:

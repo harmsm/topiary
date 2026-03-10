@@ -331,9 +331,9 @@ def ott_to_species_tree(ott_list=None,species_list=None):
     # Give every node a support of 1 and a branch length of 1
     ott_seen = []
     for n in final_tree.traverse():
-        if n.dist != 1:
+        if n.get_prop("dist") != 1:
             n.dist = 1
-        if n.support != 1:
+        if n.get_prop("support") != 1:
             n.support = 1
 
         if n.is_leaf:

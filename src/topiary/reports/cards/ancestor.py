@@ -210,7 +210,11 @@ def create_ancestor_card(anc_dict,
 
         paralogs = anc_dict[a]["paralogs"]
 
-        mean_pp = float(anc_dict[a]["anc_pp"])
+        mean_pp = anc_dict[a]["anc_pp"]
+        if mean_pp is None:
+            mean_pp_str = "N/A"
+        else:
+            mean_pp_str = f"{float(mean_pp):.2f}"
         bs_support = anc_dict[a]["bs_support"]
         if bs_support is None:
             bs_support = "N/A"
@@ -232,7 +236,7 @@ def create_ancestor_card(anc_dict,
                                                  anc_dict[a]["num_descendants"],
                                                  taxonomic,
                                                  paralogs,
-                                                 f"{mean_pp:.2f}",
+                                                 mean_pp_str,
                                                  f"{num_ambig_seq}",
                                                  f"{num_ambig_gap}",
                                                  bs_support]})

@@ -201,9 +201,10 @@ def tree_report(tree_directory,
 
         if not n.is_leaf:
 
-            if hasattr(n, "anc_label") and n.anc_label is not None:
+            anc_label = n.get_prop("anc_label")
+            if anc_label is not None:
 
-                anc_name = f"anc{n.anc_label[1:]}"
+                anc_name = f"anc{anc_label[1:]}"
                 anc_dict[anc_name] = {}
 
                 for f in n.props.keys():

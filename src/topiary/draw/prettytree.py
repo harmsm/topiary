@@ -113,7 +113,7 @@ class PrettyTree:
                 except KeyError:
                     new_names.append(name)
 
-            self._tT.set_node_data(feature=name,
+            self._tT.set_node_data(feature="name",
                                    data=np.array(new_names),
                                    inplace=True)
 
@@ -308,101 +308,6 @@ class PrettyTree:
         self._plotted_nodes = {}
 
 
-    def _get_node_values(self,
-                         get_ancestors,
-                         get_leaves,
-                         get_root=True,
-                         property_labels=None):
-        """
-        Get the x,y coordinates and properties of nodes.
-
-        Parameters
-        ----------
-        get_ancestors : bool
-            whether or not to get ancestors
-        get_leaves : bool
-            whether or not to get leaves
-        get_root : bool, default=True
-            whether or not to get the root node
-        property_labels : str or list-like
-            list of property labels to grab, in order. can take a single string
-            as equivalent to a length-1 list.
-
-        Returns
-        -------
-        x : numpy.ndarray
-            x coordinates of nodes
-        y : numpy.ndarray
-            y coordinates of nodes
-        all_props : dict or None
-            dictionary keying property_labels to an np.ndarray of that property
-            value. if property_labels is None, return None.
-        """
-
-        # Create mask with nodes to get
-        idx = np.array([node.idx for node in self.tT.get_nodes()],dtype=int)
-        leaf_mask = []
-        root_mask = []
-        for node in self._tT.get_nodes():
-            leaf_mask.append(node.is_leaf())
-            root_mask.append(node.is_root())
-
-        leaf_mask = np.array(leaf_mask,dtype=bool)
-        anc_mask = np.logical_not(leaf_mask)
-
-        if get_ancestors:
-            if get_leaves:
-                mask = np.logical_or(leaf_mask,anc_mask)
-            else:
-                mask = anc_mask
-        else:
-            if get_leaves:
-                mask = leaf_mask
-            else:
-                err = "\nplot_ancestors and/or plot_leaves must be True\n\n"
-                raise ValueError(err)
-
-        # If we are not getting root node
-        if not get_root:
-            root_mask = np.logical_not(np.array(root_mask,dtype=bool))
-            mask = np.logical_and(root_mask,mask)
-
-        # Get x/y coord for nodes
-        node_coord = self._tT.get_node_coordinates()
-
-        x = node_coord[idx[mask],0]
-        y = node_coord[idx[mask],1]
-
-        # Get property(s) of interest
-        all_props = {}
-        if property_labels is not None:
-
-            # If passed in as a single string, put in a list to allow iteration
-            # over single label
-            if issubclass(type(property_labels),str):
-                property_labels = [property_labels]
-
-            # Iterate over all labels
-            for p_label in property_labels:
-
-                prop = []
-                for i in idx[mask]:
-
-                    node = self._tT[i]
-                    if p_label not in node.features:
-                        prop.append(None)
-                        continue
-
-                    # Try to get feature
-                    value = self._tT.idx_dict[i].get_prop(p_label)
-                    prop.append(value)
-
-                all_props[p_label] = np.array(prop)
-
-        else:
-            all_props = None
-
-        return x, y, all_props
 
 
     def draw_nodes(self,
@@ -466,9 +371,9 @@ class PrettyTree:
         plot_root = check.check_bool(plot_root,"plot_root")
 
         if property_label is not None:
-            if property_label in self._tT.features:
+            try:
                 prop = np.array(self._tT.get_node_data(property_label))
-            else:
+            except (ValueError, KeyError):
                 err = f"property_label {property_label} is not a tree feature\n"
                 raise ValueError(err)
 
@@ -562,22 +467,38 @@ class PrettyTree:
             scatter_style = {"marker":"o",
                              "style":{"stroke": "black",
                                       "stroke-width":stroke_width}}
-        
+
         plot_mask = np.ones(num_nodes,dtype=bool)
         plot_mask[all_node_indexer] = 0
-        
+
+        # Mask nodes based on plot_ancestors, plot_leaves, plot_root
+        for i in range(num_nodes):
+            node = self._tT[i]
+            if node.is_leaf():
+                if not plot_leaves:
+                    plot_mask[i] = 1
+            else:
+                if node.is_root():
+                    if not plot_root:
+                        plot_mask[i] = 1
+                else:
+                    if not plot_ancestors:
+                        plot_mask[i] = 1
+
+        # Update keep_mask to account for node type filtering
+        final_keep_mask = ~plot_mask[all_node_indexer]
+
         tmp_sizes = np.zeros(num_nodes, dtype=float)
-        tmp_sizes[~plot_mask] = sizes[:]
+        tmp_sizes[~plot_mask] = sizes[final_keep_mask]
         tmp_colors = np.array([None for _ in range(num_nodes)], dtype=object)
-        tmp_colors[~plot_mask] = colors[:]
+        tmp_colors[~plot_mask] = colors[final_keep_mask]
 
-        # Only plot if there there are nodes to plot. 
-        if np.sum(keep_mask) > 0:
+        # Only plot if there there are nodes to plot.
+        if np.sum(~plot_mask) > 0:
 
-            self._tT.annotate.add_node_markers(axes=self._tree_ax,
+            self._tT.annotate.add_node_markers(self._tree_ax,
                                                size=tmp_sizes,
                                                color=tmp_colors,
-                                               mask=plot_mask,
                                                **scatter_style)
 
             # If there was a property label, record that we plotted it for legend
@@ -761,7 +682,11 @@ class PrettyTree:
         # Get property values
         prop_dict = {}
         for var in var_list:
-            prop_dict[var] = self._tT.get_node_data(var)
+            try:
+                prop_dict[var] = self._tT.get_node_data(var)
+            except (ValueError, KeyError):
+                # If variable not found, fill with None
+                prop_dict[var] = np.array([None for _ in range(self._tT.nnodes)])
 
         # Apply formatting string to the property values extracted
         good_mask = []
@@ -812,7 +737,7 @@ class PrettyTree:
         to_write = np.array(to_write)
 
         # Actually write labels
-        self._tT.annotate.add_node_labels(axes=self._tree_ax,
+        self._tT.annotate.add_node_labels(self._tree_ax,
                                           labels=to_write,
                                           xshift=dx,
                                           yshift=dy,

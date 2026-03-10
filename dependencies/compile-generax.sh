@@ -2,9 +2,13 @@
 
 rm -rf generax
 
-# to compile on a cluster, add a line like this one. In a SLURM environment, 
-# run module spider mpi to find the correct openmpi/gcc binaries.
-#module load mpi/gcc/13.1.0/openmpi/4.1.6
+# to compile on a cluster, add a line like this one:
+
+# module load mpi/gcc/13.1.0/openmpi/4.1.6
+
+# This makes sure that generax compiles against the correct openmpi library. In
+# a SLURM environment, you can run `module spider mpi` to find the correct
+# openmpi module.
 
 # Download repo and submodules
 git clone git@github.com:harmslab/generax.git

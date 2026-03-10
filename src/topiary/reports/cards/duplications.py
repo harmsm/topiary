@@ -106,7 +106,7 @@ def _check_duplication(supervisor,T,p_column):
                     leaf_dups[leaf] += 1
 
                 if leaf_dups[leaf] > expected_duplications:
-                    anc_label = current_node.anc_label if hasattr(current_node, "anc_label") else None
+                    anc_label = current_node.get_prop("anc_label")
                     excess_duplications["ancestor"].append(anc_label)
                     excess_duplications["num_descendants"].append(len(list(current_node.leaves())))
     

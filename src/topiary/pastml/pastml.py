@@ -76,8 +76,8 @@ def get_ancestral_gaps(alignment_file,tree_file,prediction_method="DOWNPASS"):
     if prediction_method != "DOWNPASS":
         raise ValueError(f"Only prediction_method='DOWNPASS' is supported natively. Got {prediction_method}.")
 
-    # Load the tree, keeping the internal node names
-    tree = topiary.io.read_tree(tree_file)
+    # Load the tree, keeping the internal node names (fmt=1)
+    tree = topiary.io.read_tree(tree_file, fmt=1)
     
     # 1. Initialize states for each node
     # state array: shape (num_sites, 2), where [:, 0] is False state, [:, 1] is True state

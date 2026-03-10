@@ -87,7 +87,7 @@ def _make_ancestor_summary_trees(df,
         # ETE4 requires a dist attribute to write the tree, but RAxML-NG >1.2.0
         # sometimes omits the dist for the root node.
         for n in (label_node, pp_node):
-            if not hasattr(n, "dist") or n.dist is None:
+            if n.get_prop("dist") is None:
                 n.dist = 0.0
 
         # See if this is a leaf and make sure the labeles
@@ -126,8 +126,8 @@ def _make_ancestor_summary_trees(df,
         else:
             pp_node.support = avg_pp_dict[anc_name]
 
-    t_out_pp.write(parser=2,format_root_node=True,outfile="tree_anc-pp.newick")
-    t_out_label.write(parser=3,format_root_node=True,outfile="tree_anc-label.newick")
+    t_out_pp.write(format_root_node=True,outfile="tree_anc-pp.newick",parser=2)
+    t_out_label.write(format_root_node=True,outfile="tree_anc-label.newick",parser=3)
 
 def _get_bad_columns(phy_file):
     """

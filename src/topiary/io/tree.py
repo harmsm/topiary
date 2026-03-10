@@ -98,7 +98,63 @@ def read_tree(tree,fmt=None):
     return t
 
 
-def _map_tree_to_tree(T1,T2):
+
+def _ete4_node_dict(T,rooted=False):
+    """
+    Create dictionary keying ete4 tree nodes to tuple of descendants.
+    """
+    all_leaves = set(T.leaf_names())
+    ref_leaf = min(all_leaves)
+
+    node_dict = {}
+    for node in T.traverse():
+        d1 = set(node.leaf_names())
+        if d1 == all_leaves:
+            split = ("ROOT",)
+        else:
+            if rooted:
+                split = tuple(sorted(list(d1)))
+            else:
+                if ref_leaf in d1:
+                    split = tuple(sorted(list(all_leaves - d1)))
+                else:
+                    split = tuple(sorted(list(d1)))
+
+        if split not in node_dict:
+            node_dict[split] = []
+        node_dict[split].append(node)
+
+    return node_dict
+
+def _toytree_node_dict(T,rooted=False):
+    """
+    Create dictionary keying toytree tree nodes to tuple of descendants.
+    """
+    all_leaves = set(T.get_tip_labels())
+    ref_leaf = min(all_leaves)
+
+    node_dict = {}
+    for node in T.get_nodes():
+        d1 = set(node.get_leaf_names())
+        if d1 == all_leaves:
+            split = ("ROOT",)
+        else:
+            if rooted:
+                split = tuple(sorted(list(d1)))
+            else:
+                if ref_leaf in d1:
+                    split = tuple(sorted(list(all_leaves - d1)))
+                else:
+                    split = tuple(sorted(list(d1)))
+
+        if split not in node_dict:
+            node_dict[split] = []
+        node_dict[split].append(node)
+
+    return node_dict
+
+
+def _map_tree_to_tree(T1,T2,rooted=False):
     """
     Map nodes between one tree and another based on shared descendants.
 
@@ -119,66 +175,40 @@ def _map_tree_to_tree(T1,T2):
         list of nodes from T2 that are not in T1
     """
 
-    def _ete4_node_dict(T):
-        """
-        Create dictionary keying ete4 tree nodes to tuple of descendants.
-        """
-
-        node_dict = {}
-        for node in T.traverse():
-            leaves = node.leaf_names()
-            leaves = [t for t in leaves]
-            leaves.sort()
-            leaves = tuple(leaves)
-            node_dict[leaves] = node
-
-        return node_dict
-
-    def _toytree_node_dict(T):
-        """
-        Create dictionary keying toytree tree nodes to tuple of descendants.
-        """
-
-        node_dict = {}
-        for k in T.idx_dict:
-            leaves = T.idx_dict[k].get_leaf_names()
-            leaves.sort()
-            leaves = tuple(leaves)
-            node_dict[leaves] = T.idx_dict[k]
-
-        return node_dict
-
     # Construct dictionary keying node to tuple of descendants for T1
     if isinstance(T1,ete.Tree):
-        T1_node_dict = _ete4_node_dict(T1)
+        T1_node_dict = _ete4_node_dict(T1,rooted=rooted)
     else:
-        T1_node_dict = _toytree_node_dict(T1)
+        T1_node_dict = _toytree_node_dict(T1,rooted=rooted)
 
     # Construct dictionary keying node to tuple of descendants for T2
     if isinstance(T2,ete.Tree):
-        T2_node_dict = _ete4_node_dict(T2)
+        T2_node_dict = _ete4_node_dict(T2,rooted=rooted)
     else:
-        T2_node_dict = _toytree_node_dict(T2)
+        T2_node_dict = _toytree_node_dict(T2,rooted=rooted)
 
     T1_nodes = []
     shared_nodes = []
     T2_keys = list(T2_node_dict.keys())
     for key in T1_node_dict:
-
-        try:
-            # Shared, not in T2 alone
-            shared_nodes.append((T1_node_dict[key],T2_node_dict[key]))
-            T2_keys.remove(key)
-
-        except KeyError:
-            # Only in T1
-            T1_nodes.append(T1_node_dict[key])
+        if key in T2_node_dict:
+            for n1 in T1_node_dict[key]:
+                for n2 in T2_node_dict[key]:
+                    shared_nodes.append((n1,n2))
+            
+            try:
+                T2_keys.remove(key)
+            except ValueError:
+                pass
+        else:
+            for n1 in T1_node_dict[key]:
+                T1_nodes.append(n1)
 
     # If key is left in T2_keys, the node is only in T2
     T2_nodes = []
     for key in T2_keys:
-        T2_nodes.append(T2_node_dict[key])
-
+        for n2 in T2_node_dict[key]:
+            T2_nodes.append(n2)
 
     return shared_nodes, T1_nodes, T2_nodes
 
@@ -301,6 +331,17 @@ def load_trees(directory=None,
             T.root.del_prop("support")
         except (AttributeError, KeyError):
             pass
+        try:
+            T.root.del_prop("dist")
+        except (AttributeError, KeyError):
+            pass
+
+    # If this is not a reconciled tree, strip the root node name. ETE4 requires 
+    # a clean root to avoid issues during rooting/drawing, and most gene tree
+    # formats don't have meaningful data at the root junction. For reconciled
+    # trees, we keep it because it stores the root evolutionary event (D, S, etc.)
+    if prefix != "reconciled":
+        T.root.name = ""
 
     # If we have an event tree, root all trees on that rooted tree
     if prefix == "reconciled":
@@ -327,10 +368,20 @@ def load_trees(directory=None,
         # We must do this on a COPY because set_midpoint_outgroup resolves multifurcations
         # permanently, causing topology mismatches down the line.
         tmp_T = T_list[0].copy()
+        for n in tmp_T.traverse():
+            if not n.is_leaf:
+                try:
+                    n.del_prop("support")
+                except (AttributeError, KeyError):
+                    pass
+                n.name = ""
+        
+        # Root MUST NOT have distance or support for ETE4 rooting
         try:
-            tmp_T.root.del_prop("support")
+            tmp_T.root.del_prop("dist")
         except (AttributeError, KeyError):
             pass
+
         tmp_T.set_midpoint_outgroup()
         
         root_on = []
@@ -339,48 +390,65 @@ def load_trees(directory=None,
             leaves.sort()
             root_on.append(tuple(leaves))
 
-    # For each tree...
-    for T in T_list:
-
-        # Do not root the event tree as it will wipe out label
-        if T is T_event:
-            continue
-
-        # Get MRCA for descendants of left and right from event root
-        T.unroot()
-        left = T.common_ancestor(root_on[0])
-        right = T.common_ancestor(root_on[1])
-
-        # If there is only one descendant on one lineage, left and right
-        # will be the exact same node. Set the single descendant, rather
-        # than the MRCA as the outgroup node.
-        if left is right:
-            if len(root_on[0]) == 1:
-                left = root_on[0][0]
-            elif len(root_on[1]) == 1:
-                right = root_on[1][0]
-            else:
-                w = "Should not have gotten here. Weird rooting state possible."
-                print(w)
-
-        # Try setting left, then right outgroup.
-        try:
-            if not left.is_root:
-                T.set_outgroup(left)
-            elif not right.is_root:
-                T.set_outgroup(right)
-        except (ete.TreeError,AssertionError) as e:
-            print(f"Failed left outgroup for {T}: {e}")
+    # Synchronize rooting for all trees in T_list based on root_on. Only do this 
+    # for non-reconciled trees. Reconciled trees are already rooted correctly
+    # on their event root. 
+    if prefix != "reconciled":
+        for T in T_list:
+            if T is None:
+                continue
+            T.unroot()
             try:
-                if not right.is_root:
+                left = T.common_ancestor(root_on[0])
+                T.set_outgroup(left)
+            except Exception:
+                try:
+                    right = T.common_ancestor(root_on[1])
                     T.set_outgroup(right)
-                elif not left.is_root:
-                    T.set_outgroup(left)
-            except (ete.TreeError,AssertionError) as e2:
-                print(f"Failed right outgroup for {T}: {e2}")
+                except Exception:
+                    pass
 
     # Make new tree from first tree in list. This will be our output tree.
     out_tree = T_list[0].copy()
+
+    # Clean out_tree internal nodes of all properties that might interfere with 
+    # rooting. Since we map properties back later, this is safe. 
+    for n in out_tree.traverse():
+        if not n.is_leaf:
+            try:
+                n.del_prop("support")
+            except (AttributeError, KeyError):
+                pass
+            try:
+                n.del_prop("dist")
+            except (AttributeError, KeyError):
+                if not n.is_root: # Root might not have dist
+                    pass
+            n.name = ""
+
+    # Root out_tree!
+    out_tree.unroot()
+    left = out_tree.common_ancestor(root_on[0])
+    right = out_tree.common_ancestor(root_on[1])
+    if left is right:
+        if len(root_on[0]) == 1:
+            left = root_on[0][0]
+        elif len(root_on[1]) == 1:
+            right = root_on[1][0]
+    
+    try:
+        if not left.is_root:
+            out_tree.set_outgroup(left)
+        elif not right.is_root:
+            out_tree.set_outgroup(right)
+    except (ete.TreeError,AssertionError) as e:
+        try:
+            if not right.is_root:
+                out_tree.set_outgroup(right)
+            elif not left.is_root:
+                out_tree.set_outgroup(left)
+        except (ete.TreeError,AssertionError) as e2:
+            print(f"Failed to root out_tree: {e2}")
     for n in out_tree.traverse():
 
         # Create empty features
@@ -394,26 +462,56 @@ def load_trees(directory=None,
     # features_to_load maps trees with information to copy (keys) to what
     # feature we should extract from that tree. Values are (feature_in_tree,
     # name_of_feature_in_out_tree,whether_to_allow_root_value).
-    features_to_load = {T_event:("name","event",True),
-                        T_anc_pp:("support","anc_pp",False),
-                        T_anc_label:("name","anc_label",False),
-                        T_support:("support","bs_support",False)}
+    features_to_load = {}
+    if T_clean is not None:
+        features_to_load[T_clean] = [("dist","dist",True),("support","support",False)]
+
+    # Map other features
+    root_ok_val = (prefix == "reconciled")
+    for T, out_f, in_f, root_ok in [(T_event,"event","name",True),
+                                    (T_anc_pp,"anc_pp","support",root_ok_val),
+                                    (T_anc_label,"anc_label","name",root_ok_val),
+                                    (T_support,"bs_support","support",False)]:
+        if T is not None:
+            if T not in features_to_load:
+                features_to_load[T] = []
+            features_to_load[T].append((in_f,out_f,root_ok))
+
+    # Ensure we have dist and support (required for ETE4 write)
+    has_dist = False
+    has_support = False
+    for T in features_to_load:
+        for f in features_to_load[T]:
+            if f[1] == "dist": has_dist = True
+            if f[1] == "support": has_support = True
+    
+    if not has_dist or not has_support:
+        for T in T_list:
+            if T is not None:
+                if T not in features_to_load:
+                    features_to_load[T] = []
+                if not has_dist:
+                    features_to_load[T].append(("dist","dist",True))
+                if not has_support:
+                    features_to_load[T].append(("support","support",False))
+                break
 
     # Only copy from trees that are not None.
-    trees = [k for k in features_to_load.keys() if k is not None]
+    trees = [k for k in features_to_load.keys()]
 
     stash_values = {}
     for T in trees:
 
-        in_feature = features_to_load[T][0]
-        out_feature = features_to_load[T][1]
-        root_allowed = features_to_load[T][2]
-
         # Since all have the same root and descendants, tree nodes should be
         # identical between trees and uniquely identified by their descendants
-        shared, T_alone, out_alone = _map_tree_to_tree(T,out_tree)
+        shared, T_alone, out_alone = _map_tree_to_tree(T,out_tree,rooted=False)
+        
+        # Pull out_feature for error message if topology mismatch. This is just
+        # picking the first one in the list for this tree. 
+        out_feature_for_err = features_to_load[T][0][1]
+        
         if len(T_alone) > 0 or len(out_alone) > 0:
-            print(f"Topology mismatch during {out_feature}!")
+            print(f"Topology mismatch during {out_feature_for_err}!")
             print(f"T_alone: {[list(n.leaf_names()) for n in T_alone]}")
             print(f"out_alone: {[list(n.leaf_names()) for n in out_alone]}")
             err = "Cannot merge trees with different topologies.\n"
@@ -427,26 +525,39 @@ def load_trees(directory=None,
             in_node = s[0]
             out_node = s[1]
 
-            # If internal
-            if not out_node.is_leaf:
+            for in_feature, out_feature, root_allowed in features_to_load[T]:
 
                 # Get value from in
                 value = in_node.get_prop(in_feature)
                 if value is None:
                     value = in_node.get_prop(f"_{in_feature}")
 
+                # If still None, check if this is a core attribute (e.g. name, support, dist)
+                if value is None:
+                    value = getattr(in_node,in_feature,None)
+
                 # small hack --> anc to a
-                if T is T_anc_label and value is not None:
-                    value = re.sub("anc","a",value)
+                if out_feature == "anc_label" and value is not None:
+                    value = re.sub("anc","a",str(value))
 
-                # Add value to out
-                out_node.add_prop(out_feature,value)
+                # Add value to out. We only add if not None because ETE4
+                # properties like dist and support will crash on access if 
+                # they are explicitly set to None (vs just being deleted or 
+                # default). 
+                if value is not None:
+                    out_node.add_prop(out_feature,value)
 
-            # If root node, pull out anc_ if there.
-            if out_node.is_root:
-                if not root_allowed:
-                    stash_values[out_feature] = value
-                    out_node.add_prop(out_feature,None)
+                # If root node, pull out value if not allowed on root
+                if out_node.is_root:
+                    if not root_allowed:
+                        stash_values[out_feature] = value
+                        if out_feature in ["dist","support","name"]:
+                            try:
+                                out_node.del_prop(out_feature)
+                            except (KeyError,AttributeError):
+                                pass
+                        else:
+                            out_node.add_prop(out_feature,None)
 
 
     # Copy ancestor to correct node because displayed by rooting
@@ -458,9 +569,10 @@ def load_trees(directory=None,
                 if n.is_leaf:
                     continue
 
-                if n.get_prop("anc_label") == "":
+                if n.get_prop("anc_label") is None or n.get_prop("anc_label") == "":
                     n.add_prop("anc_label",stash_values["anc_label"])
-                    n.add_prop("anc_pp",stash_values["anc_pp"])
+                    if "anc_pp" in stash_values:
+                        n.add_prop("anc_pp",stash_values["anc_pp"])
 
     return out_tree
 
