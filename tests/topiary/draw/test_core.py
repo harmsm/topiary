@@ -31,6 +31,8 @@ def test__deprotect_name():
     assert _deprotect_name("'te%20st'") == "te st"
     assert _deprotect_name("'%20te%20st%20'") == " te st "
     assert _deprotect_name("'te,st'") == "te,st"
+    # line 34
+    assert _deprotect_name(None) == ""
 
 def test_color_to_css():
 
@@ -39,8 +41,13 @@ def test_color_to_css():
     assert color_to_css([1,0,0,1]) == 'rgba(100.0%,0.0%,0.0%,1.000)'
     assert color_to_css("red") == 'rgba(100.0%,0.0%,0.0%,1.000)'
 
+    # test invalid color types (58-60)
     with pytest.raises(ValueError):
-        color_to_css([1,0,0,1,1,1])
+        color_to_css(5.0)
+
+    # test invalid iterable length (53-55)
+    with pytest.raises(ValueError):
+        color_to_css((1,2))
 
 def test_get_round_to():
 
@@ -58,6 +65,10 @@ def test_get_round_to():
     assert get_round_to(1.12,total_requested=3) == 2
     assert get_round_to(1.12,total_requested=2) == 1
     assert get_round_to(1.12,total_requested=1) == 0
+    # edge case 100
+    assert get_round_to(0, total_requested=3) == 0
+    # edge case 116
+    assert get_round_to(np.nan, total_requested=3) == 0
 
     assert get_round_to(-1e50,total_requested=3) == 0
     assert get_round_to(-0.1,total_requested=3) == 1
@@ -168,6 +179,14 @@ def test_ete4_to_toytree():
     T = ete.Tree(tree)
     tT = ete4_to_toytree(T)
 
+def test_load_trees():
+    from topiary.io.tree import load_trees
+    # Test file not found (returns None)
+    assert load_trees("not_a_directory") is None
+    
+    # Test invalid tree (returns None)
+    assert load_trees("NOT A TREE") is None
+
 
 def test_construct_colormap():
 
@@ -265,6 +284,14 @@ def test_construct_colormap():
     with pytest.raises(ValueError):
         construct_colormap(prop=("A","B","C"),color={"A":"white","B":"red"})
 
+    # prop_span formatting error (456-457)
+    with pytest.raises(ValueError):
+        construct_colormap(prop=(0,1), color=("white","red"), prop_span=5)
+
+    # prop_span numeric error (470-475)
+    with pytest.raises(ValueError):
+        construct_colormap(prop=(0,1), color=("white","red"), prop_span=("not","a_float"))
+
 
 def test_construct_sizemap():
 
@@ -340,6 +367,25 @@ def test_construct_sizemap():
     sm, sm_span =construct_sizemap(prop=("A","B"),size=1)
     assert len(sm_span) == 0
 
+    # prop is not numeric for size gradient (540 in original, now handles gracefully)
+    with pytest.raises(ValueError):
+        construct_sizemap(prop=("A","B"), size=(5,10))
+
+    # prop_span logic (551-552, 568)
+    sm, sm_span = construct_sizemap(prop=(0,1), size=(5,10), prop_span=(0,2))
+    assert sm(0) == 5
+    assert sm(2) == 10
+
+    # return minimum size if max==min or size_min==size_max (555-558)
+    sm, sm_span = construct_sizemap(prop=(1,1), size=(5,10))
+    assert sm(1) == 5
+    sm, sm_span = construct_sizemap(prop=(0,1), size=(5,5))
+    assert sm(0) == 5
+
+    # construct_sizemap errors (575-576)
+    with pytest.raises(ValueError):
+        construct_sizemap(prop=(0,1), size=(5,10), prop_span=5)
+
 
 def test_create_name_dict(for_real_inference):
 
@@ -368,9 +414,29 @@ def test_create_name_dict(for_real_inference):
 
 
 def test_parse_position_string():
-
-    pass
+    from topiary.draw.core import parse_position_string
+    assert parse_position_string("top", 10, 20) == (0, 20)
+    assert parse_position_string("bottom", 10, 20) == (0, -20)
+    assert parse_position_string("left", 10, 20) == (-10, 0)
+    assert parse_position_string("right", 10, 20) == (10, 0)
+    # logic 669-672
+    with pytest.raises(ValueError):
+        parse_position_string("invalid", 10, 20)
 
 def test_parse_span_color():
+    from topiary.draw.core import parse_span_color
+    # This should raise ValueError because it wants a dict (628-632)
+    with pytest.raises(ValueError):
+        parse_span_color(("white", "red"), None)
+    
+    # logic 608
+    assert parse_span_color(None, "red") == (False, None, "red")
+    # logic 612
+    assert parse_span_color(None, None) == (False, None, None)
+    # logic 616
+    with pytest.raises(ValueError):
+        parse_span_color("not_a_dict", None)
+    
+    # Valid dict (637)
+    assert parse_span_color({0: "white", 1: "red"}, None) == (True, (0.0, 1.0), ("white", "red"))
 
-    pass

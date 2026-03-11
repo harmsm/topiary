@@ -22,8 +22,9 @@ def test_main(small_phylo,tmpdir):
 
     # Get location of binary
     location = os.path.dirname(os.path.realpath(__file__))
-    test_bin = "topiary-bootstrap-reconcile"
-    base_cmd = [test_bin]
+    import sys
+    test_bin = [sys.executable, "-m", "topiary.cli_scripts.bootstrap_reconcile"]
+    base_cmd = test_bin
 
     # Should run but fail because no arguments
     ret = subprocess.run(base_cmd)
@@ -42,7 +43,6 @@ def test_main(small_phylo,tmpdir):
     ret = subprocess.run(cmd)
     assert ret.returncode != 0
 
-    # should work because more threads than replicates, which is now dealt with    
     # gracefully (will drop to 2 threads since there are 2 replicates)
     cmd.append("10")
     ret = subprocess.run(cmd)

@@ -376,6 +376,8 @@ class PrettyTree:
             except (ValueError, KeyError):
                 err = f"property_label {property_label} is not a tree feature\n"
                 raise ValueError(err)
+        else:
+            prop = np.zeros(self._tT.nnodes)
 
         # If no nodes, return self
         if len(prop) == 0:
@@ -384,9 +386,16 @@ class PrettyTree:
         # get number of nodes
         num_nodes = len(prop)
 
-        # Do not plot anything with "None" entry
-        good_mask = np.array([p is not None for p in prop],dtype=bool)
-
+        # Do not plot anything with "None" or "NaN" entry
+        good_mask = []
+        for p in prop:
+            if p is None:
+                good_mask.append(False)
+            elif isinstance(p,float) and np.isnan(p):
+                good_mask.append(False)
+            else:
+                good_mask.append(True)
+        good_mask = np.array(good_mask,dtype=bool)
         prop = prop[good_mask]
         all_node_indexer = np.arange(num_nodes,dtype=int)[good_mask]
 
@@ -564,17 +573,17 @@ class PrettyTree:
         # Check input bools
         plot_ancestors = check.check_bool(plot_ancestors,"plot_ancestors")
         plot_leaves = check.check_bool(plot_leaves,"plot_leaves")
+        plot_root = check.check_bool(plot_root,"plot_root")
 
         # Get position and position_offset
         position = str(position)
         if position_offset is not None:
-            # Convert from px to tree coordinates.
             position_offset = check.check_float(position_offset,"position_offset")
-            x_offset = np.abs(position_offset*self._x_px_to_tree)
-            y_offset = np.abs(position_offset*self._y_px_to_tree)
         else:
-            x_offset = np.abs(self.default_size*self._x_px_to_tree)
-            y_offset = np.abs(self.default_size*self._y_px_to_tree)
+            position_offset = self.default_size*0.75
+            
+        x_offset = position_offset
+        y_offset = position_offset
 
         # small hack -- displace a bit more in y than x because it almost always
         # looks saner.
@@ -694,7 +703,13 @@ class PrettyTree:
         to_zip = [prop_dict[var] for var in var_list]
         for v in zip(*to_zip):
 
-            num_none = sum([value is None for value in v])
+            num_none = 0
+            for value in v:
+                if value is None:
+                    num_none += 1
+                elif isinstance(value,float) and np.isnan(value):
+                    num_none += 1
+
             if len(v) == num_none:
                 good_mask.append(False)
                 to_write.append(None)
@@ -708,7 +723,7 @@ class PrettyTree:
             # into np.nan. Serious hack. Turn into '999999' and remove immediately
             # with re.sub. Ugly, but can't get custom formatter in here without
             # a huge refactor...
-            except TypeError:
+            except (TypeError, ValueError):
 
                 # Go through each value in the vector
                 v = list(v)
@@ -720,7 +735,7 @@ class PrettyTree:
 
                     # If here, sub bad float with np.nan. sub bad int with
                     # 999999
-                    except TypeError:
+                    except (TypeError, ValueError):
                         if issubclass(cast_from[i],float):
                             v[i] = np.nan
                         else:
@@ -734,15 +749,34 @@ class PrettyTree:
             to_write.append(new_string)
 
         good_mask = np.array(good_mask,dtype=bool)
-        to_write = np.array(to_write)
+        to_write = np.array(to_write,dtype=object)
 
         # Actually write labels
+        
+        # Mask nodes based on plot_ancestors, plot_leaves, plot_root
+        # In toytree 3, mask=True means SHOW, mask=False means HIDE. 
+        show_mask = np.zeros(self._tT.nnodes, dtype=bool)
+        for i in range(self._tT.nnodes):
+            node = self._tT[i]
+            if node.is_leaf():
+                if plot_leaves:
+                    show_mask[i] = True
+            else:
+                if node.is_root():
+                    if plot_root:
+                        show_mask[i] = True
+                else:
+                    if plot_ancestors:
+                        show_mask[i] = True
+
+        combined_mask = np.logical_and(good_mask, show_mask)
+
         self._tT.annotate.add_node_labels(self._tree_ax,
                                           labels=to_write,
                                           xshift=dx,
                                           yshift=dy,
                                           style=text_style,
-                                          mask=np.logical_not(good_mask))
+                                          mask=combined_mask)
 
         return self
 

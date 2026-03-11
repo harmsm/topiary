@@ -284,7 +284,7 @@ def ete4_to_toytree(T):
         names_df.loc[idx] = _deprotect_name(names_df[idx])
     tT.set_node_data(feature="name",data=names_df,inplace=True)
 
-    # Map nodes unambiguously by descendant leaf names
+    # Map nodes unambiguously by descendant leaf names. 
     # toytree
     tT_node_dict = _toytree_node_dict(tT,rooted=True)
 
@@ -294,12 +294,26 @@ def ete4_to_toytree(T):
     all_features = []
     for node in T.traverse():
         all_features.extend(list(node.props.keys()))
-
+    
     # Create list of all unique features seen on any node in ete4 tree
     all_features = list(set(all_features))
+    if "name" not in all_features:
+        all_features.append("name")
 
-    # Create dictionary to hold all features for conversion to a dataframe
-    out = dict([(f,[]) for f in all_features])
+    # Create dictionary to hold all features for conversion to a dataframe. 
+    # For "name", we initialize with the current toytree names so they are
+    # not lost if a node cannot be mapped to the ete4 tree. 
+    nnodes = tT.nnodes
+    out = {}
+    for f in all_features:
+        if f == "name":
+            out[f] = list(tT.get_node_data("name"))
+        elif f == "support":
+            out[f] = [1.0] * nnodes
+        elif f == "dist":
+            out[f] = [0.0] * nnodes
+        else:
+            out[f] = [None] * nnodes
 
     # We can now map between toytree and ete4.Trees based on their shared keys.
     # Note that nodes must have identical splits. We iterate over toytree nodes
@@ -307,9 +321,7 @@ def ete4_to_toytree(T):
     
     # Get all leaves in toytree for split calculation
     tT_all_leaves = set(tT.get_tip_labels())
-    tT_ref_leaf = min(tT_all_leaves)
-
-    for node in tT.get_nodes():
+    for i, node in enumerate(tT.get_nodes()):
         
         # Calculate clade for this toytree node
         d1 = set(node.get_leaf_names())
@@ -318,19 +330,27 @@ def ete4_to_toytree(T):
         else:
             split = tuple(sorted(list(d1)))
 
-        # Get equivalent ete4 node
-        try:
-            T_node = T_node_dict[split][0]
-        except KeyError:
-            # Fallback if split not found (should not happen if topologies are identical)
-            # We'll just continue and append default values
-            for f in all_features:
-                if f == "support":
-                    out[f].append(1.0)
-                elif f == "dist":
-                    out[f].append(0.0)
-                else:
-                    out[f].append(None)
+        # Get equivalent ete4 node. 
+        T_node = None
+
+        # Try to get the node with the original split
+        T_nodes = T_node_dict.get(split,[])
+        for n in T_nodes:
+            if n.is_leaf == node.is_leaf():
+                T_node = n
+                break
+        
+        # If still not found (and not the root), try the flipped split. 
+        # This handles cases where the root moved relative to the ete4 tree.
+        if T_node is None and split != ("ROOT",):
+            flipped_split = tuple(sorted(list(tT_all_leaves - d1)))
+            T_nodes = T_node_dict.get(flipped_split,[])
+            for n in T_nodes:
+                if n.is_leaf == node.is_leaf():
+                    T_node = n
+                    break
+
+        if T_node is None:
             continue
 
         # Go through all features in the ete4 tree
@@ -339,13 +359,13 @@ def ete4_to_toytree(T):
             # Try to get property using get_prop
             value = T_node.get_prop(f)
             if value is None:
-                if f == "support":
-                    value = 1.0
-                elif f == "dist":
-                    value = 0.0
-
+                # Fallback for core properties if get_prop fails
+                if f in ["support","dist","name"]:
+                    value = getattr(T_node,f,None)
+            
             # Record value
-            out[f].append(value)
+            if value is not None:
+                out[f][i] = value
 
     # Now set each feature
     for f in out:
@@ -449,6 +469,15 @@ def construct_colormap(color,prop,prop_span=None,palette=None):
                 err = f"\nPallet {palette} should be an instance of toyplot.color.Palette\n\n"
                 raise TypeError(err)
 
+            if prop_span is not None:
+                try:
+                    prop_span = [float(v) for v in prop_span]
+                    if len(prop_span) != 2:
+                        raise ValueError
+                except (ValueError, TypeError):
+                    err = "\nprop_span must be an iterable of length 2 containing floats.\n\n"
+                    raise ValueError(err)
+
             if prop_span is None:
                 min_value = np.min(prop)
                 max_value = np.max(prop)
@@ -546,6 +575,15 @@ def construct_sizemap(size,prop,prop_span=None):
                 err = "\nProperty is not a float. Using a size\n"
                 err += "gradient requires a float property value."
                 raise ValueError(err)
+
+            if prop_span is not None:
+                try:
+                    prop_span = [float(v) for v in prop_span]
+                    if len(prop_span) != 2:
+                        raise ValueError
+                except (ValueError, TypeError):
+                    err = "\nprop_span must be an iterable of length 2 containing floats.\n\n"
+                    raise ValueError(err)
 
             if prop_span is not None:
                 value_min = prop_span[0]
