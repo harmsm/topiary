@@ -3,7 +3,7 @@
 rm -rf raxml-ng
 
 # Download repo and submodules
-git clone git@github.com:harmslab/raxml-ng.git
+git clone https://github.com/harmslab/raxml-ng.git
 cd raxml-ng
 git submodule update --init --recursive
 

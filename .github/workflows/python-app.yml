@@ -1,9 +1,6 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-# NOTE: this does not run with --run-raxml or --run-generax flags, so these
-# tests will be skipped.
-
 name: topiary
 
 on:
@@ -20,7 +17,7 @@ jobs:
       max-parallel: 3
       matrix:
         os: [ubuntu-latest,macos-latest]
-        python-version: ['3.8', '3.9', '3.10' , '3.11', '3.12']
+        python-version: ['3.10' , '3.11', '3.12', '3.13']
 
     steps:
     - name: checkout
@@ -35,12 +32,58 @@ jobs:
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
 
+    - name: get dependency hashes
+      id: get-hashes
+      shell: bash
+      run: |
+        GENERAX_HASH=$(git ls-remote https://github.com/harmslab/generax.git HEAD | awk '{print $1}')
+        RAXML_HASH=$(git ls-remote https://github.com/harmslab/raxml-ng.git HEAD | awk '{print $1}')
+        echo "generax_hash=$GENERAX_HASH" >> $GITHUB_OUTPUT
+        echo "raxml_hash=$RAXML_HASH" >> $GITHUB_OUTPUT
+
+    - name: cache generax
+      id: cache-generax
+      uses: actions/cache@v3
+      with:
+        path: bin-cache/generax
+        key: ${{ runner.os }}-generax-${{ steps.get-hashes.outputs.generax_hash }}
+
+    - name: cache raxml-ng
+      id: cache-raxml
+      uses: actions/cache@v3
+      with:
+        path: bin-cache/raxml-ng
+        key: ${{ runner.os }}-raxml-${{ steps.get-hashes.outputs.raxml_hash }}
+
     - name: install topiary
       shell: bash -l {0}
       run: |
         # platform specific packages
-        conda install -c conda-forge -c bioconda "muscle>=5.0" "raxml-ng==1.1" "generax>=2.0" "blast>=2.2"
+        conda install -c conda-forge -c bioconda cmake "muscle>=5.0" "blast>=2.2"
         python -m pip install .[dev] -vv
+
+        # Ensure bin-cache exists
+        mkdir -p bin-cache
+
+        # compile generax if not cached
+        if [ ! -f bin-cache/generax ]; then
+            cd dependencies
+            bash compile-generax.sh
+            cp $CONDA_PREFIX/bin/generax ../bin-cache/
+            cd ..
+        else
+            cp bin-cache/generax $CONDA_PREFIX/bin/
+        fi
+
+        # compile raxml if not cached
+        if [ ! -f bin-cache/raxml-ng ]; then
+            cd dependencies
+            bash compile-raxml-ng.sh
+            cp $CONDA_PREFIX/bin/raxml-ng ../bin-cache/
+            cd ..
+        else
+            cp bin-cache/raxml-ng $CONDA_PREFIX/bin/
+        fi
 
     - name: run flake8
       shell: bash -l {0}
@@ -52,7 +95,7 @@ jobs:
       run: |
         conda install pytest
         export PATH=`which conda | xargs dirname`/envs/topiary/bin/:$PATH
-        pytest
+        pytest tests/ --run-raxml --run-generax --run-blast
 
   build-windows:
     runs-on: ${{ matrix.os }}
@@ -61,7 +104,7 @@ jobs:
       max-parallel: 3
       matrix:
         os: [windows-latest]
-        python-version: ['3.8', '3.9', '3.10' , '3.11', '3.12']
+        python-version: ['3.10' , '3.11', '3.12','3.13']
 
     steps:
     - name: checkout
@@ -71,7 +114,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         activate-environment: topiary
-        environment-file: environment.yml
+        environment-file: environment_windows.yml
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
 

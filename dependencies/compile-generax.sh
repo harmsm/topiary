@@ -11,7 +11,7 @@ rm -rf generax
 # openmpi module.
 
 # Download repo and submodules
-git clone git@github.com:harmslab/generax.git
+git clone https://github.com/harmslab/generax.git
 cd generax
 git submodule update --init --recursive
 
