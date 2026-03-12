@@ -636,7 +636,7 @@ def get_merge_blocks(df,
         T = species_tree.copy()
         for leaf in T.leaves():
             leaf.add_prop("sequences",tuple(leaf.get_prop("paralogs")[p]))
-            leaf.name = f"{leaf.name} ({len(leaf.get_prop("sequences"))})"
+            leaf.name = f"{leaf.name} ({len(leaf.get_prop('sequences'))})"
 
         # Figure out how to distribute the total budget across the tree
         T = _get_sequence_budgets(T,paralog_budget[p])
