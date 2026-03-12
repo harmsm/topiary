@@ -65,6 +65,8 @@ def _rle(input_array):
     """
 
     N = input_array.shape[0]
+    if N == 0:
+        return np.array([],dtype=int), np.array([],dtype=int), np.array([],dtype=bool)
 
     # Get differences in input array
     diffs = input_array[1:] != input_array[:-1]

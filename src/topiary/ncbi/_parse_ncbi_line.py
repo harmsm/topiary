@@ -86,10 +86,12 @@ def parse_ncbi_line(line,accession=None):
     out = {"raw_line":line}
 
     if pd.isnull(line):
-        print(line)
+        return None
 
     # Clean up leading and trailing spaces
-    line = line.strip()
+    line = str(line).strip()
+    if line == "":
+        return None
 
     # Clean up leading ">" if it's there (difference between fasta and blast
     # lines)

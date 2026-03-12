@@ -1,6 +1,4 @@
-
 import pytest
-
 import topiary
 from topiary.quality import remove_redundancy
 from topiary.quality.redundancy import _get_quality_scores
@@ -8,9 +6,11 @@ from topiary.quality.redundancy import _construct_args
 from topiary.quality.redundancy import _compare_seqs
 from topiary.quality.redundancy import _redundancy_thread_function
 from topiary.quality.redundancy import _EXPECTED_COLUMNS
+from topiary.quality.redundancy import find_redundancy_cutoff
 
 import numpy as np
 import pandas as pd
+import multiprocessing
 
 def test__get_quality_scores(test_dataframes):
 
@@ -49,6 +49,10 @@ def test__get_quality_scores(test_dataframes):
 
     df["always_keep"] = True # always keep True
     assert _get_quality_scores(df.loc[0,:])[0] == 0
+
+    # Test ValueError for target_length without pct_length_cutoff
+    with pytest.raises(ValueError):
+        _get_quality_scores(df.loc[0,:], target_length=100)
 
 def test__construct_args():
 
@@ -171,8 +175,20 @@ def test__compare_seqs(test_dataframes):
     assert a2 is True
 
 def test__redundancy_thread_function():
-
-    pass
+    # Setup sequences and quality
+    sequence_array = np.array(["AAAA", "AAAA", "BBBB"])
+    quality_array = np.array([[1,1,0,0,0,0,0,0,0], [1,1,0,0,0,0,0,0,0], [1,1,0,0,0,0,0,0,0]])
+    keep_array = multiprocessing.Array('i', [1, 1, 1])
+    lock = multiprocessing.Lock()
+    
+    # Test redundancy within block (0, 3) and (0, 3)
+    _redundancy_thread_function((0, 3), (0, 3), sequence_array, quality_array, keep_array, 0.5, False, lock)
+    
+    # AAAA vs AAAA should drop one. 
+    # BBBB is unique.
+    assert keep_array[0] == 1
+    assert keep_array[1] == 0
+    assert keep_array[2] == 1
 
 
 def test_remove_redundancy(test_dataframes):
@@ -200,13 +216,11 @@ def test_remove_redundancy(test_dataframes):
 
     bad_silent = [None,"test",int,float,{"test":1}]
     for b in bad_silent:
-        print(f"trying bad silent {b}")
         with pytest.raises(ValueError):
             remove_redundancy(df=df,silent=b)
 
     good_silent = [True,False,0,1]
     for g in good_silent:
-        print(f"trying good silent {g}")
         remove_redundancy(df=df,silent=g)
 
 
@@ -240,6 +254,11 @@ def test_remove_redundancy(test_dataframes):
     assert np.sum(out_df.keep) == 4
     assert out_df.loc[out_df["species"] == species_in_df[0],:].iloc[0].keep == False
 
+    # Test mismatching column types
+    df_bad_col = df.copy()
+    df_bad_col["partial"] = ["not a number"] * len(df)
+    with pytest.raises(ValueError):
+        remove_redundancy(df_bad_col)
 
     # -------------------------------------------------------------------------
     # Make sure it takes row with higher quality
@@ -280,5 +299,28 @@ def test_remove_redundancy(test_dataframes):
     out_df = remove_redundancy(df=df,cutoff=0.2)
     assert np.sum(out_df.keep) == 1
 
-def test_find_redundancy_cutoff():
-    pass
+def test_find_redundancy_cutoff(test_dataframes):
+    df = test_dataframes["good-df"].copy()
+    
+    # Test target reached immediately (max_cutoff)
+    # len(df) is small, so we'll likely get a quick result
+    cutoff = find_redundancy_cutoff(df, target_seq_number=10, max_cutoff=0.99)
+    assert 0.25 <= cutoff <= 0.99
+    
+    # Test target reached immediately (min_cutoff)
+    cutoff = find_redundancy_cutoff(df, target_seq_number=1, min_cutoff=0.25)
+    assert 0.25 <= cutoff <= 0.99
+    
+    # Test optimization loop
+    # We'll use a larger target than 1 to force some iterations
+    # But good-df is only 5 sequences.
+    # Let's mock a larger df if needed, or just test current logic.
+    cutoff = find_redundancy_cutoff(df, target_seq_number=3)
+    assert 0.25 <= cutoff <= 0.99
+    
+    # Test min > max raises ValueError
+    with pytest.raises(ValueError):
+        find_redundancy_cutoff(df, target_seq_number=3, min_cutoff=0.9, max_cutoff=0.8)
+
+    # Test min == max returns immediately
+    assert find_redundancy_cutoff(df, target_seq_number=3, min_cutoff=0.5, max_cutoff=0.5) == 0.5

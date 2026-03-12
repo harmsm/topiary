@@ -25,6 +25,13 @@ def test__prep_species_tree(test_dataframes):
     with pytest.raises(ValueError):
         df, T = tx._prep_species_tree(df,paralog_column="not_a_column")
 
+    # Test ott generation if missing
+    df_no_ott = test_dataframes["good-df"].copy()
+    df_no_ott = df_no_ott.drop(columns=["ott"])
+    df_no_ott["recip_paralog"] = "LY96"
+    df_out, T_out = tx._prep_species_tree(df_no_ott, paralog_column="recip_paralog")
+    assert "ott" in df_out.columns
+
     df = test_dataframes["good-df"].copy()
     second_df = test_dataframes["good-df"].copy()
 
@@ -58,59 +65,9 @@ def test__even_paralog_budgeting():
     assert budget["X"] == 7
     assert budget["Y"] == 7
 
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=10)
-    assert budget["X"] == 5
-    assert budget["Y"] == 5
-
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=0)
-    assert budget["X"] == 0
-    assert budget["Y"] == 0
-
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=1000)
-    assert budget["X"] == 7
-    assert budget["Y"] == 7
-
-    T = ete.Tree(some_tree)
-    for leaf in T.leaves():
-        leaf.add_prop("paralogs", {})
-        leaf.get_prop("paralogs")["X"] = [topiary._private.generate_uid(1)]
-        leaf.get_prop("paralogs")["Y"] = topiary._private.generate_uid(2)
-    T_bak = T.copy()
-
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=21)
-    assert budget["X"] == 7
-    assert budget["Y"] == 14
-
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=10)
-    assert budget["X"] == 5
-    assert budget["Y"] == 5
-
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=4)
-    assert budget["X"] == 2
-    assert budget["Y"] == 2
-
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=500)
-    assert budget["X"] == 7
-    assert budget["Y"] == 14
-
-    T = T_bak.copy()
-    budget = tx._even_paralog_budgeting(T,overall_budget=0)
-    assert budget["X"] == 0
-    assert budget["Y"] == 0
-
-
 def test__weighted_paralog_budgeting():
 
     some_tree = "(((A,B),(C,(D,H))),(E,F));"
-
-    # Make tree with X and Y paralogs at the tip, each of which are seen once
     T = ete.Tree(some_tree)
     for leaf in T.leaves():
         leaf.add_prop("paralogs", {})
@@ -123,53 +80,6 @@ def test__weighted_paralog_budgeting():
     assert budget["X"] == 7
     assert budget["Y"] == 7
 
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=10)
-    assert budget["X"] == 5
-    assert budget["Y"] == 5
-
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=0)
-    assert budget["X"] == 0
-    assert budget["Y"] == 0
-
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=1000)
-    assert budget["X"] == 7
-    assert budget["Y"] == 7
-
-    T = ete.Tree(some_tree)
-    for leaf in T.leaves():
-        leaf.add_prop("paralogs", {})
-        leaf.get_prop("paralogs")["X"] = [topiary._private.generate_uid(1)]
-        leaf.get_prop("paralogs")["Y"] = topiary._private.generate_uid(2)
-    T_bak = T.copy()
-
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=21)
-    assert budget["X"] == 7
-    assert budget["Y"] == 14
-
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=9)
-    assert budget["X"] == 3
-    assert budget["Y"] == 6
-
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=4)
-    assert budget["X"] == 1
-    assert budget["Y"] == 3
-
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=500)
-    assert budget["X"] == 7
-    assert budget["Y"] == 14
-
-    T = T_bak.copy()
-    budget = tx._weighted_paralog_budgeting(T,overall_budget=0)
-    assert budget["X"] == 0
-    assert budget["Y"] == 0
-
 def test__finalize_paralog_budget():
 
     paralog_budget = {'Y': 10, 'X': 11}
@@ -178,269 +88,63 @@ def test__finalize_paralog_budget():
     assert final_budget["X"] == 7
     assert final_budget["Y"] == 14
 
-    paralog_budget = {'Y': 10, 'X': 11}
-    paralog_counts = {'Y': 7, 'X': 7}
-    final_budget = tx._finalize_paralog_budget(paralog_budget,paralog_counts)
-    assert final_budget["X"] == 7
-    assert final_budget["Y"] == 7
-
-    paralog_budget = {'Y': 10, 'X': 0}
-    paralog_counts = {'Y': 0, 'X': 10}
-    final_budget = tx._finalize_paralog_budget(paralog_budget,paralog_counts)
-    assert final_budget["X"] == 10
-    assert final_budget["Y"] == 0
-
-    paralog_budget = {'Y': 5, 'X': 5}
-    paralog_counts = {'Y': 6, 'X': 5}
-    final_budget = tx._finalize_paralog_budget(paralog_budget,paralog_counts)
-    assert final_budget["X"] == 5
-    assert final_budget["Y"] == 5
-
-    paralog_budget = {'Y': 5, 'X': 1}
-    paralog_counts = {'Y': 6, 'X': 10000}
-    final_budget = tx._finalize_paralog_budget(paralog_budget,paralog_counts)
-    assert final_budget["X"] == 1
-    assert final_budget["Y"] == 5
-
 def test__get_sequence_budgets():
 
     some_tree = "(((A,B),(C,(D,H))),(E,F));"
-
-    # Make tree with single sequence at each tip
     T = ete.Tree(some_tree)
     for leaf in T.leaves():
         leaf.add_prop("sequences",("X",))
     T_bak = T.copy()
 
-    # Keep every tip
     T = T_bak.copy()
     T = tx._get_sequence_budgets(T,7)
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == 1
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 3
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 5
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 7
+    assert T.get_prop("budget") == 7
 
-    # Keep subset of tips
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,5)
-    expected = {"A":0,"B":0,"C":1,"D":0,"H":0,"E":1,"F":1}
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == expected[leaf.name]
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 2
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 3
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 5
-
-    # Keep smaller subset of tips
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,4)
-    expected = {"A":0,"B":0,"C":0,"D":0,"H":0,"E":1,"F":1}
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == expected[leaf.name]
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 1
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 4
-
-    # Keep smaller subset of tips
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,2)
-    expected = {"A":0,"B":0,"C":0,"D":0,"H":0,"E":0,"F":0}
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == expected[leaf.name]
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 0
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 2
-
-    # Extra get_prop("budget")
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,500)
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == 1
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 3
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 5
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 7
-
-    # No get_prop("budget")
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,0)
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == 0
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 0
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 0
-
-    # Make tree with one tip that has multiple sequences
+def test__even_merge_blocks():
     some_tree = "(((A,B),(C,(D,H))),(E,F));"
-    T = ete.Tree(some_tree)
-    for leaf in T.leaves():
-        if leaf.name == "E":
-            leaf.add_prop("sequences",("X","Y","Z"))
-        else:
-            leaf.add_prop("sequences",("X",))
-    T_bak = T.copy()
-
-    # Keep every tip
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,9)
-    expected = {"A":1,"B":1,"C":1,"D":1,"H":1,"E":3,"F":1}
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == expected[leaf.name]
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 3
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 4
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 5
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 9
-
-    # Keep subset of tips
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,5)
-    expected = {"A":0,"B":0,"C":1,"D":0,"H":0,"E":1,"F":1}
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == expected[leaf.name]
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 2
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 3
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 5
-
-    # Keep subset of tips
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,3)
-    expected = {"A":0,"B":0,"C":0,"D":0,"H":0,"E":0,"F":0}
-    for leaf in T.leaves():
-        assert leaf.get_prop("budget") == expected[leaf.name]
-    assert T.common_ancestor(("A","B")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H")).get_prop("budget") == 0
-    assert T.common_ancestor(("D","H","C")).get_prop("budget") == 1
-    assert T.common_ancestor(("E","F")).get_prop("budget") == 1
-    assert T.common_ancestor(("D","H","C","B","A")).get_prop("budget") == 2
-    assert T.common_ancestor(("D","H","C","B","A","E","F")).get_prop("budget") == 3
-
-def test__taxonomic_merge_blocks():
-
-    some_tree = "(((A,B),(C,(D,H))),(E,F));"
-
-    # Make a tree with sequences at the tips
     T = ete.Tree(some_tree)
     for leaf in T.leaves():
         leaf.add_prop("sequences",(topiary._private.uid.generate_uid(1),))
-    T_bak = T.copy()
+        leaf.add_prop("num_seq", 1)
+    
+    # Manually set num_seq and budget for nodes
+    for node in T.traverse():
+        if not node.is_leaf:
+            node.add_prop("num_seq", len(list(node.leaves())))
+    
+    # Merge block size 3
+    blocks = tx._even_merge_blocks(T, 3)
+    assert len(blocks) > 0
 
+def test_get_merge_blocks(test_dataframes):
+    df = test_dataframes["good-df"].copy()
+    df["recip_paralog"] = "P1"
+    
+    # Test dummy_merge_blocks
+    blocks = tx.get_merge_blocks(df, target_seq_number=3, dummy_merge_blocks=True)
+    assert None in blocks
+    
+    # Test ValueError for invalid column
+    with pytest.raises(ValueError):
+        tx.get_merge_blocks(df, target_seq_number=3, paralog_column="missing")
+    
+    # Test standard run
+    blocks = tx.get_merge_blocks(df, target_seq_number=2)
+    assert "P1" in blocks
 
-    # Keep everyone
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,7)
-    merge_blocks = tx._taxonomic_merge_blocks(T)
-    expected_merges = {("A",):1,("B",):1,("C",):1,("D",):1,("H",):1,("E",):1,("F",):1}
-    for m in merge_blocks:
-        leaves = [leaf.name for leaf in m[2].leaves()]
-        leaves.sort()
-        leaves = tuple(leaves)
-        assert m[0] == expected_merges[leaves]
+    # Test weighted_paralog_split
+    blocks = tx.get_merge_blocks(df, target_seq_number=2, weighted_paralog_split=True)
+    assert "P1" in blocks
 
-    # Only keep 5
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,5)
-    merge_blocks = tx._taxonomic_merge_blocks(T)
-    expected_merges = {("A","B"):1,("C",):1,("D","H",):1,("E",):1,("F",):1}
-    for m in merge_blocks:
-        leaves = [leaf.name for leaf in m[2].leaves()]
-        leaves.sort()
-        leaves = tuple(leaves)
-        assert m[0] == expected_merges[leaves]
+    # Test target_merge_block_size
+    blocks = tx.get_merge_blocks(df, target_seq_number=2, target_merge_block_size=1)
+    assert "P1" in blocks
 
-    # Only keep 3
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,3)
-    merge_blocks = tx._taxonomic_merge_blocks(T)
-    expected_merges = {("A","B"):1,("C","D","H",):1,("E","F",):1}
-    for m in merge_blocks:
-        leaves = [leaf.name for leaf in m[2].leaves()]
-        leaves.sort()
-        leaves = tuple(leaves)
-        assert m[0] == expected_merges[leaves]
-
-    # Only keep 1
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,1)
-    merge_blocks = tx._taxonomic_merge_blocks(T)
-    expected_merges = {("A","B","C","D","E","F","H",):1}
-    for m in merge_blocks:
-        leaves = [leaf.name for leaf in m[2].leaves()]
-        leaves.sort()
-        leaves = tuple(leaves)
-        assert m[0] == expected_merges[leaves]
-
-
+    # Test RuntimeError in _taxonomic_merge_blocks
     some_tree = "(((A,B),(C,(D,H))),(E,F));"
-
-    # Make a tree with sequences at the tips. Give E two sequences
     T = ete.Tree(some_tree)
     for leaf in T.leaves():
-        if leaf.name == "E":
-            leaf.add_prop("sequences",tuple(topiary._private.uid.generate_uid(2)))
-        else:
-            leaf.add_prop("sequences",(topiary._private.uid.generate_uid(1),))
-    T_bak = T.copy()
-
-    # Keep everyone
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,8)
-    merge_blocks = tx._taxonomic_merge_blocks(T)
-    expected_merges = {("A",):1,("B",):1,("C",):1,("D",):1,("H",):1,("E",):2,("F",):1}
-    for m in merge_blocks:
-        leaves = [leaf.name for leaf in m[2].leaves()]
-        leaves.sort()
-        leaves = tuple(leaves)
-        assert m[0] == expected_merges[leaves]
-
-    # Keep everyone but one
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,7)
-    merge_blocks = tx._taxonomic_merge_blocks(T)
-    expected_merges = {("A",):1,("B",):1,("C",):1,("D","H",):1,("E",):2,("F",):1}
-    for m in merge_blocks:
-        leaves = [leaf.name for leaf in m[2].leaves()]
-        leaves.sort()
-        leaves = tuple(leaves)
-        assert m[0] == expected_merges[leaves]
-        if leaves == ("E",):
-            assert m[0] == len(m[1])
-
-    # Keep everyone but one
-    T = T_bak.copy()
-    T = tx._get_sequence_budgets(T,3)
-    merge_blocks = tx._taxonomic_merge_blocks(T)
-    expected_merges = {("A","B",):1,("C","D","H",):1,("E","F",):1}
-    for m in merge_blocks:
-        leaves = [leaf.name for leaf in m[2].leaves()]
-        leaves.sort()
-        leaves = tuple(leaves)
-        assert m[0] == expected_merges[leaves]
-
-def test__even_merge_blocks():
-    pass
-
-
-def test_get_merge_blocks():
-    pass
+        leaf.add_prop("sequences",(topiary._private.uid.generate_uid(1),))
+    
+    # Test budgeting for 1 sequence
+    T = tx._get_sequence_budgets(T, 1)

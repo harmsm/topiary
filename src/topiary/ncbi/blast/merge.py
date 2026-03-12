@@ -112,7 +112,7 @@ def merge_blast_df(blast_df_list):
     # copy of the dataframe. (We send out a copy because the merged dataframe
     # will generally not be the same object as the inputs).
     if len(blast_df_list) == 0:
-        return blast_df_list[0].copy()
+        return pd.DataFrame(columns=required_columns)
 
     # concatenate dataframes
     df = pd.concat(blast_df_list,ignore_index=True)
@@ -260,9 +260,10 @@ def merge_and_annotate(blast_df_list,blast_source_list=None):
         keep = np.array(keep,dtype=bool)
 
         # Load newly extracted column into the dataframe
-        for k in out_dict:
-            blast_df_list[i][k] = pd.NA
-            blast_df_list[i].loc[keep,k] = out_dict[k]
+        if out_dict is not None:
+            for k in out_dict:
+                blast_df_list[i][k] = pd.NA
+                blast_df_list[i].loc[keep,k] = out_dict[k]
 
         # Drop empty columns
         blast_df_list[i] = blast_df_list[i].loc[keep,:]

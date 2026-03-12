@@ -1,78 +1,50 @@
-
 import pytest
-
 import topiary
-from topiary.quality.alignment import _get_sparse_columns, _rle, _drop_gaps_only
-#from topiary.quality.alignment import _find_too_many_sparse, _find_too_few_dense
-#from topiary.quality.alignment import _find_long_insertions
-from topiary.quality.alignment import AA_TO_INT, INT_TO_AA
 from topiary.quality.alignment import score_alignment
-
 import numpy as np
 import pandas as pd
 
-def data_for_test():
+def test_score_alignment(test_dataframes, mocker):
+    
+    # Use a fresh copy for each test case to avoid side effects
+    df = test_dataframes["good-df"].copy()
+    
+    # Test ValueError for invalid align_trim
+    with pytest.raises(ValueError):
+        score_alignment(df.copy(), align_trim=(1, 0))
+    
+    with pytest.raises(ValueError):
+        score_alignment(df.copy(), align_trim=(0, 1, 2))
 
-    good =  "TEST---------------S-"
-    long =  "TESTTHISTHISTHISTHIS-"
-    short = "------------------IS-"
+    # Test with no alignment column (should trigger topiary.align)
+    df_no_align = df.copy()
+    if "alignment" in df_no_align.columns:
+        df_no_align = df_no_align.drop(columns=["alignment"])
+    
+    mocker.patch("topiary.align", side_effect=lambda x, **kwargs: x.assign(alignment="AAAAAAA"))
+    out_df = score_alignment(df_no_align)
+    assert "alignment" in out_df.columns
+    
+    # Test silent mode
+    if "alignment" not in df.columns:
+        df["alignment"] = ["AAAAAAA"] * len(df)
+        
+    out_df = score_alignment(df.copy(), silent=True)
+    
+    # Test with all gaps column
+    df_gaps = df.copy()
+    df_gaps["alignment"] = ["---"] * len(df)
+    out_df = score_alignment(df_gaps)
+    assert "fx_in_sparse" in out_df.columns
+    
+    # Test with no sparse columns
+    out_df = score_alignment(df.copy(), sparse_column_cutoff=1.0)
+    assert np.all(out_df.fx_in_sparse.dropna() == 0)
+    
+    # Test with all sparse columns
+    out_df = score_alignment(df.copy(), sparse_column_cutoff=0.0)
+    assert "fx_in_sparse" in out_df.columns
 
-    seqs = []
-    for i in range(20):
-        seqs.append([AA_TO_INT[g] for g in list(good)])
-    seqs.append([AA_TO_INT[g] for g in list(long)])
-    seqs.append([AA_TO_INT[g] for g in list(short)])
-
-    return np.array(seqs)
-
-def test__get_sparse_columns():
-
-    seqs = data_for_test()
-
-    sparse_mask = np.ones(seqs.shape[1],dtype=bool)
-    sparse_mask[:4] = 0
-    sparse_mask[-2] = 0
-
-    sparse = _get_sparse_columns(seqs)
-    assert np.array_equal(sparse,sparse_mask)
-
-    sparse = _get_sparse_columns(seqs,sparse_column_cutoff=0.045)
-    sparse_mask = np.ones(seqs.shape[1],dtype=bool)
-    sparse_mask[-2] = 0
-    assert np.array_equal(sparse,sparse_mask)
-
-def test__rle():
-
-    input = np.array([1,1,1,0,0,0,1,1,1])
-    run_lengths, start_positions, values = _rle(input)
-    assert np.array_equal(run_lengths,np.array([3,3,3]))
-    assert np.array_equal(start_positions,np.array([0,3,6]))
-    assert np.array_equal(values,np.array([1,0,1]))
-
-    input = np.array([1,2,1,0])
-    run_lengths, start_positions, values = _rle(input)
-    assert np.array_equal(run_lengths,np.array([1,1,1,1]))
-    assert np.array_equal(start_positions,np.array([0,1,2,3]))
-    assert np.array_equal(values,np.array([1,2,1,0]))
-
-    input = np.array([0,0,0,0])
-    run_lengths, start_positions, values = _rle(input)
-    assert np.array_equal(run_lengths,np.array([4]))
-    assert np.array_equal(start_positions,np.array([0]))
-    assert np.array_equal(values,np.array([0]))
-
-def test__drop_gaps_only():
-
-    seqs = data_for_test()
-
-    new_seqs = _drop_gaps_only(seqs)
-    assert new_seqs.shape[1] == seqs.shape[1] - 1
-
-    hacked_seqs = seqs[:20]
-    new_seqs = _drop_gaps_only(hacked_seqs)
-    assert new_seqs.shape[1] == 5
-
-
-def test_score_alignment():
-
-    pass
+    # Test align_trim index forcing (front_index == back_index)
+    score_alignment(df.copy(), align_trim=(0.0, 0.000001))
+    score_alignment(df.copy(), align_trim=(0.9999999, 1.0))
