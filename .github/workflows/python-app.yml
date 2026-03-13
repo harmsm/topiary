@@ -120,10 +120,13 @@ jobs:
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
         miniconda-version: "latest"
+        auto-update-conda: true
+        use-mamba: true
 
     - name: install topiary
       shell: pwsh
       run: |
+        pip install pytest pytest-mock flake8
         python -m pip install .[dev] -vv
 
     - name: run flake8
@@ -134,6 +137,4 @@ jobs:
     - name: run pytest
       shell: pwsh
       run: |
-        conda install pytest
-        $Env:PATH = "C:\Miniconda3\Scripts\;$Env:PATH"
-        pytest
+        pytest tests/ --run-blast

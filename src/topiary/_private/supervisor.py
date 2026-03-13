@@ -151,6 +151,40 @@ class Supervisor:
             self._df = topiary.read_dataframe(df_file)
 
 
+    def get_previous_calc_dir(self,index):
+        """
+        Get the absolute path to a previous calculation directory.
+
+        Parameters
+        ----------
+        index : int
+            index of the previous calculation to get (e.g. -1 for the last).
+
+        Returns
+        -------
+        prev_calc_dir : str
+            absolute path to the previous calculation directory.
+        """
+        if self.previous_entries is None or len(self.previous_entries) == 0:
+            err = "\nThere are no previous entries for this calculation.\n\n"
+            raise ValueError(err)
+
+        try:
+            prev_dir = self._run_parameters["previous_entries"][index]["calc_dir"]
+        except IndexError:
+            err = f"\nIndex {index} out of range for {len(self.previous_entries)} entries.\n\n"
+            raise IndexError(err)
+
+        if not os.path.isabs(prev_dir):
+            if self.calc_dir is None:
+                # If we haven't created a calc_dir yet, we are likely in the
+                # process of loading an existing one.
+                return os.path.abspath(prev_dir)
+            
+            return os.path.abspath(os.path.join(self.calc_dir,prev_dir))
+
+        return prev_dir
+
     def _increment(self,new_calc_dir):
         """
         Increment the calculation with creation of a new directory, moving
@@ -176,7 +210,7 @@ class Supervisor:
         prev = self._run_parameters["previous_entries"][-1]
 
         # Record calc and start directories
-        prev["calc_dir"] = self._calc_dir
+        prev["calc_dir"] = os.path.relpath(self._calc_dir,new_calc_dir)
         prev["starting_dir"] = self._starting_dir
 
         for k in keys:
@@ -273,7 +307,12 @@ class Supervisor:
         if "previous_entries" in self._run_parameters:
 
             last = self._run_parameters["previous_entries"][-1]
-            previous_dir = os.path.join(last["calc_dir"],"output")
+            last_calc_dir = last["calc_dir"]
+            if not os.path.isabs(last_calc_dir):
+                last_calc_dir = os.path.abspath(os.path.join(self.calc_dir,
+                                                             last_calc_dir))
+
+            previous_dir = os.path.join(last_calc_dir,"output")
 
             prev_df = os.path.join(previous_dir,"dataframe.csv")
             if os.path.isfile(prev_df):
@@ -287,7 +326,8 @@ class Supervisor:
                 if os.path.isfile(prev_tree):
                     input_tree = os.path.join(input_dir,t)
                     shutil.copy(prev_tree,input_tree)
-                    self._run_parameters["_".join(t.split(".")[0].split("-"))] = input_tree
+                    input_tree_rel = os.path.relpath(input_tree,self._calc_dir)
+                    self._run_parameters["_".join(t.split(".")[0].split("-"))] = input_tree_rel
 
         # ---------------------------------------------------------------------
         # Load arguments (after we've already processed stuff from previous
@@ -313,7 +353,8 @@ class Supervisor:
                 else:
                     T.write(outfile=out_tree,parser=1)
 
-                self._run_parameters["_".join(tree_names[i].split("-"))] = out_tree
+                out_tree_rel = os.path.relpath(out_tree,self._calc_dir)
+                self._run_parameters["_".join(tree_names[i].split("-"))] = out_tree_rel
 
         if model is not None:
             self._run_parameters["model"] = model
@@ -324,7 +365,8 @@ class Supervisor:
         if self._df is not None:
             aln_file = os.path.join(input_dir,"alignment.phy")
             topiary.io.write_phy(self._df,aln_file)
-            self._run_parameters["alignment"] = aln_file
+            aln_file_rel = os.path.relpath(aln_file,self._calc_dir)
+            self._run_parameters["alignment"] = aln_file_rel
 
         # ---------------------------------------------------------------------
         # Record calc status
@@ -426,6 +468,9 @@ class Supervisor:
 
         if self.previous_entries is not None:
             prev_dir = self.previous_entries[-1]["calc_dir"]
+            if not os.path.isabs(prev_dir):
+                prev_dir = os.path.abspath(os.path.join(self.calc_dir,prev_dir))
+
             existing_files = glob.glob(os.path.join(prev_dir,"output",pattern))
             for f in existing_files:
                 filename = os.path.basename(f)
@@ -739,7 +784,10 @@ class Supervisor:
         """
 
         if "gene_tree" in self._run_parameters:
-            return self._run_parameters["gene_tree"]
+            if self._run_parameters["gene_tree"] is None:
+                return None
+            return os.path.abspath(os.path.join(self.calc_dir,
+                                               self._run_parameters["gene_tree"]))
         else:
             return None
 
@@ -751,8 +799,11 @@ class Supervisor:
         run_parameters["species_tree"])
         """
 
-        if "gene_tree" in self._run_parameters:
-            return self._run_parameters["species_tree"]
+        if "species_tree" in self._run_parameters:
+            if self._run_parameters["species_tree"] is None:
+                return None
+            return os.path.abspath(os.path.join(self.calc_dir,
+                                               self._run_parameters["species_tree"]))
         else:
             return None
 
@@ -764,7 +815,10 @@ class Supervisor:
         """
 
         if "reconciled_tree" in self._run_parameters:
-            return self._run_parameters["reconciled_tree"]
+            if self._run_parameters["reconciled_tree"] is None:
+                return None
+            return os.path.abspath(os.path.join(self.calc_dir,
+                                               self._run_parameters["reconciled_tree"]))
         else:
             return None
 
@@ -776,7 +830,10 @@ class Supervisor:
         run_parameters["alignment"])
         """
         if "alignment" in self._run_parameters:
-            return self._run_parameters["alignment"]
+            if self._run_parameters["alignment"] is None:
+                return None
+            return os.path.abspath(os.path.join(self.calc_dir,
+                                               self._run_parameters["alignment"]))
         else:
             return None
 

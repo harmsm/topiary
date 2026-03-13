@@ -194,11 +194,11 @@ def reconcile(prev_calculation=None,
             raise ValueError(err)
 
         # Make sure bootstrap directory exists
-        bs_dir = os.path.join(supervisor.previous_entries[-1]["calc_dir"],
-                              "output","bootstrap_replicates")
+        prev_calc_dir = supervisor.get_previous_calc_dir(-1)
+        bs_dir = os.path.join(prev_calc_dir,"output","bootstrap_replicates")
 
         if not os.path.isdir(bs_dir):
-            err = f"\ninput directory '{supervisor.previous_entries[-1]['calc_dir']}'\n"
+            err = f"\ninput directory '{prev_calc_dir}'\n"
             err += "does not have an output/bootstrap_replicates directory. Was\n"
             err += "this calculation run with bootstrap=True?\n\n"
             raise FileNotFoundError(err)

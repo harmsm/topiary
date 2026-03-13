@@ -690,7 +690,8 @@ def test_Supervisor_previous_entries(tmpdir):
 
     sv.create_calc_dir("test1",calc_type="test1")
     assert len(sv.previous_entries) == 1
-    assert sv.previous_entries[0]["calc_dir"] == os.path.abspath("test0")
+    assert sv.previous_entries[0]["calc_dir"] == os.path.relpath(os.path.abspath("test0"),
+                                                                os.path.abspath("test1"))
 
     os.chdir(current_dir)
 

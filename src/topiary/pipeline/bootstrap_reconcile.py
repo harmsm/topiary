@@ -152,10 +152,14 @@ def bootstrap_reconcile(previous_run_dir,
 
     # Try to get a time estimate from supervisor stack
     try:
-        for p in supervisor.previous_entries:
+        for i, p in enumerate(supervisor.previous_entries):
             if p["calc_type"] == "reconcile":
 
                 prev_dt = p["completion_time"] - p["creation_time"]
+                
+                # Use absolute path to check for num_threads in events from 
+                # run_parameters.json in that directory. events[1] is typically 
+                # where the generax/raxml command is recorded.
                 prev_num_threads = p["events"][1]["num_threads"]
 
                 pretty_prev = f"{str(datetime.timedelta(seconds=prev_dt))} (D:H:M:S)"
