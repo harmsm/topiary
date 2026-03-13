@@ -14,23 +14,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 1
       matrix:
         os: [ubuntu-latest,macos-latest]
         python-version: ['3.10' , '3.11', '3.12', '3.13']
 
     steps:
     - name: checkout
-      uses: actions/checkout@v3.0.0
+      uses: actions/checkout@v4
 
     - name: set up miniconda
-      uses: conda-incubator/setup-miniconda@v2
+      uses: conda-incubator/setup-miniconda@v3
       with:
         activate-environment: topiary
         environment-file: environment.yml
         channel-priority: strict
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
+        miniconda-version: "latest"
 
     - name: get dependency hashes
       id: get-hashes
@@ -43,14 +44,14 @@ jobs:
 
     - name: cache generax
       id: cache-generax
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: bin-cache/generax
         key: ${{ runner.os }}-generax-${{ steps.get-hashes.outputs.generax_hash }}
 
     - name: cache raxml-ng
       id: cache-raxml
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: bin-cache/raxml-ng
         key: ${{ runner.os }}-raxml-${{ steps.get-hashes.outputs.raxml_hash }}
@@ -102,22 +103,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 1
       matrix:
         os: [windows-latest]
         python-version: ['3.10' , '3.11', '3.12','3.13']
 
     steps:
     - name: checkout
-      uses: actions/checkout@v3.0.0
+      uses: actions/checkout@v4
 
     - name: set up miniconda
-      uses: conda-incubator/setup-miniconda@v2
+      uses: conda-incubator/setup-miniconda@v3
       with:
         activate-environment: topiary
         environment-file: environment_windows.yml
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
+        miniconda-version: "latest"
 
     - name: install topiary
       shell: pwsh
