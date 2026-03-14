@@ -97,9 +97,7 @@ def bootstrap_reconcile(previous_run_dir,
 
     installed.validate_stack(to_validate)
 
-    # If we got here, reconciliation software is ready to go. Now check to
-    # whether mpi can really grab the number of slots requested.
-    check_mpi_configuration(num_threads)
+    installed.validate_stack(to_validate)
 
     # --------------------------------------------------------------------------
     # Validate the previous calculation
@@ -149,6 +147,9 @@ def bootstrap_reconcile(previous_run_dir,
               f"Dropping the number of threads to {num_replicates} to match.\n", flush=True)
         num_threads = num_replicates
 
+    # Now that we've potentially dropped the number of threads to match the
+    # number of replicates, check to see if mpirun can actually grab them.
+    check_mpi_configuration(num_threads)
 
     # Try to get a time estimate from supervisor stack
     try:

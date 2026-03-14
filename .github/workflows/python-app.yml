@@ -17,7 +17,7 @@ jobs:
       max-parallel: 1
       matrix:
         os: [ubuntu-latest,macos-latest]
-        python-version: ['3.10' , '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
 
     steps:
     - name: checkout
@@ -94,6 +94,8 @@ jobs:
 
     - name: run pytest
       shell: bash -l {0}
+      env:
+        TOPIARY_MPI_OVERSUBSCRIBE: "1"
       run: |
         conda install pytest
         export PATH=`which conda | xargs dirname`/envs/topiary/bin/:$PATH
@@ -106,7 +108,7 @@ jobs:
       max-parallel: 1
       matrix:
         os: [windows-latest]
-        python-version: ['3.10' , '3.11', '3.12','3.13']
+        python-version: ['3.11', '3.12','3.13']
 
     steps:
     - name: checkout
@@ -120,8 +122,6 @@ jobs:
         python-version: ${{ matrix.python-version }}
         auto-activate-base: false
         miniconda-version: "latest"
-        auto-update-conda: true
-        use-mamba: true
 
     - name: install topiary
       shell: pwsh

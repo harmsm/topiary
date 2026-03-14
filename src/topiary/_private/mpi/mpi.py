@@ -7,7 +7,21 @@ import sys
 import os
 
 from topiary._private.environment import load_env_variable
+from topiary._private.check import check_bool
 from topiary._private.check import check_int
+
+def _get_mpi_oversubscribe():
+    """
+    Check if we should use --oversubscribe with mpirun.
+    """
+    v = load_env_variable("TOPIARY_MPI_OVERSUBSCRIBE",
+                          check_function=check_int,
+                          check_function_kwargs={"minimum_allowed":0,
+                                                 "maximum_allowed":1})
+    if v is None:
+        return False
+    
+    return bool(v)
 
 def get_mpi_env():
     """
@@ -51,8 +65,12 @@ def get_hosts(num_slots):
     script = os.path.join(location,"_get_hosts.py")
     python = sys.executable
 
-    ret = subprocess.run(["mpirun","-np",f"{num_slots}",python,script],
-                          capture_output=True, env=get_mpi_env())
+    cmd = ["mpirun"]
+    if _get_mpi_oversubscribe():
+        cmd.append("--oversubscribe")
+    cmd.extend(["-np",f"{num_slots}",python,script])
+
+    ret = subprocess.run(cmd, capture_output=True, env=get_mpi_env())
     if ret.returncode == 0:
         stdout = ret.stdout.decode()
         raw_hosts = [s.strip() for s in stdout.split("\n") if s.strip() != ""]
