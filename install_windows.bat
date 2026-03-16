@@ -26,15 +26,26 @@ pip install setuptools Cython^<3.0 wheel
 pip install numpy
 
 :: 6. Install ete4 without build isolation to avoid Cython 3.0 path issues
-pip install ete4 --no-build-isolation
+pip install "ete4<4.4.0" --no-build-isolation
 
 :: 7. Install the current directory
 pip install .
 
+:: 8. Install muscle 5.1
+echo Downloading and installing muscle 5.1...
+powershell -Command "Invoke-WebRequest -Uri https://github.com/rcedgar/muscle/releases/download/v5.1/muscle5.1.win64.exe -OutFile .topiary\Scripts\muscle.exe"
+
+:: 9. Install NCBI BLAST+ 2.16.0
+echo Downloading and installing NCBI BLAST+ 2.16.0...
+powershell -Command "Invoke-WebRequest -Uri https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/ncbi-blast-2.16.0+-win64.zip -OutFile blast.zip"
+powershell -Command "Expand-Archive -Path blast.zip -DestinationPath .topiary\_blast_temp"
+xcopy /Y /E ".topiary\_blast_temp\ncbi-blast-2.16.0+\bin\*" ".topiary\Scripts\"
+rmdir /S /Q ".topiary\_blast_temp"
+del blast.zip
+
 echo.
 echo Installation complete! 
 echo To use topiary in the future, run: .topiary\Scripts\activate
-echo 
-echo Please make sure that muscle and ncbi tools are installed in the $PATH. 
-echo See https://topiary-asr.readthedocs.io/en/latest/installation.html for
-echo details.
+echo.
+echo Muscle 5 and NCBI BLAST+ tools have been installed into your virtual environment.
+echo.
