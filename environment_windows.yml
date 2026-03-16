@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.13
+  - python
   - numpy
   - pandas
   - xlrd
@@ -11,9 +11,9 @@ dependencies:
   - matplotlib
   - biopython
   - tqdm
-  - dendropy
-  - toytree
+  - toytree>3.0
   - ete4
   - pip
   - pip:
     - opentree
+    - dendropy
