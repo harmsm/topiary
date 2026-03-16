@@ -111,7 +111,20 @@ def get_num_slots():
     max_num_slots = load_env_variable("TOPIARY_MAX_SLOTS",
                                       check_function=check_int,
                                       check_function_kwargs={"minimum_allowed":1})
-
+    
+    # If oversubscribe is enabled, return the number of cores on the machine. 
+    # This prevents an infinite loop because oversubscribe will almost always 
+    # work regardless of the number of slots requested. 
+    if _get_mpi_oversubscribe():
+        num_slots = os.cpu_count()
+        if num_slots is None:
+            num_slots = 1
+            
+        if max_num_slots is not None:
+            if num_slots > max_num_slots:
+                num_slots = max_num_slots
+        
+        return num_slots
 
     # Increase number of slots until mpirun fails
     num_slots = 1
