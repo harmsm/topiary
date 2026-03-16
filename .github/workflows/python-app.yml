@@ -9,6 +9,10 @@ on:
   pull_request:
     branches: [ main   ]
 
+concurrency:
+  group: topiary-ci-group
+  cancel-in-progress: false
+
 jobs:
   build-nix:
     runs-on: ${{ matrix.os }}
