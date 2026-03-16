@@ -1,4 +1,5 @@
 import pytest
+from unittest import mock
 import topiary
 
 from topiary.generax.reconcile import reconcile
@@ -70,8 +71,10 @@ def test_reconcile(small_phylo,tmpdir):
     os.chdir("test1")
     kwargs = copy.deepcopy(kwargs_template)
     kwargs["num_threads"] = 99999999999999
-    with pytest.raises(RuntimeError):
-        reconcile(**kwargs)
+    with mock.patch("topiary.generax.reconcile.check_mpi_configuration",
+                    side_effect=RuntimeError("fail")):
+        with pytest.raises(RuntimeError):
+            reconcile(**kwargs)
     os.chdir("..")
 
 

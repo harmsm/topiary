@@ -21,6 +21,15 @@ def _get_mpi_oversubscribe():
     if v is None:
         return False
     
+    # If we are blocking oversubscribe (set by test suite for heavy tasks)
+    # return False. 
+    block = load_env_variable("TOPIARY_BLOCK_MPI_OVERSUBSCRIBE",
+                              check_function=check_int,
+                              check_function_kwargs={"minimum_allowed":0,
+                                                     "maximum_allowed":1})
+    if block:
+        return False
+
     return bool(v)
 
 def get_mpi_env():

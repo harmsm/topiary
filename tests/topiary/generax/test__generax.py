@@ -395,15 +395,18 @@ def test_run_generax(generax_data,tmpdir):
                           num_threads=2,
                           generax_binary=GENERAX_BINARY,
                           write_to_script="run_generax.sh")
-
+ 
         assert cmd == f"mpirun -np 2 {generax_binary} --families control.txt --species-tree species_tree.newick --prefix result --rec-model UndatedDTL"
-
-        with pytest.raises(RuntimeError):
-            cmd = run_generax(run_directory=out_dir,
-                              allow_horizontal_transfer=True,
-                              num_threads=1000000,
-                              generax_binary=GENERAX_BINARY,
-                              write_to_script="run_generax.sh")
+ 
+        import unittest.mock as mock
+        with mock.patch("topiary.generax._generax.check_mpi_configuration",
+                        side_effect=RuntimeError("fail")):
+            with pytest.raises(RuntimeError):
+                cmd = run_generax(run_directory=out_dir,
+                                  allow_horizontal_transfer=True,
+                                  num_threads=1000000,
+                                  generax_binary=GENERAX_BINARY,
+                                  write_to_script="run_generax.sh")
 
         with pytest.raises(FileNotFoundError):
             cmd = run_generax(run_directory=out_dir,
