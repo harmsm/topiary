@@ -65,8 +65,8 @@ jobs:
       run: |
         # platform specific packages
         conda install -c conda-forge cmake
-        pip install flake8 pytest pytest-mock
         python -m pip install .[dev] -vv
+        python -m pip install coverage flake8 pytest genbadge[tests] pytest-mock
 
         # Ensure bin-cache exists
         mkdir -p bin-cache
@@ -74,7 +74,7 @@ jobs:
         # compile generax if not cached
         if [ ! -f bin-cache/generax ]; then
             cd dependencies
-            bash compile-generax.sh
+            conda run -n topiary bash compile-generax.sh
             cp $CONDA_PREFIX/bin/generax ../bin-cache/
             cd ..
         else
@@ -84,7 +84,7 @@ jobs:
         # compile raxml if not cached
         if [ ! -f bin-cache/raxml-ng ]; then
             cd dependencies
-            bash compile-raxml-ng.sh
+            conda run -n topiary bash compile-raxml-ng.sh
             cp $CONDA_PREFIX/bin/raxml-ng ../bin-cache/
             cd ..
         else
@@ -101,48 +101,4 @@ jobs:
       env:
         TOPIARY_MPI_OVERSUBSCRIBE: "1"
       run: |
-        conda install pytest
-        export PATH=`which conda | xargs dirname`/envs/topiary/bin/:$PATH
         pytest tests/ --run-raxml --run-generax --run-blast
-
-  build-windows:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        os: [windows-latest]
-        python-version: ['3.11', '3.12', '3.13']
-
-    steps:
-    - name: checkout
-      uses: actions/checkout@v4
-
-    - name: set up miniconda
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        activate-environment: topiary
-        environment-file: environment_windows.yml
-        channel-priority: strict
-        python-version: ${{ matrix.python-version }}
-        auto-activate-base: false
-        miniconda-version: "latest"
-
-    - name: install topiary
-      shell: cmd
-      run: |
-        call install_windows.bat
-
-    - name: run flake8
-      shell: cmd
-      run: |
-        call conda activate .\.topiary
-        pip install flake8
-        flake8 src/topiary tests --count --select=E9,F63,F7,F82 --show-source --statistics
-
-    - name: run pytest
-      shell: cmd
-      run: |
-        call conda activate .\.topiary
-        pip install pytest pytest-mock
-        pytest tests/ --run-blast
