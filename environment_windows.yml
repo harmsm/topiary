@@ -1,0 +1,19 @@
+name: topiary
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.13
+  - numpy
+  - pandas
+  - xlrd
+  - openpyxl
+  - matplotlib
+  - biopython
+  - tqdm
+  - dendropy
+  - toytree
+  - ete4
+  - pip
+  - pip:
+    - opentree

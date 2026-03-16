@@ -112,16 +112,21 @@ jobs:
       max-parallel: 1
       matrix:
         os: [windows-latest]
-        python-version: ['3.11', '3.12','3.13']
+        python-version: ['3.11', '3.12', '3.13']
 
     steps:
     - name: checkout
       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: set up miniconda
+      uses: conda-incubator/setup-miniconda@v3
       with:
+        activate-environment: topiary
+        environment-file: environment_windows.yml
+        channel-priority: strict
         python-version: ${{ matrix.python-version }}
+        auto-activate-base: false
+        miniconda-version: "latest"
 
     - name: install topiary
       shell: cmd
@@ -131,13 +136,13 @@ jobs:
     - name: run flake8
       shell: cmd
       run: |
-        call .topiary\Scripts\activate
+        call conda activate .\.topiary
         pip install flake8
         flake8 src/topiary tests --count --select=E9,F63,F7,F82 --show-source --statistics
 
     - name: run pytest
       shell: cmd
       run: |
-        call .topiary\Scripts\activate
+        call conda activate .\.topiary
         pip install pytest pytest-mock
         pytest tests/ --run-blast
