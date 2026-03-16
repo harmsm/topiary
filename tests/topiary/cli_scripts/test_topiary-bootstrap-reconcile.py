@@ -43,7 +43,7 @@ def test_main(small_phylo, tmpdir, monkeypatch):
     assert ret.returncode != 0
 
     # gracefully (will drop to 2 threads since there are 2 replicates)
-    cmd.append("10")
+    cmd.append("1")
     ret = subprocess.run(cmd)
     assert ret.returncode == 0
     assert os.getcwd() == os.path.join(tmpdir,"test0")

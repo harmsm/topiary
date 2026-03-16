@@ -1,8 +1,4 @@
-
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "This script should be run as 'source fresh-start.sh', not 'bash fresh-start.sh'."
-    exit
-fi
+#!/bin/bash
 
 # wipe local builds
 rm -rf build/
@@ -27,3 +23,5 @@ bash compile-raxml-ng.sh
 
 #return to start
 cd ..
+
+echo "To use topiary in the future, type `conda activate topiary` after opening the terminal.
