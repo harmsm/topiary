@@ -368,6 +368,16 @@ def _synchronize_tree_rooting(T_list, prefix):
                 T.root.del_prop(p)
             except (AttributeError, KeyError):
                 pass
+        
+        # If the tree is bifurcating at the root, ensure the children have 
+        # identical support values. ETE4.unroot() will raise an AssertionError 
+        # if the root node has two children with different support values. 
+        if len(T.children) == 2:
+            s0 = getattr(T.children[0],"support",0.0)
+            s1 = getattr(T.children[1],"support",0.0)
+            if s0 != s1:
+                T.children[0].support = s0
+                T.children[1].support = s0
 
         T.unroot()
         new_outgroup = _get_root_node(T, root_on)

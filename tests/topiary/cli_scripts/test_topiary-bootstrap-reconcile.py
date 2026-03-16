@@ -12,13 +12,12 @@ import tarfile
 
 @pytest.mark.run_generax
 @pytest.mark.run_raxml
-def test_main(small_phylo,tmpdir):
+def test_main(small_phylo, tmpdir, monkeypatch):
 
     prev_bs = small_phylo["05_gene-tree-bootstraps_toy"]
     current_bs = small_phylo["06_reconciled-tree-bootstraps_toy"]
 
-    current_dir = os.getcwd()
-    os.chdir(tmpdir)
+    monkeypatch.chdir(tmpdir)
 
     # Get location of binary
     location = os.path.dirname(os.path.realpath(__file__))
@@ -33,7 +32,7 @@ def test_main(small_phylo,tmpdir):
     print("----> TEST 0")
 
     os.mkdir("test0")
-    os.chdir("test0")
+    monkeypatch.chdir("test0")
     os.mkdir("existing-run")
     shutil.copytree(prev_bs,os.path.join("existing-run","05_gene-tree-bootstraps"))
     cmd = base_cmd[:]
@@ -75,7 +74,7 @@ def test_main(small_phylo,tmpdir):
     assert param["seed"] == 12345
     assert param["bootstrap_converged"] == False
 
-    os.chdir("..")
+    monkeypatch.chdir("..")
 
     # print("----> TEST 1")
     #
@@ -218,4 +217,3 @@ def test_main(small_phylo,tmpdir):
     # os.chdir("..")
 
 
-    os.chdir(current_dir)
