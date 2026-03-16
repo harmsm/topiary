@@ -3,6 +3,7 @@ echo Setting up the topiary environment...
 
 :: 1. Create the virtual environment folder named .topiary
 python -m venv .topiary
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 :: 2. Check if the environment was created successfully
 if not exist ".topiary\Scripts\activate" (
@@ -19,29 +20,40 @@ call .topiary\Scripts\activate
 
 :: 4. Upgrade pip and install build dependencies
 python -m pip install --upgrade pip
+if %errorlevel% neq 0 exit /b %errorlevel%
 pip install setuptools Cython^<3.0 wheel
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 :: 5. Install ete4 dependencies manually since we'll use --no-build-isolation
 :: These are base dependencies for building ete4
 pip install numpy
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 :: 6. Install ete4 without build isolation to avoid Cython 3.0 path issues
 pip install "ete4<4.4.0" --no-build-isolation
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 :: 7. Install the current directory
 pip install .
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 :: 8. Install muscle 5.1
 echo Downloading and installing muscle 5.1...
 powershell -Command "Invoke-WebRequest -Uri https://github.com/rcedgar/muscle/releases/download/v5.1/muscle5.1.win64.exe -OutFile .topiary\Scripts\muscle.exe"
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 :: 9. Install NCBI BLAST+ 2.16.0
 echo Downloading and installing NCBI BLAST+ 2.16.0...
 powershell -Command "Invoke-WebRequest -Uri https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.16.0/ncbi-blast-2.16.0+-win64.zip -OutFile blast.zip"
+if %errorlevel% neq 0 exit /b %errorlevel%
 powershell -Command "Expand-Archive -Path blast.zip -DestinationPath .topiary\_blast_temp"
+if %errorlevel% neq 0 exit /b %errorlevel%
 xcopy /Y /E ".topiary\_blast_temp\ncbi-blast-2.16.0+\bin\*" ".topiary\Scripts\"
+if %errorlevel% neq 0 exit /b %errorlevel%
 rmdir /S /Q ".topiary\_blast_temp"
+if %errorlevel% neq 0 exit /b %errorlevel%
 del blast.zip
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo.
 echo Installation complete! 

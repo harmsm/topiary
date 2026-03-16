@@ -20,4 +20,4 @@ dependencies:
   - mpi4py
   - pip:
     - opentree
-    - ete4
+    - ete4<4.4.0
