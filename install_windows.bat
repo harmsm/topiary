@@ -17,8 +17,18 @@ echo Activating environment and installing topiary...
 :: We use 'call' so the batch script continues after activation
 call .topiary\Scripts\activate
 
-:: 4. Upgrade pip and install the current directory
+:: 4. Upgrade pip and install build dependencies
 python -m pip install --upgrade pip
+pip install setuptools Cython^<3.0 wheel
+
+:: 5. Install ete4 dependencies manually since we'll use --no-build-isolation
+:: These are base dependencies for building ete4
+pip install numpy
+
+:: 6. Install ete4 without build isolation to avoid Cython 3.0 path issues
+pip install ete4 --no-build-isolation
+
+:: 7. Install the current directory
 pip install .
 
 echo.
