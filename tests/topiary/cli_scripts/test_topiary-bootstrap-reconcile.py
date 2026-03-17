@@ -38,12 +38,15 @@ def test_main(small_phylo, tmpdir, monkeypatch):
     cmd = base_cmd[:]
     cmd.append("existing-run")
 
-    # Fail because no threads
+    # Should run and infer threads
     ret = subprocess.run(cmd)
-    assert ret.returncode != 0
+    assert ret.returncode == 0
+    
+    # Clean up output from the run above so we can test it specifically with 1 thread
+    shutil.rmtree(os.path.join("existing-run","06_reconciled-tree-bootstraps"))
 
     # gracefully (will drop to 2 threads since there are 2 replicates)
-    cmd.append("1")
+    cmd.extend(["--num_threads", "1"])
     ret = subprocess.run(cmd)
     assert ret.returncode == 0
     assert os.getcwd() == os.path.join(tmpdir,"test0")

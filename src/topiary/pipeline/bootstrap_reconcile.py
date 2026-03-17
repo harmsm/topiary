@@ -23,8 +23,8 @@ import shutil
 
 @run_cleanly
 def bootstrap_reconcile(previous_run_dir,
-                        num_threads,
-                        threads_per_replicate=1,
+                        num_threads=None,
+                        threads_per_replicate=None,
                         restart=False,
                         overwrite=False,
                         raxml_binary=RAXML_BINARY,
@@ -36,17 +36,19 @@ def bootstrap_reconcile(previous_run_dir,
     previous_run_dir : str
         previous pipeline run directory. Should have a directory named 
         xx_*bootstraps*, where xx is an integer and * are any value. 
-    num_threads : int
-        number of threads to use. GeneRax uses MPI for parallelization;
-        num_threads correspond to the number of "slots" in MPI lingo. This job
-        can be massively parallelized as there is no cross-talk between
-        replicates, so feel free to span this across as many compute nodes as
-        you like.
-    threads_per_replicate : int, default=1
-        number of threads to use for each bootstrap replicate. If this is
-        greater than 1, mpirun will be called for each replicate with 
-        -np threads_per_replicate. Total number of slots used will be 
-        num_threads.
+    num_threads : int, optional
+        total number of threads (slots, in MPI lingo) to use. If None, topiary
+        will infer the number of slots from the environment.
+    threads_per_replicate : int, optional
+        number of threads to use for each bootstrap replicate. To minimize
+        the impact of slow cross-node communication, topiary attempts to 
+        run each replicate on a single physical node or processor. 
+        threads_per_replicate sets the number of slots to use for each 
+        replicate. If this is not specified, topiary will choose a number of
+        threads based on the number of slots on each compute node. NOTE: if you 
+        manually set threads_per_replicate, choose a number that is a factor of
+        the number of slots on each compute node to avoid wasting slots. If you
+        have 24 slots per node, you could choose 2, 3, 4, 6, 8, 12, or 24.
     restart : bool, default=False
         restart job from where it stopped in output directory. incompatible with
         overwrite
@@ -66,11 +68,39 @@ def bootstrap_reconcile(previous_run_dir,
         raise FileNotFoundError(err)
 
     # --------------------------------------------------------------------------
-    # Check sanity of num_threads
+    # Check sanity of num_threads and threads_per_replicate
+    
+    if num_threads is None:
+        num_threads = topiary._private.mpi.get_num_slots()
 
     num_threads = check.check_int(num_threads,
                                   "num_threads",
                                   minimum_allowed=1)
+
+    if threads_per_replicate is None:
+        
+        # Get hosts to see how many slots per node
+        hosts = topiary._private.mpi.get_hosts(num_threads)
+        
+        # Get number of slots on the first node (assume homogeneous nodes)
+        # This counts how many times the first host appears in the list
+        slots_per_node = hosts.count(hosts[0])
+
+        # Find factor of slots_per_node closest to 10
+        best_factor = 1
+        best_diff = 10
+        for i in range(1, slots_per_node + 1):
+            if slots_per_node % i == 0:
+                diff = abs(i - 10)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_factor = i
+                elif diff == best_diff:
+                    # If tie (e.g. 7 vs 13), pick smaller
+                    if i < best_factor:
+                        best_factor = i
+        
+        threads_per_replicate = best_factor
 
     threads_per_replicate = check.check_int(threads_per_replicate,
                                             "threads_per_replicate",

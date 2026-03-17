@@ -18,6 +18,10 @@ def test_bootstrap_reconcile(tmpdir, mocker):
     mock_reconcile_bootstrap = mocker.patch("topiary.pipeline.bootstrap_reconcile.reconcile_bootstrap")
     mock_pipeline_report = mocker.patch("topiary.pipeline.bootstrap_reconcile.pipeline_report")
     
+    # Mock mpi functions
+    mock_get_num_slots = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_num_slots", return_value=56)
+    mock_get_hosts = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_hosts", return_value=["n1"]*56)
+    
     # Mock os/glob functions
     mocker.patch("os.path.isdir", return_value=True)
     mocker.patch("glob.glob", side_effect=[
@@ -55,7 +59,7 @@ def test_bootstrap_reconcile(tmpdir, mocker):
         bootstrap=True,
         overwrite=False,
         num_threads=2,
-        threads_per_rep=1,
+        threads_per_rep=8, # Closest factor of 56 to 10
         raxml_binary=mocker.ANY,
         generax_binary=mocker.ANY
     )
@@ -111,13 +115,27 @@ def test_bootstrap_reconcile(tmpdir, mocker):
     ])
     mock_reconcile.reset_mock()
     bootstrap_reconcile("prev_dir", num_threads=4, threads_per_replicate=2)
+    mock_reconcile.assert_called()
+    
+    # Test auto-detection
+    mock_get_num_slots = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_num_slots", return_value=56)
+    mock_get_hosts = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_hosts", return_value=["n1"]*56)
+    
+    mocker.patch("glob.glob", side_effect=[
+        ["04_bootstraps"], # bootstrap_dirs
+        ["rep"]*100 # many replicates
+    ])
+    mock_reconcile.reset_mock()
+    bootstrap_reconcile("prev_dir") # num_threads=-1, threads_per_replicate=None
+    
+    # 56 cores -> factor of 56 closest to 10 is 8.
     mock_reconcile.assert_called_with(
         prev_calculation="04_bootstraps",
         calc_dir="05_reconciled-tree-bootstraps",
         bootstrap=True,
         overwrite=False,
-        num_threads=2, # dropped to 2 because only 2 replicates
-        threads_per_rep=2,
+        num_threads=56,
+        threads_per_rep=8,
         raxml_binary=mocker.ANY,
         generax_binary=mocker.ANY
     )
