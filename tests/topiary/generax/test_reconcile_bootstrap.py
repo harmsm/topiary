@@ -1,6 +1,7 @@
 import pytest
 import topiary.generax._reconcile_bootstrap as rb
 from unittest.mock import MagicMock
+import os
 
 def test__construct_args(mocker):
     # Mock mpi.get_hosts
@@ -46,7 +47,7 @@ def test__generax_thread_function(mocker):
     mocker.patch("os.chdir")
     mocker.patch("os.listdir", return_value=["00001"])
     mocker.patch("os.path.isdir", return_value=True)
-    mocker.patch("os.path.isfile", side_effect=[False, False, False, True, True]) # completed, running, skipped, run_generax.sh, result_tree
+    mocker.patch("os.path.isfile", side_effect=[False, False, False, False, True, True]) # completed, running, skipped, failed, run_generax.sh, result_tree
     mocker.patch("pathlib.Path.touch")
     mocker.patch("os.remove")
     
@@ -66,7 +67,7 @@ def test__generax_thread_function(mocker):
     
     # Mock mpi._get_mpi_oversubscribe
     mocker.patch("topiary.generax._reconcile_bootstrap.mpi._get_mpi_oversubscribe", return_value=False)
-    mocker.patch("topiary.generax._reconcile_bootstrap.get_mpi_env", return_value={})
+    mock_get_mpi_env = mocker.patch("topiary.generax._reconcile_bootstrap.mpi.get_mpi_env", return_value={"STAY": "STAY"})
 
     # Mock lock
     mock_lock = MagicMock()
@@ -82,5 +83,51 @@ def test__generax_thread_function(mocker):
             found_mpirun = True
             assert "--host" in args
             assert "n1,n1" in args
+            # Check if env was passed correctly
+            assert call_args[1]["env"] == {"STAY": "STAY"}
     
     assert found_mpirun
+
+def test_generax_thread_function_failure(mocker, tmpdir):
+    # Mock subprocess.run to fail
+    mock_run = mocker.patch("topiary.generax._reconcile_bootstrap.subprocess.run",
+                            side_effect=RuntimeError("MPI Crash!"))
+    
+    # Create a mock directory structure in tmpdir
+    rep_dir = os.path.join(tmpdir, "replicates")
+    os.makedirs(rep_dir)
+    os.makedirs(os.path.join(rep_dir, "00001"))
+    with open(os.path.join(rep_dir, "00001", "run_generax.sh"), "w") as f:
+        f.write("generax --args\n")
+    
+    # Mock chdir to actually change directory within tmpdir
+    original_chdir = os.chdir
+    def mock_chdir(path):
+        if path == ".." :
+            original_chdir(os.path.dirname(os.getcwd()))
+        elif os.path.isabs(path):
+            original_chdir(path)
+        else:
+            original_chdir(os.path.join(os.getcwd(), path))
+
+    mocker.patch("os.chdir", side_effect=mock_chdir)
+    
+    # Mock mpi._get_mpi_oversubscribe and get_mpi_env
+    mocker.patch("topiary.generax._reconcile_bootstrap.mpi._get_mpi_oversubscribe", return_value=False)
+    mocker.patch("topiary.generax._reconcile_bootstrap.mpi.get_mpi_env", return_value={"STAY": "STAY"})
+
+    # Run thread function
+    original_dir = os.getcwd()
+    try:
+        os.chdir(rep_dir)
+        rb._generax_thread_function(rep_dir, 0.03, False, ["localhost"], lock=None)
+    finally:
+        os.chdir(original_dir)
+    
+    # Check if 'failed' file was created
+    assert os.path.isfile(os.path.join(rep_dir, "00001", "failed"))
+    # Check if 'running' file was removed (or never existed/was cleaned up)
+    assert not os.path.exists(os.path.join(rep_dir, "00001", "running"))
+    
+    # Verify that the Exception was caught and printed as a WARNING
+    # (We can check stdout if needed, but the 'failed' file is the main indicator)

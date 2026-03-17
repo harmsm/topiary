@@ -44,7 +44,12 @@ def get_mpi_env():
     env : dict
         environment dictionary suitable for passing to subprocess.run
     """
-    return os.environ.copy()
+    env = os.environ.copy()
+    for k in list(env.keys()):
+        if k.startswith("SLURM_"):
+            env.pop(k)
+
+    return env
 
 def get_hosts(num_slots):
     """

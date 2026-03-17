@@ -200,13 +200,11 @@ def _generax_thread_function(replicate_dir,
     # Construct a base mpirun command that the generax commands will be
     # appended to. If we are running purely on the local node, omit the --host 
     # flag entirely to avoid OpenMPI attempting to SSH to localhost.
-    base_cmd = ["mpirun"]
+    base_cmd = ["mpirun", "-np", str(len(hosts))]
     if mpi._get_mpi_oversubscribe():
         base_cmd.append("--oversubscribe")
 
-    if all([h == "localhost" for h in hosts]):
-        base_cmd.extend(["-np", str(len(hosts))])
-    else:
+    if not all([h == "localhost" for h in hosts]):
         base_cmd.extend(["--host",",".join(hosts)])
 
     # Path to result tree within each directory
@@ -233,6 +231,10 @@ def _generax_thread_function(replicate_dir,
             # If this directory has already been set to skip
             if os.path.isfile(os.path.join(d,"skipped")):
                 continue
+            
+            # If this directory failed previously
+            if os.path.isfile(os.path.join(d,"failed")):
+                continue
 
             # Stake a claim
             os.chdir(d)
@@ -258,46 +260,71 @@ def _generax_thread_function(replicate_dir,
         cmd.extend(bash_cmd)
 
         # Launch as a subprocess
-        ret = subprocess.run(cmd,capture_output=True,env=get_mpi_env())
-
-        # Write stdout and stderr
-        f = open("stdout.log","w")
-        f.write(ret.stdout.decode())
-        f.close()
-
-        f = open("stderr.log","w")
-        f.write(ret.stderr.decode())
-        f.close()
-
-        # If failure (non-zero return code), check if result tree was actually
-        # generated. MPI can sometimes throw a warning and a non-zero exit code
-        # even if the underlying program finished successfully.
-        if ret.returncode != 0:
-            if not os.path.isfile(result_tree):
-                err = f"\ngenerax crashed in directory {d}. Writing stderr and\n"
-                err += "stdout there.\n\n"
-                raise RuntimeError(err)
-
-        # Grab result tree
-        f = open(result_tree,'r')
-        tree = f.read().strip()
-        f.close()
-
-        # Update status bar and final tree file
-        lock.acquire()
         try:
+            ret = subprocess.run(cmd,capture_output=True,env=mpi.get_mpi_env())
 
-            # Update replicates tree file
-            f = open(os.path.join("..","bs-trees.newick"),"a")
-            f.write(f"{tree}\n")
+            # Write stdout and stderr
+            f = open("stdout.log","w")
+            f.write(ret.stdout.decode())
             f.close()
 
-        finally:
-            lock.release()
+            f = open("stderr.log","w")
+            f.write(ret.stderr.decode())
+            f.close()
 
-        # Create a completed file, nuke running file, move to next directory.
-        pathlib.Path("completed").touch()
-        os.remove("running")
+            # If failure (non-zero return code), check if result tree was actually
+            # generated. MPI can sometimes throw a warning and a non-zero exit code
+            # even if the underlying program finished successfully.
+            if ret.returncode != 0:
+                if not os.path.isfile(result_tree):
+                    err = f"\ngenerax crashed in directory {d}. Writing stderr and\n"
+                    err += "stdout there.\n\n"
+                    raise RuntimeError(err)
+
+            # Grab result tree
+            f = open(result_tree,'r')
+            tree = f.read().strip()
+            f.close()
+
+            # Update status bar and final tree file
+            lock.acquire()
+            try:
+
+                # Update replicates tree file
+                f = open(os.path.join("..","bs-trees.newick"),"a")
+                f.write(f"{tree}\n")
+                f.close()
+
+            finally:
+                lock.release()
+
+            # Create a completed file, nuke running file, move to next directory.
+            pathlib.Path("completed").touch()
+            os.remove("running")
+
+        except Exception as e:
+            
+            # If we were in the directory, make sure we get out even if we crash
+            if os.path.split(os.getcwd())[-1] == d:
+                
+                # If we have a stderr.log, it might already have info. If not,
+                # write the exception.
+                if not os.path.isfile("stderr.log"):
+                    f = open("stderr.log","w")
+                    f.write(str(e))
+                    f.close()
+                
+                pathlib.Path("failed").touch()
+                if os.path.exists("running"):
+                    os.remove("running")
+                
+                os.chdir("..")
+            
+            w = f"\nWARNING: bootstrap replicate {d} failed. Check\n"
+            w += f"{os.path.abspath(os.path.join(d,'stderr.log'))} for details.\n"
+            print(w, flush=True)
+            
+            continue
         os.chdir("..")
 
         # For the manager thread, check for convergence
