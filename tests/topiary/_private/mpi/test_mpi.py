@@ -5,6 +5,7 @@ from unittest import mock
 from topiary._private.mpi import get_hosts
 from topiary._private.mpi import get_num_slots
 from topiary._private.mpi import check_mpi_configuration
+from topiary._private.mpi import get_mpi_env
 
 from topiary.generax import GENERAX_BINARY
 
@@ -84,3 +85,21 @@ def test_get_num_slots_oversubscribe():
         with mock.patch("os.cpu_count", return_value=None):
             num_slots = get_num_slots()
             assert num_slots == 1
+
+def test_get_mpi_env():
+
+    # Create dummy environment with SLURM/PMI variables
+    dummy_env = {"SLURM_JOB_ID": "12345",
+                 "PMI_RANK": "0",
+                 "NORMAL_VAR": "value"}
+    
+    with mock.patch.dict(os.environ, dummy_env, clear=True):
+        env = get_mpi_env()
+        
+        # SLURM and PMI variables should now be preserved
+        assert "SLURM_JOB_ID" in env
+        assert env["SLURM_JOB_ID"] == "12345"
+        assert "PMI_RANK" in env
+        assert env["PMI_RANK"] == "0"
+        assert "NORMAL_VAR" in env
+        assert env["NORMAL_VAR"] == "value"

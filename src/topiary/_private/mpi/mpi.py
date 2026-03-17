@@ -44,20 +44,7 @@ def get_mpi_env():
     env : dict
         environment dictionary suitable for passing to subprocess.run
     """
-    env = os.environ.copy()
-    
-    # Strip ALL SLURM and PMI environment variables. Conda OpenMPI is often 
-    # strictly incompatible with the host HPC's Slurm PMIx library, and keeping 
-    # Slurm variables causes `MPI_Init` to crash with "NULL communicator". By 
-    # stripping them all, we force OpenMPI to run natively. (If multi-node SSH 
-    # is blocked, this restricts execution to single-node allocations, but 
-    # avoids the crash).
-    for key in list(env.keys()):
-        key_upper = key.upper()
-        if key_upper.startswith("SLURM_") or key_upper.startswith("PMI"):
-            del env[key]
-            
-    return env
+    return os.environ.copy()
 
 def get_hosts(num_slots):
     """
