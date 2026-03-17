@@ -504,6 +504,17 @@ def _construct_args(replicate_dir,
     kwargs_list = []
     for i in range(0,len(hosts),threads_per_rep):
 
+        this_hosts = hosts[i:i+threads_per_rep]
+
+        # Check for node locality
+        unique_hosts = set(this_hosts)
+        if len(unique_hosts) > 1:
+            w = f"\nWARNING: A bootstrap replicate calculation spans multiple compute\n"
+            w += f"nodes ({', '.join(list(unique_hosts))}). This can lead to very slow\n"
+            w += "performance. Consider setting threads_per_replicate such that\n"
+            w += "it is a factor of the number of slots per node.\n"
+            print(w, flush=True)
+
         if i == 0:
             is_manager = True
         else:
@@ -511,7 +522,7 @@ def _construct_args(replicate_dir,
 
         kwargs_list.append({"replicate_dir":replicate_dir,
                             "is_manager":is_manager,
-                            "hosts":hosts[i:i+threads_per_rep],
+                            "hosts":this_hosts,
                             "converge_cutoff":converge_cutoff})
 
     return kwargs_list, len(kwargs_list)

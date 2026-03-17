@@ -24,6 +24,7 @@ import shutil
 @run_cleanly
 def bootstrap_reconcile(previous_run_dir,
                         num_threads,
+                        threads_per_replicate=1,
                         restart=False,
                         overwrite=False,
                         raxml_binary=RAXML_BINARY,
@@ -41,6 +42,11 @@ def bootstrap_reconcile(previous_run_dir,
         can be massively parallelized as there is no cross-talk between
         replicates, so feel free to span this across as many compute nodes as
         you like.
+    threads_per_replicate : int, default=1
+        number of threads to use for each bootstrap replicate. If this is
+        greater than 1, mpirun will be called for each replicate with 
+        -np threads_per_replicate. Total number of slots used will be 
+        num_threads.
     restart : bool, default=False
         restart job from where it stopped in output directory. incompatible with
         overwrite
@@ -48,8 +54,6 @@ def bootstrap_reconcile(previous_run_dir,
         whether or not to overwrite existing output. incompatible with restart.
         This will overwrite an existing 05_reconciliation-bootstraps directory,
         not the rest of the pipeline directory.
-    threads : int, default=-1
-        number of threads to use. if -1 use all available
     raxml_binary : str, optional
         raxml binary to use
     generax_binary : str, optional
@@ -67,6 +71,10 @@ def bootstrap_reconcile(previous_run_dir,
     num_threads = check.check_int(num_threads,
                                   "num_threads",
                                   minimum_allowed=1)
+
+    threads_per_replicate = check.check_int(threads_per_replicate,
+                                            "threads_per_replicate",
+                                            minimum_allowed=1)
 
     # --------------------------------------------------------------------------
     # Check sanity of overwrite, restart, and combination
@@ -171,14 +179,6 @@ def bootstrap_reconcile(previous_run_dir,
 
                 pt = f"{str(datetime.timedelta(seconds=t_per_slot))} (D:H:M:S)"
 
-                out = ["\n----------------------------------------------------------------------\n"]
-                out.append(f"The first reconciliation calculation took {pretty_prev}")
-                out.append(f"to complete on {prev_num_threads} threads. Assuming a similar machine architecture,")
-                out.append("topiary predicts the current calculation should take ")
-                out.append(f"{pt} to complete on {num_threads} threads.")
-                out.append("\n----------------------------------------------------------------------\n")
-                print("\n".join(out))
-
     except (KeyError,IndexError):
         out = ["\n----------------------------------------------------------------------\n"]
         out.append("Could not determine previous run time and thread/counts to")
@@ -223,6 +223,7 @@ def bootstrap_reconcile(previous_run_dir,
                             overwrite=False,
                             supervisor=supervisor,
                             num_threads=num_threads,
+                            threads_per_rep=threads_per_replicate,
                             generax_binary=generax_binary,
                             raxml_binary=raxml_binary)
 
@@ -233,6 +234,7 @@ def bootstrap_reconcile(previous_run_dir,
                           bootstrap=True,
                           overwrite=False,
                           num_threads=num_threads,
+                          threads_per_rep=threads_per_replicate,
                           raxml_binary=raxml_binary,
                           generax_binary=generax_binary)
 

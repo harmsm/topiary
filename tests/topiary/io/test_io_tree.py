@@ -216,7 +216,7 @@ def test__merge_tree_features_missing_dist_support(tmpdir):
     root_on = [tuple(sorted(["A"])), tuple(sorted(["B","C"]))]
     out_tree = _prepare_output_tree([t1], root_on, "gene")
     # This should hit lines 473-481
-    merged = _merge_tree_features(out_tree, [t1], "gene", 
+    merged = _merge_tree_features(out_tree, [t1], root_on, "gene", 
                                   None, None, None, None, None)
     assert merged is not None
 
@@ -500,7 +500,7 @@ def test_merge_tree_features_complex():
     
     # Pass same tree for multiple features to hit line 460
     # Also pass T_clean=None and others=None to hit branches
-    merged = _merge_tree_features(out_tree, [t1], "gene",
+    merged = _merge_tree_features(out_tree, [t1], root_on, "gene",
                                   None, None, t1, t1, None)
     assert merged is not None
 
@@ -543,7 +543,7 @@ def test_exhaustive_branches():
     t_no_nothing = ete.Tree("(A,B);")
     out_tree = _prepare_output_tree([t_no_nothing], [("A",),("B",)], "gene")
     # This should hit the 473->483 loop
-    merged = _merge_tree_features(out_tree, [t_no_nothing], "gene", 
+    merged = _merge_tree_features(out_tree, [t_no_nothing], [("A",),("B",)], "gene", 
                                   None, None, None, None, None)
     assert merged is not None
     

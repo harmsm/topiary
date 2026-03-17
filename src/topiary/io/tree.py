@@ -359,15 +359,32 @@ def _synchronize_tree_rooting(T_list, prefix):
         
         # Stash current root properties before we unroot/re-root
         root_props = T.root.props.copy()
+
+        # Expressly stash name and support. These are not always in props. 
+        root_name = T.root.name
+        root_support = T.root.support
         
         # Strip root node properties as they cause ETE4 assertion 
         # errors during rooting and can lead to duplication if they 
         # end up on a child node after re-rooting. 
-        for p in root_props:
+        for p in list(T.root.props.keys()):
             try:
                 T.root.del_prop(p)
             except (AttributeError, KeyError):
                 pass
+        
+        # Reset name and support to avoid them being moved to children. 
+        # Note: ETE4's unroot() asserts that the root does NOT have 
+        # branch properties like support or dist.
+        T.root.name = ""
+        try:
+            T.root.del_prop("support")
+        except (AttributeError, KeyError):
+            pass
+        try:
+            T.root.del_prop("dist")
+        except (AttributeError, KeyError):
+            pass
         
         # If the tree is bifurcating at the root, ensure the children have 
         # identical support values. ETE4.unroot() will raise an AssertionError 
@@ -395,6 +412,10 @@ def _synchronize_tree_rooting(T_list, prefix):
 
         # Re-apply stashed properties to the new root
         T.root.props.update(root_props)
+        if root_name:
+            T.root.name = root_name
+        if root_support is not None:
+            T.root.support = root_support
 
     return T_list, root_on
 
@@ -445,7 +466,7 @@ def _prepare_output_tree(T_list, root_on, prefix):
 
     return out_tree
 
-def _merge_tree_features(out_tree, T_list, prefix, 
+def _merge_tree_features(out_tree, T_list, root_on, prefix, 
                         T_clean, T_support, T_anc_label, T_anc_pp, T_event):
     """
     Map features from individual trees onto the output tree.
@@ -545,19 +566,42 @@ def _merge_tree_features(out_tree, T_list, prefix,
                     else:
                         out_node.add_prop(out_feature,value)
 
-    # Copy root ancestor to correct node because displaced by rooting. 
-    # Try to find a node that has NO anc_label. This should be the child
-    # that was the root in the original tree. 
-    if stash_values.get("anc_label"):
+    # If we have stashed values, we need to restore them. They were at the 
+    # root of the tree they came from. 
+    if stash_values.get("anc_label") or stash_values.get("anc_pp"):
+        
+        # Heuristic: try to find an internal node that lacks an ancestral label.
+        # This is likely the node that corresponds to the original root split.
+        # (This keeps the labels on internal nodes rather than the root node 
+        # itself, which matches Topiary's historical behavior and ensures 
+        # they appear in Newick format 1). 
+        target_node = None
         for n in out_tree.traverse():
             if n.is_leaf or n.is_root:
                 continue
             
-            if n.get_prop("anc_label") is None or n.get_prop("anc_label") == "":
-                n.add_prop("anc_label",stash_values["anc_label"])
-                if "anc_pp" in stash_values:
-                    n.add_prop("anc_pp",stash_values["anc_pp"])
+            # Use a very broad check for empty
+            val = n.get_prop("anc_label")
+            if val is None or str(val).strip() == "" or str(val) == "None":
+                target_node = n
                 break
+        
+        # If no internal node found, fallback to root
+        if target_node is None:
+            target_node = out_tree.root
+        
+        # Restore stashed values independently
+        for out_f in ["anc_label", "anc_pp"]:
+            if out_f in stash_values:
+                # If anc_label, make sure we do the aX conversion
+                val = stash_values[out_f]
+                if out_f == "anc_label":
+                    val = re.sub("anc","a",str(val))
+                
+                # Store the value. We allow overwriting None/empty/0.0. 
+                current = target_node.get_prop(out_f)
+                if current is None or str(current).strip() == "" or current == 0.0 or target_node.is_root:
+                    target_node.add_prop(out_f, val)
 
     return out_tree
 
@@ -630,7 +674,7 @@ def load_trees(directory=None,
     out_tree = _prepare_output_tree(T_list,root_on,prefix)
 
     # Merge features from all trees onto out_tree
-    out_tree = _merge_tree_features(out_tree,T_list,prefix,**trees)
+    out_tree = _merge_tree_features(out_tree,T_list,root_on,prefix,**trees)
 
     return out_tree
 

@@ -55,6 +55,7 @@ def test_bootstrap_reconcile(tmpdir, mocker):
         bootstrap=True,
         overwrite=False,
         num_threads=2,
+        threads_per_rep=1,
         raxml_binary=mocker.ANY,
         generax_binary=mocker.ANY
     )
@@ -101,3 +102,22 @@ def test_bootstrap_reconcile(tmpdir, mocker):
     ])
     with pytest.raises(WrappedFunctionException):
         bootstrap_reconcile("prev_dir", num_threads=2)
+
+    # Test threads_per_replicate passed correctly
+    isdir_returns["05_reconciled-tree-bootstraps"] = False
+    mocker.patch("glob.glob", side_effect=[
+        ["04_bootstraps"], # bootstrap_dirs
+        ["rep1.phy", "rep2.phy"] # num_replicates
+    ])
+    mock_reconcile.reset_mock()
+    bootstrap_reconcile("prev_dir", num_threads=4, threads_per_replicate=2)
+    mock_reconcile.assert_called_with(
+        prev_calculation="04_bootstraps",
+        calc_dir="05_reconciled-tree-bootstraps",
+        bootstrap=True,
+        overwrite=False,
+        num_threads=2, # dropped to 2 because only 2 replicates
+        threads_per_rep=2,
+        raxml_binary=mocker.ANY,
+        generax_binary=mocker.ANY
+    )
