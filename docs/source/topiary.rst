@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   topiary.cli_scripts
    topiary.draw
    topiary.generax
    topiary.io

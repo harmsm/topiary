@@ -246,8 +246,7 @@ def create_name_dict(df,tip_columns=None,separator="|",disambiguate=True):
 
 def ete4_to_toytree(T):
     """
-    Convert an ete4 tree into a toytree tree.
- instance from an ete4.Tree instance. Copies over
+    Convert an ete4 tree into a toytree tree instance. Copies over
     branch lengths, labels, and features.
 
     Parameters

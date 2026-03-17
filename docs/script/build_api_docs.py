@@ -14,7 +14,7 @@ def main():
     """
 
     # Run sphinx-apidoc on
-    os.system("sphinx-apidoc -f ../../topiary -o .")
+    os.system("sphinx-apidoc -f ../../src/topiary -o .")
 
     # This wackiness cleans up the sphinx-apidoc so it's much cleaner and easier
     # to read

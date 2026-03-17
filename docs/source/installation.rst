@@ -12,133 +12,103 @@ Installation
 
 Topiary is a python package that wraps several external software packages. This
 walks through installing topiary and all of the external software packages it
-wraps. Note that topiary requires a linux or macOS machine.
+wraps. 
 
-The basic installation instructions for topiary are:
+.. IMPORTANT::
+   Topiary requires a linux or macOS machine. **Windows is no longer supported.**
 
-1. Download and install `miniconda <miniconda-link_>`_
-2. Install topiary using conda
-
-1. Install miniconda
-====================
-
-To prevent interference with other packages, we recommend installing topiary in
-its own conda environment. If you do not have conda installed, download and
-install `miniconda <miniconda-link_>`_ before proceeding. Installation instructions
-are available on the `linked miniconda page <miniconda-link_>`_. 
-
-2. Install topiary
+Basic Installation
 ==================
 
-Once conda is installed, open a standard terminal. Copy the following commands
-into the prompt to run them. 
+The easiest way to install topiary and its dependencies is to use the provided
+installation script. 
+
+1. Download and install `miniconda <miniconda-link_>`_
+2. Open a terminal and run the following commands:
 
 .. code-block:: shell-session
 
   conda install git
   git clone https://github.com/harmslab/topiary
   cd topiary
-  conda config --set channel_priority strict
-  conda env create -f environment.yml
+  bash install.sh
+
+The `install.sh` script will:
+
+* Prompt you for a conda environment name (default is `topiary`).
+* Ask for an optional `NCBI API Key <https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/>`_. Providing one is highly recommended to avoid rate-limiting during BLAST searches.
+* Prompt you about cluster installation (see below).
+* Create the conda environment, install all python dependencies, and compile the necessary external binaries (RAxML-NG and GeneRax).
+
+Cluster Installation
+====================
+
+If you are installing topiary on a high-performance computing (HPC) cluster, you
+generally need to ensure that the external software (GeneRax) is
+compiled using the cluster's specific MPI and C compilers. 
+
+To do this:
+
+1. Identify the correct MPI and compiler modules on your cluster (e.g., using `module spider mpi`). The details of this step depend on your cluster architecture. If you do not know how to do this, please contact your cluster administrator.
+2. Open `dependencies/compile-generax.sh` in a text editor.
+3. Add the appropriate `module load` command near the top of the script. For example:
+
+   .. code-block:: bash
+
+      module load mpi/gcc/13.1.0/openmpi/4.1.6
+
+4. Save the file and run `bash install.sh`. When prompted if you are on a cluster, answer `y`. 
+
+This ensures that GeneRax and RAxML-NG are linked against the cluster's high-performance interconnects, allowing them to run efficiently across multiple nodes.
+
+Checking Installation
+=====================
+
+After the installation script finishes, you can verify that everything is 
+installed correctly by running:
+
+.. code-block:: shell-session
+
   conda activate topiary
-  python -m pip install . -vv
-
-At this point, you should have topiary and its supporting software installed. 
-
-2.1. Installing RAxML-NG and GeneRax
-====================================
-
-Unfortunately, the versions of RAxML-NG and GeneRax on conda are currently
-broken. To get around this, we have to download and compile these software
-packages manually. In a shell, run:
-
-.. code-block:: shell-session
-
-  git clone https://github.com/harmsm/raxml-ng.git
-  cd raxml-ng
-  mkdir build
-  cd build
-  cmake ..
-  make -j 4
-  cp build/bin/raxml-ng $CONDA_PREFIX/bin/
-
-.. code-block:: shell-session
-
-  git clone https://github.com/harmsm/generax.git
-  cd generax
-  mkdir build
-  cd build
-  cmake ..
-  make -j 4
-  cp build/bin/generax $CONDA_PREFIX/bin/
-
-
-3. Check supporting software packages
-=======================================
-
-You can check which software packages are visible to topiary by:
-
-.. code-block:: shell-session
-
   topiary-check-installed
 
-The output should look something like this:
+(Replace `topiary` with your custom environment name if you chose one).
+
+The output should show :code:`passes: Y` for all required packages:
 
 .. image:: _static/img/installation/topiary-check-installed_450x483.png
   :align: center
   :alt: topiary-check-installed terminal output
 
-:raw-html:`<br />`
-If some of the packages are not installed (:code:`passes: N`), proceed to the
-sections below.
-
 ----------------------------
 NCBI API Key
 ----------------------------
 
-If you wish to use an `NCBI API Key <https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/>`_,
-set the environment variable :code:`NCBI_API_KEY` to point to your key. For 
-example: 
+If you did not provide an NCBI API key during the initial installation, you can 
+add one later by running:
 
 .. code-block:: shell-session
 
-  export NCBI_API_KEY='abcdef012'
+  conda env config vars set NCBI_API_KEY='your_key_here' -n topiary
 
-Topiary will recognize this key and increase the number of allowed requests per
-second to NCBI servers. 
+This ensures the key is automatically exported whenever the topiary environment 
+is activated.
 
-If any of the packages are not installed, you can try to manually install then with:
+Required Software
+=================
 
-.. code-block:: shell-session
+While `install.sh` handles these automatically, topiary relies on the following
+software. Note that we use custom versions of these (specifically GeneRax and
+RAxML-NG) so we cannot gaurantee topiary will function using other versions of 
+these pieces of code. Our custom versions are included in the `dependencies`
+directory.
 
-  conda install -c conda-forge -c bioconda mpi4py openmpi "muscle>=5.0" "raxml-ng>=1.1" "generax>=2.0" "blast>=2.2"
++ `NCBI blast+ >= 2.2 <blast-download_>`_
++ `muscle >= 5.0 <muscle-download_>`_
++ `GeneRax >= 2.1.3 <generax-download_>`_
++ `RAxML-NG >= 1.2.2 <raxml-ng-download_>`_
++ `Python >= 3.11 <python-link_>`_
 
-You can then check to make sure everything installed correctly by running:
-
-.. code-block:: shell-session
-
-  topiary-check-installed
-
-If any of these packages were not installed by conda--or you wish to install
-them yourself--you can install them manually using the following links:
-
-+ `NCBI blast+ >= 2.2 <blast-download_>`_. (This will install both the blastp and
-  makeblastdb programs.)
-+ `muscle >= 5.0 <muscle-download_>`_.
-+ `GeneRax >= 2.1.3 <generax-download_>`_.
-+ `RAxML-NG >= 1.2.2 <raxml-ng-download_>`_.
-
-After installation, you'll need to make sure the directories containing these
-binaries are in your :code:`$PATH` directory. (See `here <nix-path_>`_ for
-instructions).
-
-------------------
-Required libraries
-------------------
-
-+ Core scientific python libraries:
-
-  + `Python >= 3.8 <python-link_>`_
   + `numpy <numpy-link_>`_
   + `pandas <pandas-link_>`_
   + `matplotlib <matplotlib-link_>`_
@@ -153,6 +123,6 @@ Required libraries
 
   + `NCBI BLAST+ <blast-download_>`_
   + `muscle >= 5.0 <muscle-download_>`_
-  + `GeneRax >= 2.0 <generax-download_>`_
-  + `RAxML-NG >= 1.1 <raxml-ng-download_>`_
+  + `GeneRax >= 2.1.3 <generax-download_>`_
+  + `RAxML-NG >= 1.2.2 <raxml-ng-download_>`_
   + `python-opentree <opentree-link_>`_

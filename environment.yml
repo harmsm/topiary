@@ -18,6 +18,9 @@ dependencies:
   - muscle>=5.0
   - openmpi<5
   - mpi4py
+  - sphinx
+  - sphinx_rtd_theme
+  - pydata-sphinx-theme
   - pip:
     - opentree
     - ete4

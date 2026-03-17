@@ -61,6 +61,7 @@ fi
 # Overwrite if we have to 
 if [[ "$overwrite" =~ ^[Yy]$ ]]; then
     echo "Removing existing environment '$ENV_NAME'..."
+    conda deactivate $ENV_NAME
     conda env remove -n $ENV_NAME -y
 fi
 
@@ -81,7 +82,7 @@ fi
 
 # Install topiary and pip/conda dependencies
 conda run -n $ENV_NAME pip install -e . -vv
-conda run -n $ENV_NAME pip install coverage flake8 pytest genbadge[tests] pytest-mock
+conda run -n $ENV_NAME pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
 
 # compile raxml and generax
 cd dependencies
