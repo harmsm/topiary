@@ -61,7 +61,7 @@ fi
 # Overwrite if we have to 
 if [[ "$overwrite" =~ ^[Yy]$ ]]; then
     echo "Removing existing environment '$ENV_NAME'..."
-    conda deactivate $ENV_NAME
+    conda deactivate 
     conda env remove -n $ENV_NAME -y
 fi
 

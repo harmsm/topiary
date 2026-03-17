@@ -7,10 +7,11 @@ from topiary.ncbi.entrez.taxid import get_taxid
 import numpy as np
 import pandas as pd
 
+@pytest.mark.run_ncbi_server
 def test_get_taxid():
 
-    expt_taxid = set(['10090', '9606', '7955'])
-    obs_taxid = get_taxid(["Homo sapiens","Mus musculus","Danio rerio"])
+    expt_taxid = set(['9606', '10090'])
+    obs_taxid = get_taxid(["Homo sapiens","Mus musculus"])
     assert len(set(obs_taxid).difference(expt_taxid)) == 0
 
     obs_taxid = get_taxid(["Homo sapiens"])

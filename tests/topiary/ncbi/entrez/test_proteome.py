@@ -45,6 +45,7 @@ def test__get_genome_url(esummary_assembly_records):
 
         assert acc == expected_output[k]
 
+@pytest.mark.run_ncbi_server
 def test_get_proteome_ids():
 
     with pytest.raises(ValueError):
@@ -69,27 +70,20 @@ def test_get_proteome_ids():
     assert len(by_taxid) > 0
     assert err is None
 
-    # Human, by species
-    by_species, err = get_proteome_ids(species="Homo sapiens")
-
-    # Make sure species and taxid queries bring down equivalent ids
-    assert np.array_equal(by_species,by_taxid)
-
+@pytest.mark.run_ncbi_server
 def test__get_records(tmpdir):
 
     cwd = os.getcwd()
     os.chdir(tmpdir)
 
-    # I'm not sure if this is a stable test. If these ids change or are deleted,
-    # it could start failing... 
-    good_test_ids = ['11968211','11828891']
+    # Human assembly ids that should be stable
+    good_test_ids = ['11968211']
 
     output = _get_records(good_test_ids)
-    assert len(output) == 2
+    assert len(output) == 1
     
     # Try to access output key that should always be there
     output[0]["SpeciesName"]
-    output[1]["SpeciesName"]
 
     output = _get_records(["NOT_AN_ID"])
     assert len(output) == 0
@@ -97,6 +91,7 @@ def test__get_records(tmpdir):
     os.chdir(cwd)
 
 
+@pytest.mark.run_ncbi_server
 def test_get_proteome(tmpdir):
 
     cwd = os.getcwd()

@@ -548,10 +548,12 @@ def test__combine_hits(ncbi_blast_server_output):
     assert type(df_list) is list
     assert len(df_list) == 1
 
+@pytest.mark.run_ncbi_server
 def test__ncbi_blast_thread_function():
 
     pass
 
+@pytest.mark.run_ncbi_server
 def test_ncbi_blast():
 
     pass

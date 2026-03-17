@@ -101,4 +101,4 @@ jobs:
       env:
         TOPIARY_MPI_OVERSUBSCRIBE: "1"
       run: |
-        pytest tests/ --run-raxml --run-generax --run-blast
+        pytest tests/ --run-raxml --run-generax --run-blast --run-ncbi-server

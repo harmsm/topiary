@@ -24,6 +24,7 @@ def test__read_md5_file(ftp_test_files):
     assert out_dict["GCF_000001405.40_GRCh38.p14_protein.faa.gz"] == "6dbdf8c7f9c7f39da15abb996831c733"
     assert len(out_dict) == 1419
 
+@pytest.mark.run_ncbi_server
 def test_ncbi_ftp_download(ftp_test_files,tmpdir):
 
     cwd = os.getcwd()

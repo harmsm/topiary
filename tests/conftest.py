@@ -21,10 +21,16 @@ def pytest_addoption(parser):
                      default=False,
                      help="Run tests involving blast")
 
+    parser.addoption("--run-ncbi-server",
+                     action="store_true",
+                     default=False,
+                     help="Run tests that access the NCBI server")
+
 def pytest_collection_modifyitems(config, items):
     """
-    Look for run_generax and run_raxml decorators. Modify test collection based
-    on 1) pytest command line arguments and 3) operating system.
+    Look for run_generax, run_raxml, run_blast, and run_ncbi_server decorators. 
+    Modify test collection based on 1) pytest command line arguments and 
+    2) operating system.
     """
 
     # Look for --run-generax argument. Skip test if this is not specified.
@@ -46,6 +52,13 @@ def pytest_collection_modifyitems(config, items):
         skipper = pytest.mark.skip(reason="Only run when --run-blast is given")
         for item in items:
             if "run_blast" in item.keywords:
+                item.add_marker(skipper)
+
+    # Look for --run-ncbi-server argument. Skip test if this is not specified.
+    if not config.getoption("--run-ncbi-server"):
+        skipper = pytest.mark.skip(reason="Only run when --run-ncbi-server is given")
+        for item in items:
+            if "run_ncbi_server" in item.keywords:
                 item.add_marker(skipper)
 
     # If this is a windows box, skip any test with run_generax or run_raxml

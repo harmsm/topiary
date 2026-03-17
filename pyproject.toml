@@ -70,4 +70,5 @@ markers = [
     "run_generax: marks tests as involving generax",
     "run_raxml: marks tests as involving raxml",
     "run_blast: marks tests as involving blast",
+    "run_ncbi_server: marks tests as accessing the NCBI server",
 ]

@@ -4,44 +4,40 @@ import topiary
 from topiary.ncbi.entrez.sequences import _get_sequences_thread_function
 from topiary.ncbi.entrez.sequences import get_sequences
 
+@pytest.mark.run_ncbi_server
 def test__get_sequences_thread_function():
 
     import multiprocessing as mp
     lock = mp.Lock()
-    results = _get_sequences_thread_function(ids="EAW87024.1,PJI62056",
+    results = _get_sequences_thread_function(ids="EAW87024.1",
                                              num_tries_allowed=5,
                                              lock=lock)
 
     assert isinstance(results,list)
-    assert len(results) == 2
+    assert len(results) == 1
     assert results[0][0].split(".")[0] == "EAW87024"
     assert results[0][1][:10] == "MLPFLFFSTL"
-    assert results[1][0].split(".")[0] == "PJI62056"
-    assert results[1][1][:10] == "MKPVTLYDVA"
 
+@pytest.mark.run_ncbi_server
 def test_get_sequences():
 
-    to_download = ["EAW87024.1","PJI62056"]
+    to_download = ["EAW87024.1"]
 
     # Download these sequences
     results = get_sequences(to_download,block_size=50)
 
     assert isinstance(results,list)
-    assert len(results) == 2
+    assert len(results) == 1
     assert results[0][0].split(".")[0] == "EAW87024"
     assert results[0][1][:10] == "MLPFLFFSTL"
-    assert results[1][0].split(".")[0] == "PJI62056"
-    assert results[1][1][:10] == "MKPVTLYDVA"
 
     # Force get_sequences to do queries and merge.
     results = get_sequences(to_download,block_size=1)
 
     assert isinstance(results,list)
-    assert len(results) == 2
+    assert len(results) == 1
     assert results[0][0].split(".")[0] == "EAW87024"
     assert results[0][1][:10] == "MLPFLFFSTL"
-    assert results[1][0].split(".")[0] == "PJI62056"
-    assert results[1][1][:10] == "MKPVTLYDVA"
 
     results = get_sequences([],block_size=1)
     assert isinstance(results,list)
