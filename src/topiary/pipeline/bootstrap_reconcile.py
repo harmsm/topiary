@@ -135,8 +135,6 @@ def bootstrap_reconcile(previous_run_dir,
 
     installed.validate_stack(to_validate)
 
-    installed.validate_stack(to_validate)
-
     # --------------------------------------------------------------------------
     # Validate the previous calculation
 
@@ -163,7 +161,7 @@ def bootstrap_reconcile(previous_run_dir,
     # Load calculation and make sure it completed
     supervisor = Supervisor(bootstrap_directory)
     if supervisor.status != "complete":
-        err = f"{previous_run_dir}/{bootstrap_directory} exists but has status '{supervisor.calc_status}'\n"
+        err = f"{previous_run_dir}/{bootstrap_directory} exists but has status '{supervisor.status}'\n"
         if supervisor.status == "empty":
             err += "It does not appear this calculation has been run.\n\n"
         elif supervisor.status == "running":
