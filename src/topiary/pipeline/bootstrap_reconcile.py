@@ -137,23 +137,74 @@ def bootstrap_reconcile(previous_run_dir,
 
     # --------------------------------------------------------------------------
     # Validate the previous calculation
-
+    
     os.chdir(previous_run_dir)
 
     try:
 
+        # All bootstrap directories
         bootstrap_dirs = glob.glob("*bootstraps*")
         if len(bootstrap_dirs) == 0:
             raise ValueError
         
         bootstrap_dirs = [(int(b.split("_")[0]),b) for b in bootstrap_dirs]
         bootstrap_dirs.sort()
+        
+        # Default behavior: find the highest-numbered bootstrap directory and 
+        # assume it's the input. 
         bootstrap_directory = bootstrap_dirs[-1][1]
         dir_counter = bootstrap_dirs[-1][0]
+        
+        # If we are restarting, we need to be more clever. 
+        if restart:
+
+            # If the highest-numbered directory is a reconciled-tree-bootstraps 
+            # directory, then WE are the restart. 
+            if bootstrap_directory.endswith("reconciled-tree-bootstraps"):
+                
+                # Check for input *before* this directory. 
+                if len(bootstrap_dirs) < 2:
+                    err = f"previous_run_dir '{previous_run_dir}' only has a\n"
+                    err += "reconciliation bootstrap directory. To restart, there\n"
+                    err += "must be an input bootstrap directory as well.\n\n"
+                    os.chdir("..")
+                    raise RuntimeError(err)
+                
+                # Find the highest-numbered bootstrap directory that is NOT 
+                # a reconciled-tree-bootstraps directory. 
+                found_input = False
+                for i in range(len(bootstrap_dirs)-2,-1,-1):
+                    if not bootstrap_dirs[i][1].endswith("reconciled-tree-bootstraps"):
+                        bootstrap_directory = bootstrap_dirs[i][1]
+                        found_input = True
+                        break
+                
+                if not found_input:
+                    err = f"previous_run_dir '{previous_run_dir}' does not have an\n"
+                    err += "input bootstrap directory (other than the reconciliation\n"
+                    err += "bootstrap directory itself).\n\n"
+                    os.chdir("..")
+                    raise RuntimeError(err)
+
+                # The directory we are restarting is the original highest-numbered
+                # directory.
+                calc_dir = bootstrap_dirs[-1][1]
+
+            # If the highest-numbered directory is NOT a reconciled-tree-bootstraps
+            # directory, then we can't restart.
+            else:
+                err = f"previous_run_dir '{previous_run_dir}' does not have a\n"
+                err += "reconciliation bootstrap directory to restart. To start a\n"
+                err += "new calculation, do not specify --restart.\n\n"
+                os.chdir("..")
+                raise RuntimeError(err)
+
+        else:
+            calc_dir = f"{dir_counter+1:02d}_reconciled-tree-bootstraps"
 
     except (ValueError,IndexError):
-        err = f"previous_run_dir '{previous_run_dir}' does not have an bootstraps\n"
-        err += "directory. This directory is necessary as the input to the a\n"
+        err = f"previous_run_dir '{previous_run_dir}' does not have any bootstraps\n"
+        err += "directory. This directory is necessary as the input to a\n"
         err += "reconciliation bootstrap calculation.\n\n"
         os.chdir("..")
         raise FileNotFoundError(err)
@@ -187,36 +238,8 @@ def bootstrap_reconcile(previous_run_dir,
     # number of replicates, check to see if mpirun can actually grab them.
     check_mpi_configuration(num_threads)
 
-    # Try to get a time estimate from supervisor stack
-    try:
-        for i, p in enumerate(supervisor.previous_entries):
-            if p["calc_type"] == "reconcile":
-
-                prev_dt = p["completion_time"] - p["creation_time"]
-                
-                # Use absolute path to check for num_threads in events from 
-                # run_parameters.json in that directory. events[1] is typically 
-                # where the generax/raxml command is recorded.
-                prev_num_threads = p["events"][1]["num_threads"]
-
-                pretty_prev = f"{str(datetime.timedelta(seconds=prev_dt))} (D:H:M:S)"
-
-                t_per_rep = prev_dt*prev_num_threads
-                t_overall = t_per_rep*num_replicates
-                t_per_slot = t_overall/num_threads
-
-                pt = f"{str(datetime.timedelta(seconds=t_per_slot))} (D:H:M:S)"
-
-    except (KeyError,IndexError):
-        out = ["\n----------------------------------------------------------------------\n"]
-        out.append("Could not determine previous run time and thread/counts to")
-        out.append("estimate run time for this calculation.")
-        out.append("\n----------------------------------------------------------------------\n")
-        print("\n".join(out))
-
     # Make sure the output either exists with --overwrite or --restart or
     # does not exist
-    calc_dir = f"{dir_counter+1:02d}_reconciled-tree-bootstraps"
     if os.path.isdir(calc_dir):
         if overwrite:
             rmtree(calc_dir)
@@ -235,6 +258,7 @@ def bootstrap_reconcile(previous_run_dir,
             os.chdir("..")
             raise ValueError(err)
 
+        # Load existing supervisor for the directory we are restarting. 
         supervisor = Supervisor(calc_dir)
         supervisor.update("calc_status","running")
         supervisor.event("Restarting calculation.")

@@ -491,11 +491,11 @@ def _clean_replicate_dir(replicate_dir):
         directory containing replicates
     """
 
-    running = glob.glob(os.path.join(replicate_dir,"0*","running"))
+    running = glob.glob(os.path.join(replicate_dir,"*","running"),recursive=True)
     for f in running:
         os.remove(f)
 
-    skipped = glob.glob(os.path.join(replicate_dir,"0*","skipped"))
+    skipped = glob.glob(os.path.join(replicate_dir,"*","skipped"),recursive=True)
     for f in skipped:
         os.remove(f)
 

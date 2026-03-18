@@ -70,7 +70,7 @@ def test_bootstrap_reconcile(tmpdir, mocker):
     isdir_returns["05_reconciled-tree-bootstraps"] = True
     isdir_returns["05_reconciled-tree-bootstraps/working/replicates"] = True
     mocker.patch("glob.glob", side_effect=[
-        ["04_bootstraps"], # bootstrap_dirs
+        ["04_bootstraps", "05_reconciled-tree-bootstraps"], # bootstrap_dirs
         ["rep1.phy", "rep2.phy"] # num_replicates
     ])
     
