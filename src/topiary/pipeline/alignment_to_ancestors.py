@@ -167,9 +167,15 @@ def alignment_to_ancestors(df,
         do_reconcile = False
     else:
 
-        if np.sum(pd.isnull(df.ott)) > 1:
-            print("\nNot all sequences have ott. No gene/species tree reconciliation will be performed.\n",flush=True)
+        # Check for ott column
+        if "ott" not in df.columns:
+            print("\nNo 'ott' column found in the dataframe. No gene/species tree reconciliation will be performed.\n", flush=True)
             do_reconcile = False
+        
+        elif np.sum(pd.isnull(df.ott)) > 0:
+            print("\nNot all sequences have 'ott'. No gene/species tree reconciliation will be performed.\n", flush=True)
+            do_reconcile = False
+
         else:
 
             # Figure out if the default is to reconcile or not based on taxonomic 
@@ -179,10 +185,10 @@ def alignment_to_ancestors(df,
                                                 avoid_all_life=True)
 
             if mrca["is_microbial"]:
-                print("\nMicrobial dataset detected. No gene/species tree reconciliation will be performed",flush=True)
+                print("\nMrca is microbial. No gene/species tree reconciliation will be performed", flush=True)
                 do_reconcile = False
             else:
-                print("\nNon-microbial dataset detected. Gene/species tree reconciliation will be performed",flush=True)
+                print("\nMrca is non-microbial. Gene/species tree reconciliation will be performed", flush=True)
                 do_reconcile = True
 
     # --------------------------------------------------------------------------

@@ -109,3 +109,56 @@ def test_alignment_to_ancestors(tmpdir, mocker):
     os.mkdir("exists")
     with pytest.raises(WrappedFunctionException):
         alignment_to_ancestors(df, out_dir="exists", overwrite=False)
+def test_alignment_to_ancestors_reconciliation_logic(tmpdir, mocker):
+    """
+    Test the logic that decides whether to do reconciliation.
+    """
+
+    # Mock all the things!
+    mock_read_df = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.read_dataframe")
+    mock_check_df = mocker.patch("topiary.pipeline.alignment_to_ancestors.check.check_topiary_dataframe")
+    mock_check_bool = mocker.patch("topiary.pipeline.alignment_to_ancestors.check.check_bool", side_effect=lambda x, y: x)
+    mock_check_int = mocker.patch("topiary.pipeline.alignment_to_ancestors.check.check_int", side_effect=lambda x, y, minimum_allowed=None: x)
+    mock_check_float = mocker.patch("topiary.pipeline.alignment_to_ancestors.check.check_float", side_effect=lambda x, y, minimum_allowed=None, maximum_allowed=None: x)
+    
+    mock_ott_to_mrca = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.opentree.ott_to_mrca")
+    mock_validate_stack = mocker.patch("topiary.pipeline.alignment_to_ancestors.installed.validate_stack")
+    mock_check_mpi = mocker.patch("topiary.pipeline.alignment_to_ancestors.check_mpi_configuration")
+    mock_df_to_species = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.df_to_species_tree")
+    
+    mock_find_best_model = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.find_best_model")
+    mock_gen_ml_tree = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.generate_ml_tree")
+    mock_gen_ancestors = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.generate_ancestors")
+    mock_reconcile = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.reconcile")
+    mock_pipeline_report = mocker.patch("topiary.pipeline.alignment_to_ancestors.pipeline_report")
+    mocker.patch("topiary.pipeline.alignment_to_ancestors._check_restart", return_value=True)
+
+    os.chdir(tmpdir)
+
+    # Case 1: No ott column
+    df_no_ott = pd.DataFrame({"alignment": ["seq1", "seq2"]})
+    mock_check_df.return_value = df_no_ott
+    alignment_to_ancestors(df_no_ott, out_dir="out_no_ott", no_bootstrap=True)
+    assert mock_reconcile.call_count == 0
+    mock_reconcile.reset_mock()
+
+    # Case 2: Incomplete ott column
+    df_incomplete_ott = pd.DataFrame({"ott": [pd.NA, "ott1"], "alignment": ["seq1", "seq2"]})
+    mock_check_df.return_value = df_incomplete_ott
+    alignment_to_ancestors(df_incomplete_ott, out_dir="out_inc_ott", no_bootstrap=True)
+    assert mock_reconcile.call_count == 0
+    mock_reconcile.reset_mock()
+
+    # Case 3: Microbial MRSCA
+    df_ott = pd.DataFrame({"ott": ["ott1", "ott2"], "alignment": ["seq1", "seq2"]})
+    mock_check_df.return_value = df_ott
+    mock_ott_to_mrca.return_value = {"is_microbial": True}
+    alignment_to_ancestors(df_ott, out_dir="out_microbial", no_bootstrap=True)
+    assert mock_reconcile.call_count == 0
+    mock_reconcile.reset_mock()
+
+    # Case 4: Non-microbial MRCAs
+    mock_ott_to_mrca.return_value = {"is_microbial": False}
+    alignment_to_ancestors(df_ott, out_dir="out_non_microbial", no_bootstrap=True)
+    assert mock_reconcile.call_count == 1
+    mock_reconcile.reset_mock()
