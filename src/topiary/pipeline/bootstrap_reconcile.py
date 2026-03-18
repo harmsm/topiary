@@ -25,6 +25,7 @@ import shutil
 def bootstrap_reconcile(previous_run_dir,
                         num_threads=None,
                         threads_per_replicate=None,
+                        converge_cutoff=0.03,
                         restart=False,
                         overwrite=False,
                         raxml_binary=RAXML_BINARY,
@@ -49,6 +50,9 @@ def bootstrap_reconcile(previous_run_dir,
         manually set threads_per_replicate, choose a number that is a factor of
         the number of slots on each compute node to avoid wasting slots. If you
         have 24 slots per node, you could choose 2, 3, 4, 6, 8, 12, or 24.
+    converge_cutoff : float, default=0.03
+        bootstrap convergence criterion. This is RAxML-NG default, passed 
+        to --bs-cutoff.
     restart : bool, default=False
         restart job from where it stopped in output directory. incompatible with
         overwrite
@@ -271,6 +275,7 @@ def bootstrap_reconcile(previous_run_dir,
                             supervisor.run_parameters["allow_horizontal_transfer"],
                             supervisor.seed,
                             bootstrap_directory=None,
+                            converge_cutoff=converge_cutoff,
                             restart="replicates",
                             overwrite=False,
                             supervisor=supervisor,
@@ -284,6 +289,7 @@ def bootstrap_reconcile(previous_run_dir,
         topiary.reconcile(prev_calculation=bootstrap_directory,
                           calc_dir=calc_dir,
                           bootstrap=True,
+                          converge_cutoff=converge_cutoff,
                           overwrite=False,
                           num_threads=num_threads,
                           threads_per_rep=threads_per_replicate,

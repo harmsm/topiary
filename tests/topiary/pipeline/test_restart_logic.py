@@ -99,6 +99,8 @@ def test_restart_logic(tmpdir, mocker):
     # Verify that reconcile_bootstrap was called with restart="replicates"
     called_kwargs = mock_reconcile_bootstrap.call_args[1]
     assert called_kwargs["restart"] == "replicates"
+    assert "converge_cutoff" in called_kwargs
+    assert called_kwargs["converge_cutoff"] == 0.03
     
     # Verify we are in the pipe_dir or its parent (bootstrap_reconcile changes directory)
     # The function ends by os.chdir('..'), so if it started in pipe_dir, it ends in tmpdir

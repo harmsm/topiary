@@ -57,6 +57,7 @@ def test_bootstrap_reconcile(tmpdir, mocker):
         prev_calculation="04_bootstraps",
         calc_dir="05_reconciled-tree-bootstraps",
         bootstrap=True,
+        converge_cutoff=0.03,
         overwrite=False,
         num_threads=2,
         threads_per_rep=8, # Closest factor of 56 to 10
@@ -133,6 +134,7 @@ def test_bootstrap_reconcile(tmpdir, mocker):
         prev_calculation="04_bootstraps",
         calc_dir="05_reconciled-tree-bootstraps",
         bootstrap=True,
+        converge_cutoff=0.03,
         overwrite=False,
         num_threads=56,
         threads_per_rep=8,
