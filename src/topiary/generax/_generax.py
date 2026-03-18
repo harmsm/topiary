@@ -304,7 +304,18 @@ def run_generax(run_directory,
         # Make sure we have this number of threads
         check_mpi_configuration(num_threads)
 
-        cmd = ["mpirun","-np",f"{num_threads:d}",abs_path_generax_binary]
+        # Get hosts and build mpirun command. If all hosts are "localhost",
+        # omit the --host flag to avoid OpenMPI attempting to SSH to itself.
+        hosts = topiary._private.mpi.get_hosts(num_threads)
+        
+        cmd = ["mpirun", "-np", f"{num_threads:d}"]
+        if topiary._private.mpi._get_mpi_oversubscribe():
+            cmd.append("--oversubscribe")
+            
+        if not all([h == "localhost" for h in hosts]):
+            cmd.extend(["--host",",".join(hosts)])
+            
+        cmd.append(abs_path_generax_binary)
 
     else:
         cmd = [abs_path_generax_binary]
@@ -314,9 +325,9 @@ def run_generax(run_directory,
     cmd.extend(["--prefix","result"])
 
     if allow_horizontal_transfer:
-        model = cmd.extend(["--rec-model","UndatedDTL"])
+        cmd.extend(["--rec-model","UndatedDTL"])
     else:
-        model = cmd.extend(["--rec-model","UndatedDL"])
+        cmd.extend(["--rec-model","UndatedDL"])
 
     # seed argument is overloaded. Interpret based on type
     if seed is not None:

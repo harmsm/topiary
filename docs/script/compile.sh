@@ -5,4 +5,4 @@ conda run -n topiary python ../script/build_api_docs.py
 cd ..
 
 rm -rf build
-conda run -n topiary make html
+conda run -n topiary make SPHINXBUILD="python -m sphinx" html

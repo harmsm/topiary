@@ -41,6 +41,14 @@ topiary.cli\_scripts.create\_report
    :undoc-members:
    :show-inheritance:
 
+topiary.cli\_scripts.dataframe\_from\_fasta
+--------------------------------------------------
+
+.. automodule:: topiary.cli_scripts.dataframe_from_fasta
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 topiary.cli\_scripts.fasta\_into\_dataframe
 --------------------------------------------------
 

@@ -43,7 +43,7 @@ The `install.sh` script will:
 Cluster Installation
 ====================
 
-If you are installing topiary on a high-performance computing (HPC) cluster, you
+If you are installing topiary on a high-performance computing cluster, you
 generally need to ensure that the external software (GeneRax) is
 compiled using the cluster's specific MPI and C compilers. 
 
@@ -99,7 +99,7 @@ Required Software
 
 While `install.sh` handles these automatically, topiary relies on the following
 software. Note that we use custom versions of these (specifically GeneRax and
-RAxML-NG) so we cannot gaurantee topiary will function using other versions of 
+RAxML-NG), so we cannot gaurantee topiary will function using other versions of 
 these pieces of code. Our custom versions are included in the `dependencies`
 directory.
 
