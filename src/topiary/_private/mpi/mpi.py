@@ -32,12 +32,17 @@ def _get_mpi_oversubscribe():
 
     return bool(v)
 
-def get_mpi_env():
+def get_mpi_env(strip_slurm=False):
     """
     Get a copy of the current os.environ stripped of variables that can 
     conflict with mpirun. This is particularly important for SLURM HPC 
     environments where multiple mpirun instances launched via python 
     multiprocessing can collide.
+
+    Parameters
+    ----------
+    strip_slurm : bool, default=False
+        whether or not to strip SLURM_ environment variables. 
 
     Returns
     -------
@@ -45,9 +50,10 @@ def get_mpi_env():
         environment dictionary suitable for passing to subprocess.run
     """
     env = os.environ.copy()
-    for k in list(env.keys()):
-        if k.startswith("SLURM_"):
-            env.pop(k)
+    if strip_slurm:
+        for k in list(env.keys()):
+            if k.startswith("SLURM_"):
+                env.pop(k)
 
     return env
 

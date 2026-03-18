@@ -94,13 +94,23 @@ def test_get_mpi_env():
                  "NORMAL_VAR": "value"}
     
     with mock.patch.dict(os.environ, dummy_env, clear=True):
+
+        # Default should NOT strip
         env = get_mpi_env()
+        assert "SLURM_JOB_ID" in env
+        assert env["SLURM_JOB_ID"] == "12345"
+        assert "PMI_RANK" in env
+        assert env["PMI_RANK"] == "0"
+        assert "NORMAL_VAR" in env
+        assert env["NORMAL_VAR"] == "value"
+
+        # Explicit strip_slurm=False should NOT strip
+        env = get_mpi_env(strip_slurm=False)
+        assert "SLURM_JOB_ID" in env
         
-        # SLURM variables should be stripped
+        # Explicit strip_slurm=True SHOULD strip
+        env = get_mpi_env(strip_slurm=True)
         assert "SLURM_JOB_ID" not in env
-        
-        # PMI variables are NOT currently stripped by get_mpi_env, 
-        # so they should be preserved (based on current implementation)
         assert "PMI_RANK" in env
         assert env["PMI_RANK"] == "0"
         assert "NORMAL_VAR" in env

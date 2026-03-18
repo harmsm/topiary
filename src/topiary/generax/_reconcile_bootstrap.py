@@ -261,7 +261,7 @@ def _generax_thread_function(replicate_dir,
 
         # Launch as a subprocess
         try:
-            ret = subprocess.run(cmd,capture_output=True,env=mpi.get_mpi_env())
+            ret = subprocess.run(cmd,capture_output=True,env=mpi.get_mpi_env(strip_slurm=True))
 
             # Write stdout and stderr
             f = open("stdout.log","w")
