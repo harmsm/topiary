@@ -21,7 +21,7 @@ git submodule update --init --recursive
 # Build binary
 mkdir build
 cd build
-cmake ..
+cmake -DTERRAPHAST_ARCH_NATIVE=OFF -DENABLE_RAXML_SIMD=OFF -DENABLE_PLLMOD_SIMD=OFF ..
 make -j 4
 
 # Copy binary to final location

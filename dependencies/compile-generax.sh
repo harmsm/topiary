@@ -38,7 +38,7 @@ git submodule update --init --recursive
 # Build binary
 mkdir build
 cd build
-cmake -DUSE_MPI=ON ..
+cmake -DUSE_MPI=ON -DCORAX_BUILD_PORTABLE=ON ..
 make -j 4
 
 # Copy binary to final location
