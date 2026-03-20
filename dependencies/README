@@ -1,0 +1,10 @@
+You can use these scripts to download and compile the Harmslab-specific forks
+of generax and raxml-ng. We recommend using our pre-compiled binaries. 
+
+NOTE: these should be run inside the conda environment holding topiary. 
+
+Example usage:
+
+conda activate topiary
+bash compile-generax.sh
+bash compile-raxml-ng.sh

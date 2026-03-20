@@ -4,6 +4,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - pip
   - numpy
   - pandas
   - xlrd
@@ -11,16 +12,15 @@ dependencies:
   - matplotlib
   - biopython
   - tqdm
-  - ete3
   - dendropy
   - toytree
-  - pastml
-  #- openmpi  # [not win]
-  #- blast    # [not win]
-  #- muscle   # [not win]
-  #- generax  # [not win]
-  #- raxml-ng # [not win]
-  #- mpi4py   # [not win]
-  - pip
+  - blast>=2.2
+  - muscle>=5.0
+  - openmpi<5
+  - mpi4py
+  - sphinx
+  - sphinx_rtd_theme
+  - pydata-sphinx-theme
   - pip:
     - opentree
+    - ete4

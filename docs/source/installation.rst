@@ -10,211 +10,105 @@
 Installation
 ============
 
-.. note::
+Topiary is a python package that wraps several external software packages. This
+walks through installing topiary and all of the external software packages it
+wraps. 
 
-  If you plan to generate alignments but not ancestors, you may want to run 
-  topiary on `google colab <https://githubtocolab.com/harmslab/topiary-examples/blob/main/notebooks/seed-to-alignment.ipynb>`_
-  instead of installing it locally. Running the full ancestral inference pipeline
-  will require installing topiary in a high-performance Linux or macOS environment.
+.. IMPORTANT::
+   Topiary requires a linux or macOS machine. **Windows is no longer supported.**
 
-The basic installation instructions for topiary are:
-
-1. Download and install `miniconda <miniconda-link_>`_
-2. Install topiary using conda
-3. Install supporting software packages
-
-1. Install miniconda
-====================
-
-To prevent interference with other packages, we recommend installing topiary in
-its own conda environment. If you do not have conda installed, download and
-install `miniconda <miniconda-link_>`_ before proceeding. Installation instructions
-are available on the `linked miniconda page <miniconda-link_>`_. 
-
-2. Install topiary
+Basic Installation
 ==================
 
-Once conda is installed, open a standard terminal (Linux or macOS) or an 
-Anaconda Prompt (Windows). Copy the following commands into the prompt to run 
-them. 
+The easiest way to install topiary and its dependencies is to use the provided
+installation script. 
+
+1. Download and install `miniconda <miniconda-link_>`_
+2. Open a terminal and run the following commands:
 
 .. code-block:: shell-session
 
   conda install git
   git clone https://github.com/harmslab/topiary
   cd topiary
-  conda config --set channel_priority strict
-  conda env create -f environment.yml
-  conda activate topiary
-  python -m pip install . -vv
+  bash install.sh
 
-At this point, you have topiary, but not the software packages it wraps,
-installed. The next sections describe how to install the entire software
-stack.
+The `install.sh` script will:
 
-3. Install supporting software packages
-=======================================
+* Prompt you for a conda environment name (default is `topiary`).
+* Ask for an optional `NCBI API Key <https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/>`_. Providing one is highly recommended to avoid rate-limiting during BLAST searches.
+* Prompt you about cluster installation (see below).
+* Create the conda environment, install all python dependencies, and compile the necessary external binaries (RAxML-NG and GeneRax).
 
-You can check which software packages are visible to topiary by:
+Cluster Installation
+====================
+
+If you are installing topiary on a high-performance computing cluster, you
+generally need to ensure that the external software (GeneRax) is
+compiled using the cluster's specific MPI and C compilers. 
+
+To do this:
+
+1. Identify the correct MPI and compiler modules on your cluster (e.g., using `module spider mpi`). The details of this step depend on your cluster architecture. If you do not know how to do this, please contact your cluster administrator.
+2. Open `dependencies/compile-generax.sh` in a text editor.
+3. Add the appropriate `module load` command near the top of the script. For example:
+
+   .. code-block:: bash
+
+      module load mpi/gcc/13.1.0/openmpi/4.1.6
+
+4. Save the file and run `bash install.sh`. When prompted if you are on a cluster, answer `y`. 
+
+This ensures that GeneRax and RAxML-NG are linked against the cluster's high-performance interconnects, allowing them to run efficiently across multiple nodes.
+
+Checking Installation
+=====================
+
+After the installation script finishes, you can verify that everything is 
+installed correctly by running:
 
 .. code-block:: shell-session
 
+  conda activate topiary
   topiary-check-installed
 
-The output should look something like this:
+(Replace `topiary` with your custom environment name if you chose one).
+
+The output should show :code:`passes: Y` for all required packages:
 
 .. image:: _static/img/installation/topiary-check-installed_450x483.png
   :align: center
   :alt: topiary-check-installed terminal output
 
-:raw-html:`<br />`
-If some of the packages are not installed (:code:`passes: N`), proceed to the
-sections below.
-
-.. important::
-
-  Windows users must specify the complete path to each script when running
-  topiary commands. To run the above command (:code:`topiary-check-installed`)
-  please type: :code:`python c:\\users\\harmsm\\topiary\\bin\\topiary-check-installed`,
-  replacing the first part of the path (:code:`c:\\users\\harmsm`) with the path
-  on your system.
-
 ----------------------------
 NCBI API Key
 ----------------------------
 
-If you wish to use an `NCBI API Key <https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/>`_,
-set the environment variable :code:`NCBI_API_KEY` to point to your key. For 
-example: 
+If you did not provide an NCBI API key during the initial installation, you can 
+add one later by running:
 
 .. code-block:: shell-session
 
-  export NCBI_API_KEY='abcdef012'
+  conda env config vars set NCBI_API_KEY='your_key_here' -n topiary
 
-Topiary will recognize this key and increase the number of allowed requests per
-second to NCBI servers. 
+This ensures the key is automatically exported whenever the topiary environment 
+is activated.
 
-.. _macos-linux-section:
+Required Software
+=================
 
-----------------------------
-macOS and Linux instructions
-----------------------------
+While `install.sh` handles these automatically, topiary relies on the following
+software. Note that we use custom versions of these (specifically GeneRax and
+RAxML-NG), so we cannot gaurantee topiary will function using other versions of 
+these pieces of code. Our custom versions are included in the `dependencies`
+directory.
 
-You can install the software packages with:
++ `NCBI blast+ >= 2.2 <blast-download_>`_
++ `muscle >= 5.0 <muscle-download_>`_
++ `GeneRax >= 2.1.3 <generax-download_>`_
++ `RAxML-NG >= 1.2.2 <raxml-ng-download_>`_
++ `Python >= 3.11 <python-link_>`_
 
-.. code-block:: shell-session
-
-  conda install -c conda-forge -c bioconda mpi4py openmpi "muscle>=5.0" "raxml-ng>=1.1" "generax>=2.0" "blast>=2.2"
-
-You can then check to make sure everything installed correctly by running:
-
-.. code-block:: shell-session
-
-  topiary-check-installed
-
-If any of these packages were not installed by conda--or you wish to install
-them yourself--you can install them manually using the following links:
-
-+ `NCBI blast+ >= 2.2 <blast-download_>`_. (This will install both the blastp and
-  makeblastdb programs.)
-+ `muscle >= 5.0 <muscle-download_>`_.
-+ `GeneRax >= 2.0 <generax-download_>`_.
-+ `RAxML-NG >= 1.1 <raxml-ng-download_>`_.
-
-After installation, you'll need to make sure the directories containing these
-binaries are in your :code:`$PATH` directory. (See `here <nix-path_>`_ for
-instructions).
-
-.. note::
-
-  As of this writing (Summer, 2022), conda will *not* install RAxML-NG, GeneRax,
-  muscle, or blast+ on an arm64 mac (aka Apple Silicon, M1, M2, etc.). These
-  packages must be installed  manually. The RAxML-NG and GeneRax binaries remain
-  experimental, so use with caution.
-
-.. _windows-section:
-
---------------------
-Windows instructions
---------------------
-
-.. important::
-
-  RAxML-NG and GeneRax do :emph:`not` run on Windows. To generate trees and
-  ancestors, you must run topiary on a Linux or macOS machine. Topiary can be
-  used on a local Windows computer to generate an alignment, which can then be
-  passed to a Linux or macOS cluster for the ancestral inference. Tree plotting
-  can also be run on a Windows machine.
-
-To use topiary on Windows, you need to install two packages:
-
-+ `muscle >= 5.0 <muscle-download_>`_. This binary comes as a single, read-to-run
-  file. Download the file and place it in a convenient folder somewhere on
-  your computer. :emph:`Rename the file to muscle.exe`.
-+ `NCBI blast+ >=2.0 <blast-download_>`_. This is a conventional package
-  installer. Follow the on-screen prompts to install the program. This will
-  install both the blastp and makeblastdb).
-
-After you have installed blast+ and muscle,
-:emph:`close and reopen the Anaconda Prompt`. Then run:
-
-.. code-block:: shell-session
-
-  conda activate topiary
-  python c:\Users\USERNAME\topiary\bin\topiary-check-installed
-
-If the *muscle*, *blastp* and/or *makeblastdb* binaries are not found,
-you likely need to add the directories containing the blast and muscle binaries
-to the :code:`$PATH` variable. This `stackoverflow thread <windows-path_>`_
-gives detailed instructions on how to accomplish this. Once you have added the
-directories containing muscle and blast+ to the :code:`$PATH` variable,
-:emph:`you need to close and reopen your Anaconda Prompt.` Then check to see
-if the packages are installed.
-
-.. _install-source-section:
-
-Install from source
-===================
-
-If you wish to install the package from source or make changes to the package,
-you'll need to clone the repository:
-
-.. code-block:: shell-session
-
-  git clone https://github.com/harmslab/topiary
-
-You can install via conda:
-
-.. code-block:: shell-session
-
-  cd topiary
-  conda env create -f environment.yml
-  conda activate topiary
-  python -m pip install . -vv
-
-Alternatively, you can install via pip:
-
-.. code-block:: shell-session
-
-  cd topiary
-  pip install -r requirements.txt
-
-These steps will install topiary, but not the full software stack. If you are on
-macOS or Linux, you can install the core software by:
-
-.. code-block:: shell-session
-
-  conda install -c conda-forge -c bioconda "openmpi<4.1.3" "muscle>=5.0" "raxml-ng>=1.1" "generax>=2.0" "blast>=2.2"
-
-If you are on Windows, please see the :ref:`windows section<windows-section>`.
-
-------------------
-Required libraries
-------------------
-
-+ Core scientific python libraries:
-
-  + `Python >= 3.8 <python-link_>`_
   + `numpy <numpy-link_>`_
   + `pandas <pandas-link_>`_
   + `matplotlib <matplotlib-link_>`_
@@ -229,7 +123,6 @@ Required libraries
 
   + `NCBI BLAST+ <blast-download_>`_
   + `muscle >= 5.0 <muscle-download_>`_
-  + `GeneRax >= 2.0 <generax-download_>`_
-  + `RAxML-NG >= 1.1 <raxml-ng-download_>`_
-  + `pastml <pastml-link_>`_
+  + `GeneRax >= 2.1.3 <generax-download_>`_
+  + `RAxML-NG >= 1.2.2 <raxml-ng-download_>`_
   + `python-opentree <opentree-link_>`_

@@ -1,0 +1,17 @@
+mpi-scheduler optimizeGeneTrees result/results/reconcile/geneTree.newick mapping.link alignment.phy result/species_trees/inferred_species_tree.newick rtREV result/gene_optimization_2/dtl_rates.txt 0 2 0 1 UNIFORM 0 1 0 0 PARENTS 0 0 0.000001 NONE 0 2 -1 1 1 1 3 result/results/reconcile/geneTree.newick result/results/reconcile/stats.txt 0 result/gene_optimization_2/checkpoints/reconcile 
+[00:00:00] Starting optimizeGeneTreesSlave
+LibpllModel rtREV
+[00:00:00] Starting optimizing gene tree
+Number of ranks 4
+(0.0919418, 1e-07, score = 0)
+Taxa number: 8
+joint: -138.896  libpll: -135.19  reconciliation: -3.70596  
+Initial ll = -138.896
+[00:00:00] SPR Search with radius 3: trying 18 prune nodes
+[00:00:00] Found 0 potential better moves
+[00:00:00] 	GeneRax will now test and apply all the 0 potential good moves one after each other
+joint: -138.896  libpll: -135.19  reconciliation: -3.70596  
+Saving tree in result/results/reconcile/geneTree.newick
+Finished saving  result/results/reconcile/geneTree.newick
+[00:00:00] End of optimizing gene tree after 0s
+[00:00:00] End of optimizeGeneTreesSlave
