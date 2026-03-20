@@ -304,14 +304,15 @@ def run_generax(run_directory,
         # Make sure we have this number of threads
         check_mpi_configuration(num_threads)
 
-        # Get hosts and build mpirun command. If all hosts are "localhost",
-        # omit the --host flag to avoid OpenMPI attempting to SSH to itself.
+        # Get hosts and build mpirun command. 
         hosts = topiary._private.mpi.get_hosts(num_threads)
         
-        cmd = ["mpirun", "-np", f"{num_threads:d}"]
+        cmd = ["mpirun"]
+        cmd.extend(topiary._private.mpi.get_mpi_flags())
         if topiary._private.mpi._get_mpi_oversubscribe():
             cmd.append("--oversubscribe")
-            
+        
+        cmd.extend(["-np", f"{num_threads:d}"])
         if not all([h == "localhost" for h in hosts]):
             cmd.extend(["--host",",".join(hosts)])
             

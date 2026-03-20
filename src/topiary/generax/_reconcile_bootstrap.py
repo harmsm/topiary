@@ -200,9 +200,12 @@ def _generax_thread_function(replicate_dir,
     # Construct a base mpirun command that the generax commands will be
     # appended to. If we are running purely on the local node, omit the --host 
     # flag entirely to avoid OpenMPI attempting to SSH to localhost.
-    base_cmd = ["mpirun", "-np", str(len(hosts))]
+    base_cmd = ["mpirun"]
+    base_cmd.extend(mpi.get_mpi_flags())
     if mpi._get_mpi_oversubscribe():
         base_cmd.append("--oversubscribe")
+    
+    base_cmd.extend(["-np", str(len(hosts))])
 
     if not all([h == "localhost" for h in hosts]):
         base_cmd.extend(["--host",",".join(hosts)])
@@ -261,7 +264,10 @@ def _generax_thread_function(replicate_dir,
 
         # Launch as a subprocess
         try:
-            ret = subprocess.run(cmd,capture_output=True,env=mpi.get_mpi_env(strip_slurm=True))
+            # Run job. We no longer strip SLURM environment variables, but
+            # instead rely on MCA flags in the mpirun command to avoid
+            # rank collisions.
+            ret = subprocess.run(cmd,capture_output=True,env=mpi.get_mpi_env())
 
             # Write stdout and stderr
             f = open("stdout.log","w")

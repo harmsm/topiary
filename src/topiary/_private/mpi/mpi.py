@@ -34,43 +34,35 @@ def _get_mpi_oversubscribe():
 
 def get_mpi_env(strip_slurm=False):
     """
-    Get a copy of the current os.environ stripped of variables that can 
-    conflict with mpirun. This is particularly important for SLURM HPC 
-    environments where multiple mpirun instances launched via python 
-    multiprocessing can collide.
+    Get a copy of the current os.environ. 
 
     Parameters
     ----------
     strip_slurm : bool, default=False
-        whether or not to strip SLURM_ environment variables. 
+        This argument is now deprecated and does nothing, as we now use 
+        MCA flags to manage SLURM allocations. 
 
     Returns
     -------
     env : dict
         environment dictionary suitable for passing to subprocess.run
     """
-    env = os.environ.copy()
-    if strip_slurm:
-        
-        # Variables that can cause OpenMPI to think the allocation is full. 
-        # These are stripped to allow multiple mpirun calls to coexist.
-        # We KEEP things like SLURM_JOB_ID and SLURM_NODELIST so mpirun
-        # can still use the slurm process launcher rather than falling 
-        # back to ssh. 
-        to_strip = ["SLURM_NTASKS",
-                    "SLURM_TASKS_PER_NODE",
-                    "SLURM_JOB_CPUS_PER_NODE",
-                    "SLURM_CPUS_ON_NODE",
-                    "SLURM_CPUS_PER_TASK",
-                    "SLURM_JOB_NUM_NODES",
-                    "SLURM_NPROCS",
-                    "SLURM_JOB_NTASKS"]
+    return os.environ.copy()
 
-        for k in to_strip:
-            if k in env:
-                env.pop(k)
+def get_mpi_flags():
+    """
+    Get MCA flags for mpirun to allow sub-jobs in SLURM.
 
-    return env
+    Returns
+    -------
+    flags : list
+        list of flags to pass to mpirun
+    """
+    flags = []
+    if "SLURM_JOB_ID" in os.environ:
+        flags.extend(["--mca", "ras", "^slurm"])
+        flags.extend(["--mca", "plm", "slurm"])
+    return flags
 
 def get_hosts(num_slots):
     """
@@ -88,6 +80,7 @@ def get_hosts(num_slots):
     python = sys.executable
 
     cmd = ["mpirun"]
+    cmd.extend(get_mpi_flags())
     if _get_mpi_oversubscribe():
         cmd.append("--oversubscribe")
     cmd.extend(["-np",f"{num_slots}",python,script])

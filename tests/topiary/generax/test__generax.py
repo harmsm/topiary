@@ -398,7 +398,22 @@ def test_run_generax(generax_data,tmpdir):
  
         assert cmd == f"mpirun -np 2 {generax_binary} --families control.txt --species-tree species_tree.newick --prefix result --rec-model UndatedDTL"
  
+        # Validate num_threads in SLURM environment
         import unittest.mock as mock
+        with mock.patch.dict(os.environ, {"SLURM_JOB_ID": "12345"}, clear=False):
+            with mock.patch("topiary.generax._generax.check_mpi_configuration"):
+                with mock.patch("topiary.generax._generax.topiary._private.mpi.get_hosts",
+                                return_value=["localhost","localhost"]):
+                    cmd = run_generax(run_directory=out_dir,
+                                      allow_horizontal_transfer=True,
+                                      num_threads=2,
+                                      generax_binary=GENERAX_BINARY,
+                                      write_to_script="run_generax.sh")
+                    
+                    assert "--mca ras ^slurm" in cmd
+                    assert "--mca plm slurm" in cmd
+                    assert "mpirun --mca ras ^slurm --mca plm slurm -np 2" in cmd
+
         with mock.patch("topiary.generax._generax.check_mpi_configuration",
                         side_effect=RuntimeError("fail")):
             with pytest.raises(RuntimeError):

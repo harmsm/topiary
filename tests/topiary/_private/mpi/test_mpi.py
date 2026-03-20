@@ -111,11 +111,10 @@ def test_get_mpi_env():
         assert "SLURM_JOB_ID" in env
         assert "SLURM_NTASKS" in env
         
-        # Explicit strip_slurm=True SHOULD strip TARGETED variables
-        # but KEEP others.
+        # Explicit strip_slurm=True SHOULD NO LONGER strip (deprecated)
         env = get_mpi_env(strip_slurm=True)
         assert "SLURM_JOB_ID" in env
-        assert "SLURM_NTASKS" not in env
+        assert "SLURM_NTASKS" in env
         assert "PMI_RANK" in env
         assert env["PMI_RANK"] == "0"
         assert "NORMAL_VAR" in env
