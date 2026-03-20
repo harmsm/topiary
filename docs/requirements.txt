@@ -8,6 +8,5 @@ tqdm
 ete4
 opentree
 dendropy
-sphinx-rtd-theme
-sphinxcontrib-napoleon
+pydata-sphinx-theme
 toytree>=3.0
