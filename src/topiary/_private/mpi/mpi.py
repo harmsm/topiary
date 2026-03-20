@@ -51,8 +51,23 @@ def get_mpi_env(strip_slurm=False):
     """
     env = os.environ.copy()
     if strip_slurm:
-        for k in list(env.keys()):
-            if k.startswith("SLURM_"):
+        
+        # Variables that can cause OpenMPI to think the allocation is full. 
+        # These are stripped to allow multiple mpirun calls to coexist.
+        # We KEEP things like SLURM_JOB_ID and SLURM_NODELIST so mpirun
+        # can still use the slurm process launcher rather than falling 
+        # back to ssh. 
+        to_strip = ["SLURM_NTASKS",
+                    "SLURM_TASKS_PER_NODE",
+                    "SLURM_JOB_CPUS_PER_NODE",
+                    "SLURM_CPUS_ON_NODE",
+                    "SLURM_CPUS_PER_TASK",
+                    "SLURM_JOB_NUM_NODES",
+                    "SLURM_NPROCS",
+                    "SLURM_JOB_NTASKS"]
+
+        for k in to_strip:
+            if k in env:
                 env.pop(k)
 
     return env

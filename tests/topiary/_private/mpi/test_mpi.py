@@ -90,6 +90,7 @@ def test_get_mpi_env():
 
     # Create dummy environment with SLURM/PMI variables
     dummy_env = {"SLURM_JOB_ID": "12345",
+                 "SLURM_NTASKS": "4",
                  "PMI_RANK": "0",
                  "NORMAL_VAR": "value"}
     
@@ -98,6 +99,7 @@ def test_get_mpi_env():
         # Default should NOT strip
         env = get_mpi_env()
         assert "SLURM_JOB_ID" in env
+        assert "SLURM_NTASKS" in env
         assert env["SLURM_JOB_ID"] == "12345"
         assert "PMI_RANK" in env
         assert env["PMI_RANK"] == "0"
@@ -107,10 +109,13 @@ def test_get_mpi_env():
         # Explicit strip_slurm=False should NOT strip
         env = get_mpi_env(strip_slurm=False)
         assert "SLURM_JOB_ID" in env
+        assert "SLURM_NTASKS" in env
         
-        # Explicit strip_slurm=True SHOULD strip
+        # Explicit strip_slurm=True SHOULD strip TARGETED variables
+        # but KEEP others.
         env = get_mpi_env(strip_slurm=True)
-        assert "SLURM_JOB_ID" not in env
+        assert "SLURM_JOB_ID" in env
+        assert "SLURM_NTASKS" not in env
         assert "PMI_RANK" in env
         assert env["PMI_RANK"] == "0"
         assert "NORMAL_VAR" in env
