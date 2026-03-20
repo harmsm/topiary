@@ -27,6 +27,25 @@ if [ -z "$CONDA_PREFIX" ]; then
     exit 1
 fi
 
+KEEP_EXISTING=0
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --keep-existing)
+      KEEP_EXISTING=1
+      shift ;;
+    *)
+      shift ;;
+  esac
+done
+
+# Check if binary already exists in final location
+if [ $KEEP_EXISTING -eq 1 ]; then
+    if [ -f "$CONDA_PREFIX/bin/generax" ]; then
+        echo "Using existing generax binary in \$CONDA_PREFIX/bin/ (skip compile)"
+        exit 0
+    fi
+fi
+
 # Clean up environment
 rm -rf generax
 

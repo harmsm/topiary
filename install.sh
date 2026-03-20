@@ -7,62 +7,104 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Default environment name
+# Default values
 ENV_NAME="topiary"
+NCBI_KEY=""
+is_cluster="n"
+overwrite="ignore"
+NON_INTERACTIVE=0
+KEEP_EXISTING=0
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -n|--name)
+      ENV_NAME="$2"
+      NON_INTERACTIVE=1
+      shift; shift ;;
+    -k|--ncbi-key)
+      NCBI_KEY="$2"
+      NON_INTERACTIVE=1
+      shift; shift ;;
+    --no-cluster)
+      is_cluster="n"
+      NON_INTERACTIVE=1
+      shift ;;
+    -y|--yes)
+      overwrite="y"
+      NON_INTERACTIVE=1
+      shift ;;
+    --keep-existing)
+      KEEP_EXISTING=1
+      NON_INTERACTIVE=1
+      shift ;;
+    *)
+      shift ;;
+  esac
+done
 
 # 1. Ask for environment name
-echo
-read -p "Enter conda environment name [$ENV_NAME]: " input_env
-if [ ! -z "$input_env" ]; then
-    ENV_NAME=$input_env
+if [ $NON_INTERACTIVE -eq 0 ]; then
+    echo
+    read -p "Enter conda environment name [$ENV_NAME]: " input_env
+    if [ ! -z "$input_env" ]; then
+        ENV_NAME=$input_env
+    fi
 fi
 
 # Check if environment already exists
+ENV_EXISTS=0
 conda env list | grep -q "^$ENV_NAME "
 if [ $? -eq 0 ]; then
-    echo
-    read -p "Conda environment '$ENV_NAME' already exists. Overwrite? (y/N): " overwrite
-    if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
-        echo "Installation cancelled to avoid overwriting existing environment."
-        exit 0
+    ENV_EXISTS=1
+    if [ $NON_INTERACTIVE -eq 0 ]; then
+        echo
+        read -p "Conda environment '$ENV_NAME' already exists. Overwrite? (y/N): " input_overwrite
+        if [[ "$input_overwrite" =~ ^[Yy]$ ]]; then
+            overwrite="y"
+        fi
     fi
-else
-    overwrite="ignore"
 fi
 
 # 2. Ask for NCBI API key
-echo
-echo "--------------------------------------------------------------------------------"
-echo "An NCBI key allows users to make more requests against the NCBI servers"
-echo "when running BLAST etc. Using one is highly recommended to prevent "
-echo "throttling. You may obtain one for free from the NCBI website."
-echo "https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/"
-echo "--------------------------------------------------------------------------------"
-read -p "Enter NCBI API key (optional, press Enter to skip): " NCBI_KEY
+if [ $NON_INTERACTIVE -eq 0 ]; then
+    echo
+    echo "--------------------------------------------------------------------------------"
+    echo "An NCBI key allows users to make more requests against the NCBI servers"
+    echo "when running BLAST etc. Using one is highly recommended to prevent "
+    echo "throttling. You may obtain one for free from the NCBI website."
+    echo "https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/"
+    echo "--------------------------------------------------------------------------------"
+    read -p "Enter NCBI API key (optional, press Enter to skip): " NCBI_KEY
+fi
 
 # 3. Cluster installation prompt
-echo
-read -p "Are you installing on a cluster? (y/N): " is_cluster
-if [[ "$is_cluster" =~ ^[Yy]$ ]]; then
-    echo "--------------------------------------------------------------------------------"
-    echo "To run topiary on a cluster, you need to make sure that the generax and raxml-ng"
-    echo "components are compiled using your cluster's compilers and MPI. You will need"
-    echo "to modify the 'dependencies/compile-generax.sh' script to do so. More details"
-    echo "are at the top of the script. If you have already modified this script, please"
-    echo "proceed with the installation."
-    echo "--------------------------------------------------------------------------------"
-    read -p "Do you want to proceed with the installation? (Y/n): " is_cluster_proceed
-    if [[ "$is_cluster_proceed" =~ ^[Nn]$ ]]; then
-        echo "Installation cancelled."
-        exit 0
+if [ $NON_INTERACTIVE -eq 0 ]; then
+    echo
+    read -p "Are you installing on a cluster? (y/N): " input_cluster
+    if [[ "$input_cluster" =~ ^[Yy]$ ]]; then
+        is_cluster="y"
+        echo "--------------------------------------------------------------------------------"
+        echo "To run topiary on a cluster, you need to make sure that the generax and raxml-ng"
+        echo "components are compiled using your cluster's compilers and MPI. You will need"
+        echo "to modify the 'dependencies/compile-generax.sh' script to do so. More details"
+        echo "are at the top of the script. If you have already modified this script, please"
+        echo "proceed with the installation."
+        echo "--------------------------------------------------------------------------------"
+        read -p "Do you want to proceed with the installation? (Y/n): " is_cluster_proceed
+        if [[ "$is_cluster_proceed" =~ ^[Nn]$ ]]; then
+            echo "Installation cancelled."
+            exit 0
+        fi
     fi
 fi
 
 # Overwrite if we have to 
 if [[ "$overwrite" =~ ^[Yy]$ ]]; then
     echo "Removing existing environment '$ENV_NAME'..."
-    conda deactivate 
+    conda deactivate > /dev/null 2>&1
     conda env remove -n $ENV_NAME -y
+    ENV_EXISTS=0
 fi
 
 # wipe local builds
@@ -72,8 +114,13 @@ for x in `find . -iname "__pycache__"`; do rm -rf $x; done
 # Nuke conda environment (now handled by overwrite check above if it exists)
 conda deactivate > /dev/null 2>&1
 
-# Create new conda environment
-conda env create -f environment.yml -n $ENV_NAME -y
+# Create/Update conda environment
+if [ $ENV_EXISTS -eq 0 ]; then
+    conda env create -f environment.yml -n $ENV_NAME -y
+else
+    echo "Updating existing environment '$ENV_NAME'..."
+    conda env update -f environment.yml -n $ENV_NAME --prune
+fi
 
 # Set NCBI API key if provided
 if [ ! -z "$NCBI_KEY" ]; then
@@ -86,8 +133,12 @@ conda run -n $ENV_NAME pip install coverage flake8 pytest genbadge[tests] pytest
 
 # compile raxml and generax
 cd dependencies
-conda run -n $ENV_NAME bash compile-generax.sh
-conda run -n $ENV_NAME bash compile-raxml-ng.sh
+args=""
+if [ $KEEP_EXISTING -eq 1 ]; then
+    args="--keep-existing"
+fi
+conda run -n $ENV_NAME bash compile-generax.sh $args
+conda run -n $ENV_NAME bash compile-raxml-ng.sh $args
 
 #return to start
 cd ..
