@@ -11,6 +11,11 @@ import shutil
 import multiprocessing as mp
 import functools
 
+try:
+    import resource
+except ImportError:
+    resource = None
+
 from topiary._private.mpi import get_mpi_env
 
 class WrappedFunctionException(Exception):
@@ -264,6 +269,15 @@ def launch(cmd,
     RuntimeError :
         If the command terminates unexpectedly.
     """
+
+    # Attempt to increase stack size for child processes to avoid segfaults
+    # on large calculations (consistent with RAxML-NG recommendations). 
+    if resource is not None:
+        try:
+            soft, hard = resource.getrlimit(resource.RLIMIT_STACK)
+            resource.setrlimit(resource.RLIMIT_STACK, (hard, hard))
+        except (resource.error, ValueError):
+            pass
 
     # Go into working directory
     cwd = os.getcwd()
