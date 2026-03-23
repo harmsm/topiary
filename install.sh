@@ -140,7 +140,7 @@ else
     # If update, explicitly install python version first to ensure it's honored
     if [ ! -z "$PYTHON_VERSION" ]; then
         echo "Ensuring Python version is $PYTHON_VERSION..."
-        conda install -n $ENV_NAME python=$PYTHON_VERSION -y
+        conda install -n $ENV_NAME python=$PYTHON_VERSION pip setuptools -y
     fi
     echo "Updating existing environment '$ENV_NAME'..."
     conda env update -f environment.yml -n $ENV_NAME --prune
@@ -152,8 +152,8 @@ if [ ! -z "$NCBI_KEY" ]; then
 fi
 
 # Install topiary and pip/conda dependencies
-conda run -n $ENV_NAME pip install -e . -vv
-conda run -n $ENV_NAME pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
+conda run -n $ENV_NAME python -m pip install -e . -vv
+conda run -n $ENV_NAME python -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
 
 # compile raxml and generax
 cd dependencies
