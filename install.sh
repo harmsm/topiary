@@ -144,6 +144,10 @@ else
     fi
     echo "Updating existing environment '$ENV_NAME'..."
     conda env update -f environment.yml -n $ENV_NAME --prune
+    
+    # Explicitly install pip dependencies to avoid any conda-pip ambiguity
+    echo "Ensuring pip dependencies are installed in the correct environment..."
+    conda run -n $ENV_NAME python -m pip install opentree ete4
 fi
 
 # Set NCBI API key if provided
@@ -151,9 +155,10 @@ if [ ! -z "$NCBI_KEY" ]; then
     conda env config vars set NCBI_API_KEY=$NCBI_KEY -n $ENV_NAME
 fi
 
-# Install topiary and pip/conda dependencies
-conda run -n $ENV_NAME python -m pip install -e . -vv
-conda run -n $ENV_NAME python -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
+# Install topiary and pip/conda dependencies. We clear PYTHONPATH to avoid 
+# picking up packages from other python versions (common in Colab).
+PYTHONPATH="" conda run -n $ENV_NAME python -m pip install -e . -vv
+PYTHONPATH="" conda run -n $ENV_NAME python -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
 
 # compile raxml and generax
 cd dependencies
