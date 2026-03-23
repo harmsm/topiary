@@ -16,6 +16,7 @@ NON_INTERACTIVE=0
 KEEP_EXISTING=0
 DO_GENERAX=1
 DO_RAXML=1
+PYTHON_VERSION=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -26,6 +27,10 @@ while [[ $# -gt 0 ]]; do
       shift; shift ;;
     -k|--ncbi-key)
       NCBI_KEY="$2"
+      NON_INTERACTIVE=1
+      shift; shift ;;
+    -p|--python)
+      PYTHON_VERSION="$2"
       NON_INTERACTIVE=1
       shift; shift ;;
     --no-cluster)
@@ -126,10 +131,18 @@ conda deactivate > /dev/null 2>&1
 
 # Create/Update conda environment
 if [ $ENV_EXISTS -eq 0 ]; then
-    conda env create -f environment.yml -n $ENV_NAME -y
+    py_arg=""
+    if [ ! -z "$PYTHON_VERSION" ]; then
+        py_arg="python=$PYTHON_VERSION"
+    fi
+    conda env create -f environment.yml -n $ENV_NAME $py_arg -y
 else
     echo "Updating existing environment '$ENV_NAME'..."
-    conda env update -f environment.yml -n $ENV_NAME --prune
+    py_arg=""
+    if [ ! -z "$PYTHON_VERSION" ]; then
+        py_arg="python=$PYTHON_VERSION"
+    fi
+    conda env update -f environment.yml -n $ENV_NAME $py_arg --prune
 fi
 
 # Set NCBI API key if provided
