@@ -137,12 +137,13 @@ if [ $ENV_EXISTS -eq 0 ]; then
     fi
     conda env create -f environment.yml -n $ENV_NAME $py_arg -y
 else
-    echo "Updating existing environment '$ENV_NAME'..."
-    py_arg=""
+    # If update, explicitly install python version first to ensure it's honored
     if [ ! -z "$PYTHON_VERSION" ]; then
-        py_arg="python=$PYTHON_VERSION"
+        echo "Ensuring Python version is $PYTHON_VERSION..."
+        conda install -n $ENV_NAME python=$PYTHON_VERSION -y
     fi
-    conda env update -f environment.yml -n $ENV_NAME $py_arg --prune
+    echo "Updating existing environment '$ENV_NAME'..."
+    conda env update -f environment.yml -n $ENV_NAME --prune
 fi
 
 # Set NCBI API key if provided
