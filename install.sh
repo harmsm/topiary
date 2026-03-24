@@ -17,6 +17,7 @@ KEEP_EXISTING=0
 DO_GENERAX=1
 DO_RAXML=1
 PYTHON_VERSION=""
+PIP_PYTHON=""
 
 # Clear variables that might confuse pip/conda about which python to use (important for Colab)
 export PYTHONPATH=""
@@ -35,6 +36,10 @@ while [[ $# -gt 0 ]]; do
       shift; shift ;;
     -p|--python)
       PYTHON_VERSION="$2"
+      NON_INTERACTIVE=1
+      shift; shift ;;
+    --pip-python)
+      PIP_PYTHON="$2"
       NON_INTERACTIVE=1
       shift; shift ;;
     --no-cluster)
@@ -150,28 +155,30 @@ else
     conda env update -f environment.yml -n $ENV_NAME --prune
 fi
 
+# Now define it for everyone. We choose between the conda environment python
+# and a specifically requested pip python.
+if [ -z "$PIP_PYTHON" ]; then
     # Get absolute path to the target environment's python. We are careful with 
     # formatting (e.g. '*' for active env)
     ENV_PREFIX=$(conda env list | awk -v name="$ENV_NAME" '$1 == name {print $NF}')
     if [ -z "$ENV_PREFIX" ]; then
         echo "WARNING: Could not find prefix for environment '$ENV_NAME'. Falling back to current PATH."
-        ENV_PYTHON=$(which python)
+        PIP_PYTHON=$(which python)
     else
-        ENV_PYTHON="$ENV_PREFIX/bin/python"
+        PIP_PYTHON="$ENV_PREFIX/bin/python"
     fi
-    echo "Using environment python: $ENV_PYTHON"
-    
-    # Verify the python version matches what we think it is
-    $ENV_PYTHON --version
-    $ENV_PYTHON -c "import site; print(f'Site packages: {site.getsitepackages()}')"
+fi
+echo "Using python for pip: $PIP_PYTHON"
+$PIP_PYTHON --version
+$PIP_PYTHON -c "import site; print(f'Site packages: {site.getsitepackages()}')"
 
 # Explicitly install pip dependencies ignoring any system ones to force them into this environment
 echo "Ensuring pip dependencies are installed in the correct environment..."
-PYTHONPATH="" $ENV_PYTHON -m pip install --ignore-installed opentree ete4
+PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed opentree ete4
 
 # Debug: show where opentree ended up
 echo "Diagnostic: opentree location:"
-$ENV_PYTHON -m pip show opentree | grep -i "Location"
+$PIP_PYTHON -m pip show opentree | grep -i "Location"
 
 # Set NCBI API key if provided
 if [ ! -z "$NCBI_KEY" ]; then
@@ -180,8 +187,8 @@ fi
 
 # Install topiary and pip/conda dependencies. We clear PYTHONPATH to avoid 
 # picking up packages from other python versions (common in Colab).
-PYTHONPATH="" $ENV_PYTHON -m pip install -e . -vv
-PYTHONPATH="" $ENV_PYTHON -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
+PYTHONPATH="" $PIP_PYTHON -m pip install -e . -vv
+PYTHONPATH="" $PIP_PYTHON -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
 
 # compile raxml and generax
 cd dependencies
