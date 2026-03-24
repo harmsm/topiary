@@ -172,9 +172,11 @@ echo "Using python for pip: $PIP_PYTHON"
 $PIP_PYTHON --version
 $PIP_PYTHON -c "import site; print(f'Site packages: {site.getsitepackages()}')"
 
-# Explicitly install pip dependencies ignoring any system ones to force them into this environment
+# Explicitly install pip dependencies ignoring any system ones to force them into this environment.
+# We include numpy here because Colab's default can sometimes get mangled during
+# the topiary install.
 echo "Ensuring pip dependencies are installed in the correct environment..."
-PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed opentree ete4
+PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed numpy opentree ete4 toytree
 
 # Debug: show where opentree ended up
 echo "Diagnostic: opentree location:"
@@ -187,7 +189,7 @@ fi
 
 # Install topiary and pip/conda dependencies. We clear PYTHONPATH to avoid 
 # picking up packages from other python versions (common in Colab).
-PYTHONPATH="" $PIP_PYTHON -m pip install -e . -vv
+PYTHONPATH="" $PIP_PYTHON -m pip install -e . 
 PYTHONPATH="" $PIP_PYTHON -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
 
 # compile raxml and generax
