@@ -172,11 +172,16 @@ echo "Using python for pip: $PIP_PYTHON"
 $PIP_PYTHON --version
 $PIP_PYTHON -c "import site; print(f'Site packages: {site.getsitepackages()}')"
 
+# Clean up potentially mangled numpy/pandas (common in Colab in-place upgrades)
+echo "Cleaning up existing numpy/pandas to ensure a healthy installation..."
+$PIP_PYTHON -m pip uninstall -y numpy pandas
+$PIP_PYTHON -m pip uninstall -y numpy pandas
+
 # Explicitly install pip dependencies ignoring any system ones to force them into this environment.
 # We include numpy here because Colab's default can sometimes get mangled during
 # the topiary install.
 echo "Ensuring pip dependencies are installed in the correct environment..."
-PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed numpy opentree ete4 toytree
+PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed --force-reinstall --upgrade numpy pandas opentree ete4 toytree
 
 # Debug: show where opentree ended up
 echo "Diagnostic: opentree location:"
