@@ -18,6 +18,10 @@ DO_GENERAX=1
 DO_RAXML=1
 PYTHON_VERSION=""
 
+# Clear variables that might confuse pip/conda about which python to use (important for Colab)
+export PYTHONPATH=""
+export PYTHONHOME=""
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -145,9 +149,13 @@ else
     echo "Updating existing environment '$ENV_NAME'..."
     conda env update -f environment.yml -n $ENV_NAME --prune
     
-    # Explicitly install pip dependencies to avoid any conda-pip ambiguity
+    # Explicitly install pip dependencies ignoring any system ones to force them into this environment
     echo "Ensuring pip dependencies are installed in the correct environment..."
-    conda run -n $ENV_NAME python -m pip install opentree ete4
+    conda run -n $ENV_NAME python -m pip install --ignore-installed opentree ete4
+    
+    # Debug: show where opentree ended up
+    echo "Diagnostic: opentree location:"
+    conda run -n $ENV_NAME python -m pip show opentree | grep -i "Location"
 fi
 
 # Set NCBI API key if provided
