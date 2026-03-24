@@ -238,6 +238,7 @@ def _run_blast(sequence_list,
                              gapcosts=gapcosts,
                              num_threads=num_threads,
                              keep_blast_xml=keep_blast_xml,
+                             name_prefix="topiary-recip-blast",
                              **kwargs)
 
     # Local blast
@@ -250,6 +251,7 @@ def _run_blast(sequence_list,
                               gapcosts=gapcosts,
                               num_threads=num_threads,
                               keep_blast_xml=keep_blast_xml,
+                              name_prefix="topiary-recip-blast",
                               **kwargs)
 
     return hit_dfs

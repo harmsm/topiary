@@ -9,7 +9,7 @@ def test__prepare_for_blast(tmpdir, mocker):
     
     # 1. db not found
     with pytest.raises(FileNotFoundError):
-        _prepare_for_blast("SEQ", "missing_db", "blastp", 100, 0.001, (11,1), {})
+        _prepare_for_blast("SEQ", "missing_db", "blastp", 100, 0.001, (11,1), 1, {})
 
     # Create dummy psq
     os.chdir(tmpdir)
@@ -18,16 +18,16 @@ def test__prepare_for_blast(tmpdir, mocker):
     
     # 2. blast_program not recognized
     with pytest.raises(ValueError):
-        _prepare_for_blast("SEQ", "exists", "NOT_A_PROGRAM", 100, 0.001, (11,1), {})
+        _prepare_for_blast("SEQ", "exists", "NOT_A_PROGRAM", 100, 0.001, (11,1), 1, {})
 
     # 3. blast_program not in path
     mocker.patch("subprocess.run", side_effect=FileNotFoundError)
     with pytest.raises(FileNotFoundError):
-        _prepare_for_blast("SEQ", "exists", "blastp", 100, 0.001, (11,1), {})
+        _prepare_for_blast("SEQ", "exists", "blastp", 100, 0.001, (11,1), 1, {})
     mocker.patch("subprocess.run", return_value=None)
 
     # 4. Success
-    seq_list, blast_args, singleton = _prepare_for_blast("SEQ", "exists", "blastp", 100, 0.001, (11,1), {"task":"blastp-fast"})
+    seq_list, blast_args, singleton = _prepare_for_blast("SEQ", "exists", "blastp", 100, 0.001, (11,1), 1, {"task":"blastp-fast"})
     assert seq_list == ["SEQ"]
     assert "blastp" in blast_args
     assert "-db" in blast_args
@@ -42,11 +42,12 @@ def test__construct_args():
     kwargs_list, num_threads = _construct_args(seq_list_10, blast_args, block_size=2, num_threads=2)
     assert num_threads == 2
 
-    # Hit line 184: remainder/block_size >= 0.5
     # 3 sequences, block_size 2 -> 1 window, remainder 1. 1/2 = 0.5 >= 0.5 -> TRUE.
+    # HOWEVER: since num_threads=4 > 1 (max_useful_threads), it will re-adjust 
+    # block_size to 1 to try to use more threads. 
     seq_list_3 = ["S"] * 3
     kwargs_list, num_threads = _construct_args(seq_list_3, blast_args, block_size=2, num_threads=4)
-    assert len(kwargs_list) == 2 # 1 window + 1 remainder
+    assert len(kwargs_list) == 3 
 
     # Hit line 192: counter >= len(windows)
     # 12 sequences, block_size 5 -> num_windows 2, remainder 2.
@@ -56,9 +57,11 @@ def test__construct_args():
     # Loop 2: windows[1]=6, rem=0, counter=2. counter >= 2 -> counter=0.
     seq_list_12 = ["S"] * 12
     kwargs_list, num_threads = _construct_args(seq_list_12, blast_args, block_size=5, num_threads=4)
-    assert len(kwargs_list) == 2
-    assert kwargs_list[0]["index"] == (0, 6)
-    assert kwargs_list[1]["index"] == (6, 12)
+    assert len(kwargs_list) == 4
+    assert kwargs_list[0]["index"] == (0, 3)
+    assert kwargs_list[1]["index"] == (3, 6)
+    assert kwargs_list[2]["index"] == (6, 9)
+    assert kwargs_list[3]["index"] == (9, 12)
 
 def test__local_blast_thread_function(tmpdir, mocker):
     

@@ -37,8 +37,6 @@ dependencies = [
   "dendropy",
   "toytree>=3.0",
   "opentree",
-  "openmpi<5",
-  "mpi4py"
 ]
 
 [project.urls]
