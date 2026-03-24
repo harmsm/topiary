@@ -169,19 +169,28 @@ if [ -z "$PIP_PYTHON" ]; then
     fi
 fi
 echo "Using python for pip: $PIP_PYTHON"
-$PIP_PYTHON --version
-$PIP_PYTHON -c "import site; print(f'Site packages: {site.getsitepackages()}')"
-
 # Clean up potentially mangled numpy/pandas (common in Colab in-place upgrades)
+# We are very aggressive here because Colab's search path often has duplicates
+# in site-packages and dist-packages.
 echo "Cleaning up existing numpy/pandas to ensure a healthy installation..."
-$PIP_PYTHON -m pip uninstall -y numpy pandas
-$PIP_PYTHON -m pip uninstall -y numpy pandas
+$PIP_PYTHON -m pip uninstall -y numpy pandas 2> /dev/null || true
+$PIP_PYTHON -m pip uninstall -y numpy pandas 2> /dev/null || true
+
+# Nuke the directories manually if they still exist (Nuclear Option)
+# This ensures we don't have overlapping installations in site-packages vs dist-packages
+PIP_ROOT=$($PIP_PYTHON -c "import site; print(site.getsitepackages()[0])" | sed 's/site-packages/dist-packages/')
+SITE_ROOT=$($PIP_PYTHON -c "import site; print(site.getsitepackages()[0])")
+for root in "$PIP_ROOT" "$SITE_ROOT"; do
+    if [ -d "$root" ]; then
+        echo "Checking for stale packages in $root..."
+        rm -rf ${root}/numpy* ${root}/pandas*
+    fi
+done
 
 # Explicitly install pip dependencies ignoring any system ones to force them into this environment.
-# We include numpy here because Colab's default can sometimes get mangled during
-# the topiary install.
+# We pin numpy<2 because bioinformatics stacks are often broken by NumPy 2.0. 
 echo "Ensuring pip dependencies are installed in the correct environment..."
-PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed --force-reinstall --upgrade numpy pandas opentree ete4 toytree
+PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed --force-reinstall --upgrade "numpy<2" "pandas<2" opentree ete4 toytree
 
 # Debug: show where opentree ended up
 echo "Diagnostic: opentree location:"
