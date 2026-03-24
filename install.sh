@@ -150,10 +150,20 @@ else
     conda env update -f environment.yml -n $ENV_NAME --prune
 fi
 
-# Get absolute path to the target environment's python
-ENV_PREFIX=$(conda env list | grep "^$ENV_NAME " | awk '{print $NF}')
-ENV_PYTHON="$ENV_PREFIX/bin/python"
-echo "Using environment python: $ENV_PYTHON"
+    # Get absolute path to the target environment's python. We are careful with 
+    # formatting (e.g. '*' for active env)
+    ENV_PREFIX=$(conda env list | awk -v name="$ENV_NAME" '$1 == name {print $NF}')
+    if [ -z "$ENV_PREFIX" ]; then
+        echo "WARNING: Could not find prefix for environment '$ENV_NAME'. Falling back to current PATH."
+        ENV_PYTHON=$(which python)
+    else
+        ENV_PYTHON="$ENV_PREFIX/bin/python"
+    fi
+    echo "Using environment python: $ENV_PYTHON"
+    
+    # Verify the python version matches what we think it is
+    $ENV_PYTHON --version
+    $ENV_PYTHON -c "import site; print(f'Site packages: {site.getsitepackages()}')"
 
 # Explicitly install pip dependencies ignoring any system ones to force them into this environment
 echo "Ensuring pip dependencies are installed in the correct environment..."
