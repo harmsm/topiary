@@ -148,15 +148,20 @@ else
     fi
     echo "Updating existing environment '$ENV_NAME'..."
     conda env update -f environment.yml -n $ENV_NAME --prune
-    
-    # Explicitly install pip dependencies ignoring any system ones to force them into this environment
-    echo "Ensuring pip dependencies are installed in the correct environment..."
-    conda run -n $ENV_NAME python -m pip install --ignore-installed opentree ete4
-    
-    # Debug: show where opentree ended up
-    echo "Diagnostic: opentree location:"
-    conda run -n $ENV_NAME python -m pip show opentree | grep -i "Location"
 fi
+
+# Get absolute path to the target environment's python
+ENV_PREFIX=$(conda env list | grep "^$ENV_NAME " | awk '{print $NF}')
+ENV_PYTHON="$ENV_PREFIX/bin/python"
+echo "Using environment python: $ENV_PYTHON"
+
+# Explicitly install pip dependencies ignoring any system ones to force them into this environment
+echo "Ensuring pip dependencies are installed in the correct environment..."
+PYTHONPATH="" $ENV_PYTHON -m pip install --ignore-installed opentree ete4
+
+# Debug: show where opentree ended up
+echo "Diagnostic: opentree location:"
+$ENV_PYTHON -m pip show opentree | grep -i "Location"
 
 # Set NCBI API key if provided
 if [ ! -z "$NCBI_KEY" ]; then
@@ -165,8 +170,8 @@ fi
 
 # Install topiary and pip/conda dependencies. We clear PYTHONPATH to avoid 
 # picking up packages from other python versions (common in Colab).
-PYTHONPATH="" conda run -n $ENV_NAME python -m pip install -e . -vv
-PYTHONPATH="" conda run -n $ENV_NAME python -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
+PYTHONPATH="" $ENV_PYTHON -m pip install -e . -vv
+PYTHONPATH="" $ENV_PYTHON -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
 
 # compile raxml and generax
 cd dependencies
