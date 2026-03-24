@@ -16,12 +16,6 @@ NON_INTERACTIVE=0
 KEEP_EXISTING=0
 DO_GENERAX=1
 DO_RAXML=1
-PYTHON_VERSION=""
-PIP_PYTHON=""
-
-# Clear variables that might confuse pip/conda about which python to use (important for Colab)
-export PYTHONPATH=""
-export PYTHONHOME=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -32,14 +26,6 @@ while [[ $# -gt 0 ]]; do
       shift; shift ;;
     -k|--ncbi-key)
       NCBI_KEY="$2"
-      NON_INTERACTIVE=1
-      shift; shift ;;
-    -p|--python)
-      PYTHON_VERSION="$2"
-      NON_INTERACTIVE=1
-      shift; shift ;;
-    --pip-python)
-      PIP_PYTHON="$2"
       NON_INTERACTIVE=1
       shift; shift ;;
     --no-cluster)
@@ -140,72 +126,20 @@ conda deactivate > /dev/null 2>&1
 
 # Create/Update conda environment
 if [ $ENV_EXISTS -eq 0 ]; then
-    py_arg=""
-    if [ ! -z "$PYTHON_VERSION" ]; then
-        py_arg="python=$PYTHON_VERSION"
-    fi
-    conda env create -f environment.yml -n $ENV_NAME $py_arg -y
+    conda env create -f environment.yml -n $ENV_NAME -y
 else
-    # If update, explicitly install python version first to ensure it's honored
-    if [ ! -z "$PYTHON_VERSION" ]; then
-        echo "Ensuring Python version is $PYTHON_VERSION..."
-        conda install -n $ENV_NAME python=$PYTHON_VERSION pip setuptools -y
-    fi
     echo "Updating existing environment '$ENV_NAME'..."
     conda env update -f environment.yml -n $ENV_NAME --prune
 fi
-
-# Now define it for everyone. We choose between the conda environment python
-# and a specifically requested pip python.
-if [ -z "$PIP_PYTHON" ]; then
-    # Get absolute path to the target environment's python. We are careful with 
-    # formatting (e.g. '*' for active env)
-    ENV_PREFIX=$(conda env list | awk -v name="$ENV_NAME" '$1 == name {print $NF}')
-    if [ -z "$ENV_PREFIX" ]; then
-        echo "WARNING: Could not find prefix for environment '$ENV_NAME'. Falling back to current PATH."
-        PIP_PYTHON=$(which python)
-    else
-        PIP_PYTHON="$ENV_PREFIX/bin/python"
-    fi
-fi
-echo "Using python for pip: $PIP_PYTHON"
-# Clean up potentially mangled numpy/pandas/scipy (common in Colab in-place upgrades)
-# We are very aggressive here because Colab's search path often has duplicates
-# in site-packages and dist-packages. ABI changes in NumPy 2.0 make this critical.
-echo "Cleaning up existing numpy/pandas/scipy to ensure a healthy installation..."
-$PIP_PYTHON -m pip uninstall -y numpy pandas scipy 2> /dev/null || true
-$PIP_PYTHON -m pip uninstall -y numpy pandas scipy 2> /dev/null || true
-
-# Nuke the directories manually if they still exist (Nuclear Option)
-# This ensures we don't have overlapping installations in site-packages vs dist-packages
-PIP_ROOT=$($PIP_PYTHON -c "import site; print(site.getsitepackages()[0])" | sed 's/site-packages/dist-packages/')
-SITE_ROOT=$($PIP_PYTHON -c "import site; print(site.getsitepackages()[0])")
-for root in "$PIP_ROOT" "$SITE_ROOT"; do
-    if [ -d "$root" ]; then
-        echo "Checking for stale packages in $root..."
-        rm -rf ${root}/numpy* ${root}/pandas* ${root}/scipy*
-    fi
-done
-
-# Explicitly install pip dependencies ignoring any system ones to force them into this environment.
-# We pin numpy<2 because the current bioinformatics stack (including ete4 and scipy) 
-# in Colab can have ABI conflicts with NumPy 2.0. 
-echo "Ensuring pip dependencies are installed in the correct environment..."
-PYTHONPATH="" $PIP_PYTHON -m pip install --ignore-installed --force-reinstall --upgrade "numpy<2" "pandas<2" "scipy" opentree ete4 toytree
-
-# Debug: show where opentree ended up
-echo "Diagnostic: opentree location:"
-$PIP_PYTHON -m pip show opentree | grep -i "Location"
 
 # Set NCBI API key if provided
 if [ ! -z "$NCBI_KEY" ]; then
     conda env config vars set NCBI_API_KEY=$NCBI_KEY -n $ENV_NAME
 fi
 
-# Install topiary and pip/conda dependencies. We clear PYTHONPATH to avoid 
-# picking up packages from other python versions (common in Colab).
-PYTHONPATH="" $PIP_PYTHON -m pip install -e . 
-PYTHONPATH="" $PIP_PYTHON -m pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
+# Install topiary and pip/conda dependencies
+conda run -n $ENV_NAME pip install -e . -vv
+conda run -n $ENV_NAME pip install coverage flake8 pytest genbadge[tests] pytest-mock sphinx pydata-sphinx-theme
 
 # compile raxml and generax
 cd dependencies
