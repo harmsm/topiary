@@ -101,11 +101,17 @@ def read_seed(df,
     # -----------------------------------------------------------------------
     # Get species ott
 
-    bad_species = []
-    ott_list, species_list, _ = species_to_ott(np.unique(df.loc[:,"species"]))
-    for i in range(len(species_list)):
-        if ott_list[i] is None:
-            bad_species.append(species_list[i])
+    # If we are not species aware, skip OTT lookup
+    if species_aware is False:
+        ott_list = [None for _ in np.unique(df.loc[:,"species"])]
+        species_list = list(np.unique(df.loc[:,"species"]))
+        bad_species = []
+    else:
+        bad_species = []
+        ott_list, species_list, _ = species_to_ott(np.unique(df.loc[:,"species"]))
+        for i in range(len(species_list)):
+            if ott_list[i] is None:
+                bad_species.append(species_list[i])
 
     # -------------------------------------------------------------------------
     # Figure out whether to keep_unresolvable if not specified in function call
@@ -240,6 +246,7 @@ def df_from_seed(seed_df,
                  num_local_blast_threads=-1,
                  keep_blast_xml=False,
                  intermediate_file=None,
+                 blast_taxid=None,
                  **kwargs):
     """
     Construct a topiary dataframe from a seed dataframe, blasting to fill in the
@@ -292,6 +299,8 @@ def df_from_seed(seed_df,
     intermediate_file : str, optional
         path to a file to use to save/restore intermediate results (downloaded
         sequences before OTT lookup).
+    blast_taxid : int or str, optional
+        limit NCBI BLAST to this taxid. If not provided, infer from key_species.
     **kwargs : dict, optional
         extra keyword arguments are passed directly to biopython
         NcbiblastXXXCommandline (for local blast) or qblast (for remote
@@ -359,6 +368,10 @@ def df_from_seed(seed_df,
         # database, hitlist_size, e_value_cutoff, gapcosts, num_threads, and
         # kwargs will all be validated by the blast call itself.
 
+        # Get name prefix if in kwargs (used for renumbering in pipeline)
+        # Pop so it does not get passed twice to the blast calls below
+        name_prefix = kwargs.pop("name_prefix",None)
+
         # ncbi blast
         blast_df = []
         blast_source = []
@@ -366,16 +379,22 @@ def df_from_seed(seed_df,
 
             print(f"BLASTing against NCBI database {ncbi_blast_db}")
 
-            # Infer phylogenetic context from key species
-            phylo_context = topiary.opentree.ott_to_mrca(species_list=key_species,
-                                                         move_up_by=move_mrca_up_by)
-            try:
-                taxid = phylo_context["taxid"]
-            except KeyError:
-                taxid = None
-
-            # Get name prefix if in kwargs (used for renumbering in pipeline)
-            name_prefix = kwargs.get("name_prefix",None)
+            # If blast_taxid is provided, use it
+            if blast_taxid is not None:
+                taxid = blast_taxid
+            else:
+                # Infer phylogenetic context from key species
+                if species_aware:
+                    phylo_context = topiary.opentree.ott_to_mrca(species_list=key_species,
+                                                                 move_up_by=move_mrca_up_by)
+                    try:
+                        taxid = phylo_context["taxid"]
+                    except KeyError:
+                        taxid = None
+                else:
+                    # Provide an NCBI-based fallback if not species aware
+                    print("Inferring BLAST context from NCBI taxonomy (OpenTreeOfLife disabled).")
+                    taxid = topiary.ncbi.get_mrca_taxid(key_species)
 
             tmp_blast_df = topiary.ncbi.ncbi_blast(seed_df.sequence,
                                                    db=ncbi_blast_db,
@@ -409,9 +428,6 @@ def df_from_seed(seed_df,
 
             print(f"BLASTing against local database {local_blast_db}")
 
-            # Get name prefix if in kwargs (used for renumbering in pipeline)
-            name_prefix = kwargs.get("name_prefix",None)
-            
             tmp_blast_df = topiary.ncbi.local_blast(seed_df.sequence,
                                                     db=local_blast_db,
                                                     hitlist_size=hitlist_size,
@@ -484,7 +500,7 @@ def df_from_seed(seed_df,
         keep_anyway = False
     else:
         keep_anyway = True
-    df = topiary.get_df_ott(df,verbose=False,keep_anyway=keep_anyway)
+    df = topiary.get_df_ott(df,verbose=False,keep_anyway=keep_anyway,species_aware=species_aware)
 
     # Create nicknames for sequences in dataframe
     df = topiary.create_nicknames(df,paralog_patterns)
