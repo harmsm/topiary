@@ -26,6 +26,10 @@ def bootstrap_reconcile(previous_run_dir,
                         num_threads=None,
                         threads_per_replicate=None,
                         converge_cutoff=0.03,
+                        replicate_timeout_factor=3.0,
+                        replicate_max_hours=24.0,
+                        replicate_min_seconds=300.0,
+                        max_failed_fraction=0.1,
                         restart=False,
                         overwrite=False,
                         raxml_binary=RAXML_BINARY,
@@ -51,8 +55,26 @@ def bootstrap_reconcile(previous_run_dir,
         the number of slots on each compute node to avoid wasting slots. If you
         have 24 slots per node, you could choose 2, 3, 4, 6, 8, 12, or 24.
     converge_cutoff : float, default=0.03
-        bootstrap convergence criterion. This is RAxML-NG default, passed 
+        bootstrap convergence criterion. This is RAxML-NG default, passed
         to --bs-cutoff.
+    replicate_timeout_factor : float, default=3.0
+        a bootstrap replicate is killed (and dropped) if it runs longer than
+        this factor times the longest replicate observed so far. This is what
+        prevents a single hung generax/MPI replicate from wedging the whole
+        calculation.
+    replicate_max_hours : float, default=24.0
+        maximum time (hours) a replicate may run before we have enough completed
+        replicates to estimate a runtime. Also the longest a first-block
+        replicate is allowed to run before the whole calculation is aborted with
+        an error.
+    replicate_min_seconds : float, default=300.0
+        minimum per-replicate timeout (seconds), so fast replicates are not
+        killed by filesystem/scheduler/MPI-startup jitter on a busy cluster.
+    max_failed_fraction : float, default=0.1
+        abort the whole calculation if more than this fraction of replicates
+        fail. This catches systemic problems (bad node, MPI misconfiguration)
+        rather than letting the run silently produce supports from a broken
+        calculation.
     restart : bool, default=False
         restart job from where it stopped in output directory. incompatible with
         overwrite
@@ -119,6 +141,30 @@ def bootstrap_reconcile(previous_run_dir,
     if overwrite and restart:
         err = "overwrite and restart flags are incompatible.\n"
         raise ValueError(err)
+
+    # --------------------------------------------------------------------------
+    # Assemble per-replicate timeout / failure circuit-breaker configuration
+
+    replicate_timeout_factor = check.check_float(replicate_timeout_factor,
+                                                 "replicate_timeout_factor",
+                                                 minimum_allowed=1.0)
+    replicate_max_hours = check.check_float(replicate_max_hours,
+                                            "replicate_max_hours",
+                                            minimum_allowed=0,
+                                            minimum_inclusive=False)
+    replicate_min_seconds = check.check_float(replicate_min_seconds,
+                                              "replicate_min_seconds",
+                                              minimum_allowed=0,
+                                              minimum_inclusive=False)
+    max_failed_fraction = check.check_float(max_failed_fraction,
+                                            "max_failed_fraction",
+                                            minimum_allowed=0,
+                                            maximum_allowed=1)
+
+    timeout_config = {"factor":replicate_timeout_factor,
+                      "ceiling":replicate_max_hours*60*60,
+                      "floor":replicate_min_seconds,
+                      "max_failed_fraction":max_failed_fraction}
 
     # --------------------------------------------------------------------------
     # Validate software stack required for this pipeline
@@ -282,7 +328,8 @@ def bootstrap_reconcile(previous_run_dir,
                             num_threads=num_threads,
                             threads_per_rep=threads_per_replicate,
                             generax_binary=generax_binary,
-                            raxml_binary=raxml_binary)
+                            raxml_binary=raxml_binary,
+                            timeout_config=timeout_config)
 
     else:
 
@@ -294,7 +341,8 @@ def bootstrap_reconcile(previous_run_dir,
                           num_threads=num_threads,
                           threads_per_rep=threads_per_replicate,
                           raxml_binary=raxml_binary,
-                          generax_binary=generax_binary)
+                          generax_binary=generax_binary,
+                          timeout_config=timeout_config)
 
     os.chdir('..')
 

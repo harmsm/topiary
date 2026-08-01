@@ -32,7 +32,8 @@ def reconcile(prev_calculation=None,
               num_threads=-1,
               threads_per_rep=1,
               generax_binary=GENERAX_BINARY,
-              raxml_binary=RAXML_BINARY):
+              raxml_binary=RAXML_BINARY,
+              timeout_config=None):
     """
     Reconcile the gene tree to the species tree using generax.
 
@@ -93,6 +94,10 @@ def reconcile(prev_calculation=None,
         what generax binary to use
     raxml_binary : str, optional
         what raxml binary to use
+    timeout_config : dict, optional
+        overrides for the per-replicate timeout / failure circuit breaker used
+        during bootstrap reconciliation (only used if bootstrap = True). See
+        `topiary.generax._reconcile_bootstrap._DEFAULT_TIMEOUT_CONFIG`.
 
     Returns
     -------
@@ -225,4 +230,5 @@ def reconcile(prev_calculation=None,
                                    num_threads=num_threads,
                                    threads_per_rep=threads_per_rep,
                                    generax_binary=generax_binary,
-                                   raxml_binary=raxml_binary)
+                                   raxml_binary=raxml_binary,
+                                   timeout_config=timeout_config)
