@@ -18,8 +18,10 @@ class MockLock():
     def __init__(self):
         pass
 
-    def acquire(self):
-        pass
+    def acquire(self,blocking=True,timeout=None):
+        # Mirror the multiprocessing.Lock proxy interface: return True to
+        # indicate the (non-existent) lock was acquired.
+        return True
 
     def release(self):
         pass

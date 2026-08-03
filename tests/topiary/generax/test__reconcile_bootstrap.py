@@ -1,6 +1,7 @@
 import pytest
 import topiary
 
+import topiary.generax._reconcile_bootstrap as _rb
 from topiary.generax._reconcile_bootstrap import _progress_bar
 from topiary.generax._reconcile_bootstrap import _check_convergence
 from topiary.generax._reconcile_bootstrap import _generax_thread_function
@@ -9,20 +10,31 @@ from topiary.generax._reconcile_bootstrap import _clean_replicate_dir
 from topiary.generax._reconcile_bootstrap import _construct_args
 from topiary.generax._reconcile_bootstrap import _run_bootstrap_calculations
 from topiary.generax._reconcile_bootstrap import reconcile_bootstrap
+from topiary.generax._reconcile_bootstrap import _LocalValue
+from topiary.generax._reconcile_bootstrap import _get_timeout_config
+from topiary.generax._reconcile_bootstrap import _compute_replicate_timeout
+from topiary.generax._reconcile_bootstrap import _should_abort
+from topiary.generax._reconcile_bootstrap import _kill_process_group
+from topiary.generax._reconcile_bootstrap import _launch_replicate
+from topiary.generax._reconcile_bootstrap import _DEFAULT_TIMEOUT_CONFIG
 from topiary.generax._generax import GENERAX_BINARY
 from topiary.raxml import RAXML_BINARY
 from topiary._private import Supervisor
 from topiary._private import mpi
+from topiary._private.threads import MockLock
 
 import ete4 as ete
 
 import pandas as pd
 
 import os
+import sys
 import glob
 import shutil
 import copy
 import pathlib
+import signal
+import subprocess
 import time
 import multiprocessing as mp
 
@@ -714,3 +726,443 @@ def test_reconcile_bootstrap(small_phylo,tmpdir):
             print(n.support)
 
     os.chdir(current_dir)
+
+
+# -----------------------------------------------------------------------------
+# Tests for the per-replicate timeout / failure-handling machinery.
+# -----------------------------------------------------------------------------
+
+def test_mocklock_acquire():
+
+    # MockLock.acquire should mirror the multiprocessing lock proxy interface:
+    # accept blocking/timeout and return True.
+    lock = MockLock()
+    assert lock.acquire() is True
+    assert lock.acquire(timeout=5) is True
+    assert lock.acquire(blocking=False) is True
+    assert lock.acquire(True,10) is True
+    assert lock.release() is None
+
+
+def test__LocalValue():
+
+    v = _LocalValue()
+    assert v.value == 0
+
+    v = _LocalValue(7)
+    assert v.value == 7
+
+    v.value += 3
+    assert v.value == 10
+
+
+def test__get_timeout_config():
+
+    # None -> a copy of the defaults (not the same object)
+    config = _get_timeout_config(None)
+    assert config == _DEFAULT_TIMEOUT_CONFIG
+    assert config is not _DEFAULT_TIMEOUT_CONFIG
+
+    # Partial override merges on top of defaults
+    config = _get_timeout_config({"factor":10.0})
+    assert config["factor"] == 10.0
+    assert config["ceiling"] == _DEFAULT_TIMEOUT_CONFIG["ceiling"]
+    assert config["floor"] == _DEFAULT_TIMEOUT_CONFIG["floor"]
+
+    # Full override
+    override = {"factor":2.0,
+                "ceiling":10.0,
+                "floor":1.0,
+                "max_failed_fraction":0.5,
+                "max_failed_floor":1}
+    config = _get_timeout_config(override)
+    assert config == override
+
+    # Unrecognized key raises
+    with pytest.raises(ValueError):
+        _get_timeout_config({"not_a_key":1})
+
+
+def test__compute_replicate_timeout():
+
+    config = {"factor":3.0,"ceiling":1000.0,"floor":10.0,
+              "max_failed_fraction":0.1,"max_failed_floor":5}
+
+    # No sample threshold -> always the ceiling, even with data
+    assert _compute_replicate_timeout([],None,config) == 1000.0
+    assert _compute_replicate_timeout([1,2,3],None,config) == 1000.0
+
+    # Not enough samples yet -> ceiling
+    assert _compute_replicate_timeout([],3,config) == 1000.0
+    assert _compute_replicate_timeout([5.0,5.0],3,config) == 1000.0
+
+    # Enough samples, factor dominates the floor
+    #   max = 20, factor*max = 60 > floor (10) -> 60
+    assert _compute_replicate_timeout([10.0,20.0,5.0],3,config) == 60.0
+
+    # Enough samples, floor dominates
+    #   max = 1, factor*max = 3 < floor (10) -> 10
+    assert _compute_replicate_timeout([1.0,1.0,1.0],3,config) == 10.0
+
+
+def test__should_abort():
+
+    config = {"factor":3.0,"ceiling":1000.0,"floor":10.0,
+              "max_failed_fraction":0.1,"max_failed_floor":5}
+
+    # Below the failure floor -> never abort, regardless of fraction
+    assert _should_abort(0,100,config) is False
+    assert _should_abort(4,10,config) is False
+
+    # num_total is None or non-positive -> never abort
+    assert _should_abort(100,None,config) is False
+    assert _should_abort(100,0,config) is False
+
+    # At/above floor and above the fraction -> abort
+    #   6 > 0.1 * 10 = 1.0 -> True
+    assert _should_abort(6,10,config) is True
+
+    # At/above floor but not above the fraction -> do not abort
+    #   6 failures out of 100 -> 6 > 10.0 is False
+    assert _should_abort(6,100,config) is False
+
+    # Exactly equal to the fraction is not "more than" -> do not abort
+    #   10 == 0.1 * 100 -> not > -> False
+    assert _should_abort(10,100,config) is False
+
+
+def test__kill_process_group(tmpdir,monkeypatch):
+
+    monkeypatch.chdir(tmpdir)
+
+    # Launch a shell that spawns a sleeping grandchild, all in a new session so
+    # they form their own process group.
+    proc = subprocess.Popen(["sh","-c","sleep 60"],start_new_session=True)
+
+    # Let the group come up and grab its id.
+    time.sleep(0.3)
+    pgid = os.getpgid(proc.pid)
+
+    # signal 0 -> group currently exists
+    os.killpg(pgid,0)
+
+    _kill_process_group(proc)
+    proc.wait(timeout=10)
+
+    # The direct child is dead
+    assert proc.poll() is not None
+
+    # The whole group (including the sleep grandchild) is gone
+    time.sleep(0.3)
+    with pytest.raises(ProcessLookupError):
+        os.killpg(pgid,0)
+
+
+def test__launch_replicate(tmpdir,monkeypatch):
+
+    monkeypatch.chdir(tmpdir)
+
+    # -------------------------------------------------------------------------
+    # Normal completion: stdout/stderr captured to files, returncode reported,
+    # not timed out.
+
+    cmd = [sys.executable,"-c",
+           "import sys; sys.stdout.write('hello out'); sys.stderr.write('hello err')"]
+    returncode, timed_out = _launch_replicate(cmd,
+                                              timeout=30,
+                                              stdout_path="stdout.log",
+                                              stderr_path="stderr.log")
+    assert returncode == 0
+    assert timed_out is False
+
+    with open("stdout.log") as f:
+        assert "hello out" in f.read()
+    with open("stderr.log") as f:
+        assert "hello err" in f.read()
+
+    # -------------------------------------------------------------------------
+    # Non-zero exit code is reported (but not treated as a timeout)
+
+    cmd = [sys.executable,"-c","import sys; sys.exit(3)"]
+    returncode, timed_out = _launch_replicate(cmd,
+                                              timeout=30,
+                                              stdout_path="stdout2.log",
+                                              stderr_path="stderr2.log")
+    assert returncode == 3
+    assert timed_out is False
+
+    # -------------------------------------------------------------------------
+    # Timeout: a long-running process is killed and flagged as timed out. The
+    # call must return well before the process would have finished on its own.
+
+    cmd = [sys.executable,"-c","import time; time.sleep(60)"]
+    start = time.time()
+    returncode, timed_out = _launch_replicate(cmd,
+                                              timeout=0.5,
+                                              stdout_path="stdout3.log",
+                                              stderr_path="stderr3.log")
+    elapsed = time.time() - start
+    assert timed_out is True
+    assert elapsed < 30
+
+
+def test__launch_replicate_env(tmpdir,monkeypatch):
+
+    monkeypatch.chdir(tmpdir)
+
+    # The environment handed to the subprocess must come from mpi.get_mpi_env.
+    monkeypatch.setattr(_rb.mpi,"get_mpi_env",
+                        lambda: {"TOPIARY_MARKER":"present"})
+
+    cmd = [sys.executable,"-c",
+           "import os; print(os.environ.get('TOPIARY_MARKER','missing'))"]
+    returncode, timed_out = _launch_replicate(cmd,
+                                              timeout=30,
+                                              stdout_path="stdout.log",
+                                              stderr_path="stderr.log")
+    assert returncode == 0
+    assert timed_out is False
+    with open("stdout.log") as f:
+        assert "present" in f.read()
+
+
+def _build_fake_replicate_dir(repdir,names):
+    """
+    Build a minimal replicate directory tree with `run_generax.sh` files for
+    each replicate in `names`.
+    """
+
+    os.mkdir(repdir)
+    for name in names:
+        d = os.path.join(repdir,name)
+        os.mkdir(d)
+        with open(os.path.join(d,"run_generax.sh"),"w") as f:
+            f.write("generax --families control.txt &> topiary.log\n")
+
+
+def _make_fake_launch(plan):
+    """
+    Build a fake `_launch_replicate` that behaves according to `plan`, a dict
+    mapping replicate directory name -> one of "success", "timeout", "notree".
+    """
+
+    result_tree = os.path.join("result","results","reconcile","geneTree.newick")
+
+    def fake_launch(cmd,timeout,stdout_path,stderr_path):
+
+        # We are inside the replicate directory when this is called.
+        with open(stdout_path,"w") as f:
+            f.write("fake stdout\n")
+        with open(stderr_path,"w") as f:
+            f.write("fake stderr\n")
+
+        outcome = plan[os.path.basename(os.getcwd())]
+
+        if outcome == "success":
+            os.makedirs(os.path.dirname(result_tree),exist_ok=True)
+            with open(result_tree,"w") as f:
+                f.write("(A:1,B:1);\n")
+            return 0, False
+
+        if outcome == "timeout":
+            return None, True
+
+        if outcome == "raise":
+            raise RuntimeError("boom")
+
+        # "notree" -- exited (non-zero) without producing a result tree
+        return 1, False
+
+    return fake_launch
+
+
+def test__generax_thread_function_failure_handling(tmpdir,monkeypatch):
+
+    monkeypatch.chdir(tmpdir)
+
+    names = ["00001","00002","00003","00004","00005"]
+    _build_fake_replicate_dir("replicates",names)
+
+    # 00002 times out, 00003 produces no tree; the rest succeed.
+    plan = {"00001":"success",
+            "00002":"timeout",
+            "00003":"notree",
+            "00004":"success",
+            "00005":"success"}
+    monkeypatch.setattr(_rb,"_launch_replicate",_make_fake_launch(plan))
+
+    durations = []
+    fail_count = _LocalValue(0)
+
+    out = _generax_thread_function(replicate_dir="replicates",
+                                   converge_cutoff=0.5,
+                                   is_manager=False,
+                                   hosts=["localhost"],
+                                   lock=None,
+                                   durations=durations,
+                                   fail_count=fail_count,
+                                   total_replicates=len(names),
+                                   sample_threshold=None,
+                                   timeout_config=None)
+    assert out is None
+
+    # Successful replicates are marked completed (not failed)
+    for name in ["00001","00004","00005"]:
+        assert os.path.isfile(os.path.join("replicates",name,"completed"))
+        assert not os.path.isfile(os.path.join("replicates",name,"failed"))
+        assert not os.path.isfile(os.path.join("replicates",name,"running"))
+
+    # Failed replicates (timeout + missing tree) are marked failed (not completed)
+    for name in ["00002","00003"]:
+        assert os.path.isfile(os.path.join("replicates",name,"failed"))
+        assert not os.path.isfile(os.path.join("replicates",name,"completed"))
+        assert not os.path.isfile(os.path.join("replicates",name,"running"))
+
+    # Runtime recorded only for the three successes
+    assert len(durations) == 3
+
+    # Failure counter incremented for the two failures
+    assert fail_count.value == 2
+
+    # bs-trees.newick has exactly the three successful trees
+    with open(os.path.join("replicates","bs-trees.newick")) as f:
+        lines = [line for line in f if line.strip() != ""]
+    assert len(lines) == 3
+
+    # Failure reason annotated into the stderr log
+    with open(os.path.join("replicates","00002","stderr.log")) as f:
+        assert "timeout" in f.read()
+    with open(os.path.join("replicates","00003","stderr.log")) as f:
+        assert "result tree" in f.read()
+
+
+def test__generax_thread_function_unexpected_exception(tmpdir,monkeypatch):
+
+    # An unexpected exception inside the launch must be caught and turned into a
+    # normal replicate failure (directory flagged `failed`, not left `running`),
+    # so it can never wedge the whole calculation.
+
+    monkeypatch.chdir(tmpdir)
+
+    names = ["00001","00002"]
+    _build_fake_replicate_dir("replicates",names)
+
+    plan = {"00001":"raise","00002":"success"}
+    monkeypatch.setattr(_rb,"_launch_replicate",_make_fake_launch(plan))
+
+    durations = []
+    fail_count = _LocalValue(0)
+
+    out = _generax_thread_function(replicate_dir="replicates",
+                                   converge_cutoff=0.5,
+                                   is_manager=False,
+                                   hosts=["localhost"],
+                                   lock=None,
+                                   durations=durations,
+                                   fail_count=fail_count,
+                                   total_replicates=len(names),
+                                   sample_threshold=None,
+                                   timeout_config=None)
+    assert out is None
+
+    # The exception replicate is failed (and not stuck running)
+    assert os.path.isfile(os.path.join("replicates","00001","failed"))
+    assert not os.path.isfile(os.path.join("replicates","00001","running"))
+    assert not os.path.isfile(os.path.join("replicates","00001","completed"))
+
+    # The following replicate still ran to completion
+    assert os.path.isfile(os.path.join("replicates","00002","completed"))
+
+    assert fail_count.value == 1
+    with open(os.path.join("replicates","00001","stderr.log")) as f:
+        assert "unexpected error" in f.read()
+
+
+def test__generax_thread_function_circuit_breaker(tmpdir,monkeypatch):
+
+    monkeypatch.chdir(tmpdir)
+
+    names = ["00001","00002","00003","00004","00005"]
+    _build_fake_replicate_dir("replicates",names)
+    repdir = os.path.abspath("replicates")
+
+    # Everything fails.
+    plan = {name:"notree" for name in names}
+    monkeypatch.setattr(_rb,"_launch_replicate",_make_fake_launch(plan))
+
+    durations = []
+    fail_count = _LocalValue(0)
+
+    # floor of 2 failures, 10% fraction of 5 replicates -> abort on the 2nd
+    # failure (2 >= 2 and 2 > 0.5).
+    timeout_config = {"max_failed_floor":2,"max_failed_fraction":0.1}
+
+    with pytest.raises(RuntimeError):
+        _generax_thread_function(replicate_dir="replicates",
+                                 converge_cutoff=0.5,
+                                 is_manager=False,
+                                 hosts=["localhost"],
+                                 lock=None,
+                                 durations=durations,
+                                 fail_count=fail_count,
+                                 total_replicates=len(names),
+                                 sample_threshold=None,
+                                 timeout_config=timeout_config)
+
+    # Aborting mid-run can leave the working directory changed; restore it so
+    # relative-path bookkeeping in later tests is unaffected.
+    monkeypatch.chdir(tmpdir)
+
+    # Aborted after the second failure; later replicates never ran.
+    assert fail_count.value == 2
+    assert os.path.isfile(os.path.join(repdir,"00001","failed"))
+    assert os.path.isfile(os.path.join(repdir,"00002","failed"))
+    assert not os.path.isfile(os.path.join(repdir,"00003","failed"))
+
+
+def test__generax_thread_function_adaptive_timeout(tmpdir,monkeypatch):
+
+    monkeypatch.chdir(tmpdir)
+
+    names = ["00001","00002","00003"]
+    _build_fake_replicate_dir("replicates",names)
+
+    plan = {name:"success" for name in names}
+
+    # Record the timeout handed to each replicate so we can verify the adaptive
+    # behavior. The first replicate should get the (long) ceiling; once we have
+    # a sample, subsequent replicates get factor*max(durations), floored.
+    seen_timeouts = []
+    base_fake = _make_fake_launch(plan)
+
+    def recording_fake(cmd,timeout,stdout_path,stderr_path):
+        seen_timeouts.append(timeout)
+        return base_fake(cmd,timeout,stdout_path,stderr_path)
+
+    monkeypatch.setattr(_rb,"_launch_replicate",recording_fake)
+
+    durations = []
+    fail_count = _LocalValue(0)
+    timeout_config = {"factor":3.0,"ceiling":9999.0,"floor":1.0,
+                      "max_failed_fraction":0.1,"max_failed_floor":5}
+
+    _generax_thread_function(replicate_dir="replicates",
+                             converge_cutoff=0.5,
+                             is_manager=False,
+                             hosts=["localhost"],
+                             lock=None,
+                             durations=durations,
+                             fail_count=fail_count,
+                             total_replicates=len(names),
+                             sample_threshold=1,
+                             timeout_config=timeout_config)
+
+    # First replicate: no samples yet -> ceiling.
+    assert seen_timeouts[0] == 9999.0
+
+    # Subsequent replicates: adaptive. With a sample_threshold of 1, once one
+    # replicate has completed we switch to factor*max(durations), floored at 1.
+    assert len(seen_timeouts) == 3
+    for t in seen_timeouts[1:]:
+        assert t != 9999.0
+        assert t >= 1.0

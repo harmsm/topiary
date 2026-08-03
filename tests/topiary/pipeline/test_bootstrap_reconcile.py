@@ -62,7 +62,8 @@ def test_bootstrap_reconcile(tmpdir, mocker):
         num_threads=2,
         threads_per_rep=8, # Closest factor of 56 to 10
         raxml_binary=mocker.ANY,
-        generax_binary=mocker.ANY
+        generax_binary=mocker.ANY,
+        timeout_config=mocker.ANY
     )
     mock_pipeline_report.assert_called()
 
@@ -139,5 +140,6 @@ def test_bootstrap_reconcile(tmpdir, mocker):
         num_threads=56,
         threads_per_rep=8,
         raxml_binary=mocker.ANY,
-        generax_binary=mocker.ANY
+        generax_binary=mocker.ANY,
+        timeout_config=mocker.ANY
     )
