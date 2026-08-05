@@ -158,15 +158,16 @@ def _run_muscle(input_fasta,
     """
 
     # Check muscle version
-    binary, muscle_version = installed.check_muscle()
+    binary, muscle_version, muscle_diagnostic = installed.check_muscle()
     if muscle_version == (-2,-2,-2):
         err = f"\nmuscle not found in the PATH ({os.environ['PATH']})\n\n"
         raise RuntimeError(err)
 
     if muscle_version == (-1,-1,-1):
-        ret = subprocess.run([muscle_binary],capture_output=True)
-        err = f"\nmuscle is in the PATH, but is crashing. The output of \n"
-        err += f"`muscle` follows:\n\n {ret.stderr.decode()}\n\n"
+        err = f"\nmuscle is in the PATH ({binary}), but is crashing. The output\n"
+        err += "of running `muscle` follows:\n\n"
+        if muscle_diagnostic is not None:
+            err += f" {muscle_diagnostic['stderr']}\n\n"
         raise RuntimeError(err)
 
     if muscle_version == (0,0,0):

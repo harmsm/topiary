@@ -4,6 +4,8 @@ import sys
 import os
 import subprocess
 
+from topiary.cli_scripts.check_installed import main
+
 def test_main():
 
     # simple test. Make sure it runs. We test validation stack directly
@@ -18,5 +20,32 @@ def test_main():
     else:
         base_cmd = [test_bin]
 
-    # basically make sure it runs without throwing an exception. 
+    # basically make sure it runs without throwing an exception.
     ret = subprocess.run(base_cmd)
+
+
+def test_main_surfaces_crash(mocker,capsys):
+    """
+    When validate_stack reports a crashing binary (e.g. an architecture-
+    incompatible raxml-ng dying with 'Illegal instruction'), main() should
+    print that detailed message rather than silently assuming a $PATH problem.
+    """
+
+    import topiary
+
+    crash_message = ("raxml-ng (/some/path/raxml-ng): killed by signal SIGILL\n"
+                     "Illegal instruction (core dumped)\n"
+                     "This usually means the binary is incompatible with this "
+                     "machine (architecture).")
+
+    mocker.patch.object(topiary._private.installed,
+                        "validate_stack",
+                        side_effect=RuntimeError(crash_message))
+
+    # Should not raise -- the RuntimeError is caught and reported.
+    main()
+
+    captured = capsys.readouterr()
+    assert "SIGILL" in captured.out
+    assert "Illegal instruction (core dumped)" in captured.out
+    assert "$PATH" in captured.out
