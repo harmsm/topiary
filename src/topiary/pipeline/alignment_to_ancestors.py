@@ -13,7 +13,6 @@ from topiary._private import check
 from topiary._private import run_cleanly
 from topiary._private.mpi import check_mpi_configuration
 from topiary._private.interface import rmtree
-from topiary.reports import pipeline_report
 
 import pandas as pd
 import numpy as np
@@ -414,6 +413,11 @@ def alignment_to_ancestors(df,
         counter += 1
 
     os.chdir(current_dir)
+
+    # Imported here rather than at the top of the module because generating a
+    # report pulls in matplotlib and toytree, which are slow to import (see
+    # also topiary/__init__.py).
+    from topiary.reports import pipeline_report
 
     # Create an html report for the calculation
     pipeline_report(pipeline_directory=out_dir,

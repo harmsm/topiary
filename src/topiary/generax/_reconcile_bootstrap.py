@@ -18,7 +18,6 @@ from topiary.generax._generax import setup_generax
 from topiary.generax._generax import run_generax
 from topiary.generax._generax import GENERAX_BINARY
 
-import ete4 as ete
 
 from tqdm.auto import tqdm
 
@@ -30,7 +29,6 @@ import copy
 import tarfile
 import random
 import string
-import signal
 import subprocess
 import time
 import pathlib
@@ -173,29 +171,43 @@ def _should_abort(num_failed,
     return num_failed > config["max_failed_fraction"] * num_total
 
 
-def _kill_process_group(proc):
+def _terminate_process(proc):
     """
-    Kill an entire process group spawned by `proc`. `proc` must have been
-    launched with ``start_new_session=True`` so that it (and its mpirun/generax
-    children) form their own process group. This makes sure a timed-out generax
-    run does not leave orphaned MPI ranks holding onto the node's slots.
+    Stop a launched replicate subprocess (an ``mpirun`` invocation).
+
+    We signal ``mpirun`` itself -- SIGTERM first, so OpenMPI can forward it to
+    its ranks and shut them down cleanly, then SIGKILL if it does not exit
+    promptly. We deliberately do NOT kill a whole process group: doing so would
+    require launching ``mpirun`` in its own session (``start_new_session=True``),
+    which interferes with OpenMPI's SLURM launcher (``--mca plm slurm``) and
+    serializes what should be parallel replicates. Relying on mpirun's own signal
+    forwarding keeps replicates running concurrently at the small cost of a rare
+    orphaned rank if mpirun cannot clean up.
 
     Parameters
     ----------
     proc : subprocess.Popen
-        process whose group should be killed.
+        process to terminate.
     """
 
+    # Ask mpirun to shut down (it forwards the signal to its ranks).
     try:
-        pgid = os.getpgid(proc.pid)
-        os.killpg(pgid,signal.SIGKILL)
-    except (ProcessLookupError,PermissionError,OSError):
-        # Group is already gone or we cannot signal it; fall back to killing the
-        # direct child.
-        try:
-            proc.kill()
-        except (ProcessLookupError,OSError):
-            pass
+        proc.terminate()
+    except (ProcessLookupError,OSError):
+        return
+
+    # Give it a chance to exit cleanly.
+    try:
+        proc.wait(timeout=30)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+
+    # Escalate.
+    try:
+        proc.kill()
+    except (ProcessLookupError,OSError):
+        pass
 
 
 def _launch_replicate(cmd,timeout,stdout_path,stderr_path):
@@ -208,6 +220,11 @@ def _launch_replicate(cmd,timeout,stdout_path,stderr_path):
     keeps the stdout/stderr pipe open, leaving ``subprocess`` blocked forever
     waiting for EOF. With file redirection the call only waits on the direct
     child (mpirun) exiting.
+
+    The subprocess is launched in the same session/process group as this worker
+    (no ``start_new_session``): detaching mpirun into its own session breaks
+    OpenMPI's SLURM launcher and serializes otherwise-parallel replicates. On
+    timeout we therefore signal mpirun directly rather than killing a group.
 
     Parameters
     ----------
@@ -234,8 +251,7 @@ def _launch_replicate(cmd,timeout,stdout_path,stderr_path):
         proc = subprocess.Popen(cmd,
                                 stdout=stdout_f,
                                 stderr=stderr_f,
-                                env=mpi.get_mpi_env(),
-                                start_new_session=True)
+                                env=mpi.get_mpi_env())
     finally:
         # The child has its own duplicated file descriptors; we can close ours.
         stdout_f.close()
@@ -247,8 +263,8 @@ def _launch_replicate(cmd,timeout,stdout_path,stderr_path):
 
     except subprocess.TimeoutExpired:
 
-        # Take out the whole process group (mpirun + generax ranks), then reap.
-        _kill_process_group(proc)
+        # Signal mpirun to shut down (it forwards to its ranks), then reap.
+        _terminate_process(proc)
         try:
             proc.wait(timeout=30)
         except subprocess.TimeoutExpired:
@@ -702,6 +718,10 @@ def _build_replicate_dirs(df,
     # Create replicate directory
     replicate_dir = os.path.abspath(os.path.join("replicates"))
     os.mkdir(replicate_dir)
+
+    # Imported here rather than at the top of the module because importing ete4
+    # pulls in scipy, which is slow (see also topiary/__init__.py).
+    import ete4 as ete
 
     # Find and sort bootstrap alignment files
     alignment_files = glob.glob(os.path.join(bootstrap_directory,"*.phy"))

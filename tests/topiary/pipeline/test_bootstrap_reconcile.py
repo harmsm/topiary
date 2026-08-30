@@ -16,7 +16,7 @@ def test_bootstrap_reconcile(tmpdir, mocker):
     mock_supervisor_class = mocker.patch("topiary.pipeline.bootstrap_reconcile.Supervisor")
     mock_reconcile = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary.reconcile")
     mock_reconcile_bootstrap = mocker.patch("topiary.pipeline.bootstrap_reconcile.reconcile_bootstrap")
-    mock_pipeline_report = mocker.patch("topiary.pipeline.bootstrap_reconcile.pipeline_report")
+    mock_pipeline_report = mocker.patch("topiary.reports.pipeline_report")
     
     # Mock mpi functions
     mock_get_num_slots = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_num_slots", return_value=56)

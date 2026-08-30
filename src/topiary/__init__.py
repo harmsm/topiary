@@ -31,7 +31,6 @@ _in_notebook = _check_for_notebook()
 
 # Submodules
 from . import util
-from . import draw
 from . import pipeline
 from . import _private
 from . import quality
@@ -56,3 +55,30 @@ from .io import read_fasta_into, write_fasta, write_phy
 
 # Topiary version
 from .__version__ import __version__
+
+
+# Subpackages that are expensive to import and are only needed for specific
+# tasks. `draw` pulls in matplotlib, toytree, and ete4 (which itself drags in
+# scipy); together these are the majority of topiary's import time and are not
+# needed to run most of the pipeline. They are loaded on first attribute access
+# instead, so `topiary.draw.tree(...)` still works as before.
+_LAZY_SUBMODULES = ("draw",)
+
+def __getattr__(name):
+    """
+    Import expensive subpackages on first access (see PEP 562).
+    """
+
+    if name in _LAZY_SUBMODULES:
+        import importlib
+        module = importlib.import_module(f".{name}",__name__)
+
+        # Cache on the package so this __getattr__ is not hit again
+        globals()[name] = module
+        return module
+
+    err = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(err)
+
+def __dir__():
+    return sorted(list(globals().keys()) + list(_LAZY_SUBMODULES))

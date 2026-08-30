@@ -4,8 +4,6 @@ Load a tree into an ete4 tree data structure.
 
 from topiary._private.check import check_bool
 
-import ete4 as ete
-from ete4 import Tree
 import dendropy as dp
 
 import glob
@@ -50,6 +48,11 @@ def read_tree(tree,fmt=None):
     + 100: topology only
 
     """
+
+    # Imported here rather than at the top of the module because importing ete4
+    # pulls in scipy, which is slow (see also topiary/__init__.py).
+    import ete4 as ete
+    from ete4 import Tree
 
     # Already an ete4 tree.
     if isinstance(tree,ete.Tree):
@@ -193,6 +196,10 @@ def _map_tree_to_tree(T1,T2,rooted=False):
         list of nodes from T2 that are not in T1
     """
 
+    # Imported here rather than at the top of the module because importing ete4
+    # pulls in scipy, which is slow (see also topiary/__init__.py).
+    import ete4 as ete
+
     # Construct dictionary keying node to tuple of descendants for T1
     if isinstance(T1,ete.Tree):
         T1_node_dict = _ete4_node_dict(T1,rooted=rooted)
@@ -240,6 +247,10 @@ def _get_trees_from_directory(directory=None,
     """
     Load trees from directory and validate consistency.
     """
+
+    # Imported here rather than at the top of the module because importing ete4
+    # pulls in scipy, which is slow (see also topiary/__init__.py).
+    from ete4 import Tree
 
     # Load trees from the directory
     if directory is not None:
@@ -722,6 +733,10 @@ def write_trees(T,
         Newick string representation of the output tree(s)
     """
     
+    # Imported here rather than at the top of the module because importing ete4
+    # pulls in scipy, which is slow (see also topiary/__init__.py).
+    import ete4 as ete
+
     # --------------------------------------------------------------------------
     # Parameter sanity checking
     if not isinstance(T,ete.Tree):

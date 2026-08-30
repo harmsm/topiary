@@ -18,7 +18,7 @@ def test_restart_logic(tmpdir, mocker):
     mocker.patch("topiary.pipeline.bootstrap_reconcile.check_mpi_configuration")
     mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_num_slots", return_value=1)
     mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_hosts", return_value=["localhost"])
-    mocker.patch("topiary.pipeline.bootstrap_reconcile.pipeline_report")
+    mocker.patch("topiary.reports.pipeline_report")
     
     # Mock the actual core calculation to avoid running generax/raxml
     mock_reconcile_bootstrap = mocker.patch("topiary.pipeline.bootstrap_reconcile.reconcile_bootstrap")

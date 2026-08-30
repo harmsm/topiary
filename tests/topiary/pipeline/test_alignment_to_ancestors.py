@@ -48,7 +48,7 @@ def test_alignment_to_ancestors(tmpdir, mocker):
     mock_gen_ancestors = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.generate_ancestors")
     mock_reconcile = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.reconcile")
     mock_gen_bootstraps = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.generate_bootstraps")
-    mock_pipeline_report = mocker.patch("topiary.pipeline.alignment_to_ancestors.pipeline_report")
+    mock_pipeline_report = mocker.patch("topiary.reports.pipeline_report")
     
     mock_check_restart = mocker.patch("topiary.pipeline.alignment_to_ancestors._check_restart", return_value=True)
 
@@ -130,7 +130,7 @@ def test_alignment_to_ancestors_reconciliation_logic(tmpdir, mocker):
     mock_gen_ml_tree = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.generate_ml_tree")
     mock_gen_ancestors = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.generate_ancestors")
     mock_reconcile = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.reconcile")
-    mock_pipeline_report = mocker.patch("topiary.pipeline.alignment_to_ancestors.pipeline_report")
+    mock_pipeline_report = mocker.patch("topiary.reports.pipeline_report")
     mocker.patch("topiary.pipeline.alignment_to_ancestors._check_restart", return_value=True)
 
     os.chdir(tmpdir)

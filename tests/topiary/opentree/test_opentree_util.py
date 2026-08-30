@@ -4,6 +4,8 @@ from topiary.opentree.util import _validate_ott_or_species
 from topiary.opentree.util import ott_to_mrca
 from topiary.opentree.util import ott_to_resolvable
 from topiary.opentree.util import species_to_ott
+from topiary.opentree.util import _tnrs_query
+from topiary.opentree.util import _parse_tnrs_matches
 from topiary.opentree.util import ott_to_species_tree
 from topiary.opentree.util import tree_to_taxa_order
 from topiary.opentree.util import sort_df_by_taxa
@@ -15,6 +17,7 @@ import numpy as np
 
 import re
 import string
+import warnings
 
 def test__validate_ott_or_species():
 
@@ -134,6 +137,163 @@ def test_species_to_ott():
     # This is a fuzzy match and should fail
     ott_list, species_list, results = species_to_ott(["Neosciurus carolinensis"])
     assert results["Neosciurus carolinensis"]["msg"].startswith("No exact match")
+
+
+def _fake_tnrs_response(name_to_ott):
+    """
+    Build a minimal stand-in for the object OT.tnrs_match returns. Takes a
+    dictionary of ott ids keyed to query name; an ott of None means the query
+    matched nothing.
+    """
+
+    class FakeResponse:
+        pass
+
+    results = []
+    for name, ott_id in name_to_ott.items():
+        if ott_id is None:
+            matches = []
+        else:
+            matches = [{"is_approximate_match":False,
+                        "is_synonym":False,
+                        "matched_name":name,
+                        "taxon":{"ott_id":ott_id,
+                                 "name":name,
+                                 "tax_sources":[]}}]
+        results.append({"name":name,"matches":matches})
+
+    out = FakeResponse()
+    out.response_dict = {"results":results}
+
+    return out
+
+
+def test__tnrs_query(monkeypatch):
+
+    # An empty query should not hit the server at all
+    def explode(*args,**kwargs):
+        raise AssertionError("should not have queried opentree")
+    monkeypatch.setattr(topiary.opentree.util.OT,"tnrs_match",explode)
+    assert _tnrs_query([]) == {}
+
+    # Results should be keyed by the name each result carries, not by the
+    # position it came back in. Hand back results in an order that has nothing
+    # to do with the query order.
+    sent = {}
+    def fake_tnrs_match(names,context_name=None,do_approximate_matching=False,
+                        include_suppressed=False):
+        sent["names"] = names
+        sent["context_name"] = context_name
+        return _fake_tnrs_response({"Homo sapiens":770315,
+                                    "Octopus sinensis":110468,
+                                    "Hypanus sabinus":351766})
+
+    monkeypatch.setattr(topiary.opentree.util.OT,"tnrs_match",fake_tnrs_match)
+
+    query = ["Octopus sinensis","Hypanus sabinus","Homo sapiens"]
+    matches = _tnrs_query(query)
+
+    # We should have asked for the widest possible context
+    assert sent["names"] == query
+    assert sent["context_name"] == topiary.opentree.util._TNRS_CONTEXT
+
+    for s, expected_ott in [("Octopus sinensis",110468),
+                            ("Hypanus sabinus",351766),
+                            ("Homo sapiens",770315)]:
+        assert matches[s][0]["taxon"]["ott_id"] == expected_ott
+
+
+def test__parse_tnrs_matches():
+
+    # No match
+    result = _parse_tnrs_matches("Not really a species",[])
+    assert result["matched"] == False
+    assert result["num_matches"] == 0
+    assert result["ott_id"] is None
+    assert result["ott_name"] is None
+    assert result["taxid"] is None
+    assert result["msg"].startswith("No match")
+
+    # Single, exact match
+    matches = _fake_tnrs_response({"Homo sapiens":770315}).response_dict["results"][0]["matches"]
+    matches[0]["taxon"]["tax_sources"] = ["ncbi:9606","gbif:2436436"]
+    result = _parse_tnrs_matches("Homo sapiens",matches)
+    assert result["matched"] == True
+    assert result["num_matches"] == 1
+    assert result["msg"] == "success"
+    assert result["ott_id"] == 770315
+    assert result["ott_name"] == "Homo sapiens"
+    assert result["taxid"] == 9606
+
+    # Multiple, non-synonymous matches are ambiguous
+    matches = _fake_tnrs_response({"Drosophila":1}).response_dict["results"][0]["matches"]
+    matches[0]["taxon"]["tax_sources"] = ["ncbi:7215"]
+    matches.append({"is_approximate_match":False,
+                    "is_synonym":False,
+                    "matched_name":"Drosophila",
+                    "taxon":{"ott_id":2,
+                             "name":"Drosophila",
+                             "tax_sources":["ncbi:2081351"]}})
+    result = _parse_tnrs_matches("Drosophila",matches)
+    assert result["num_matches"] == 2
+    assert result["msg"] == "multiple matches"
+    assert result["ott_id"] == 1
+
+    # An approximate match is not a match
+    matches = _fake_tnrs_response({"Neosciurus carolinensis":1}).response_dict["results"][0]["matches"]
+    matches[0]["is_approximate_match"] = True
+    matches[0]["matched_name"] = "Sciurus carolinensis"
+    matches[0]["taxon"]["tax_sources"] = ["ncbi:1"]
+    matches.append({"is_approximate_match":True,
+                    "is_synonym":False,
+                    "matched_name":"Nesticus carolinensis",
+                    "taxon":{"ott_id":2,
+                             "name":"Nesticus carolinensis",
+                             "tax_sources":["ncbi:2"]}})
+    result = _parse_tnrs_matches("Neosciurus carolinensis",matches)
+    assert result["matched"] == False
+    assert result["msg"].startswith("No exact match")
+
+
+def test_species_to_ott_batch_context():
+    """
+    opentree's TNRS infers a taxonomic context from the batch of names sent to
+    it. Historically, mixing distant clades in one query narrowed that context
+    and made the out-of-context species come back unmatched, even though those
+    same species matched fine when queried alone or in a smaller batch.
+    """
+
+    expected = {"Hypanus sabinus":351766,
+                "Octopus sinensis":110468,
+                "Homo sapiens":770315}
+
+    queries = [["Hypanus sabinus"],
+               ["Octopus sinensis"],
+               ["Hypanus sabinus","Octopus sinensis"],
+               ["Octopus sinensis","Homo sapiens","Hypanus sabinus"]]
+
+    for query in queries:
+        ott_list, species_list, results = species_to_ott(query)
+        assert len(ott_list) == len(query)
+        for i, s in enumerate(query):
+            assert ott_list[i] == expected[s]
+            assert results[s]["num_matches"] == 1
+
+
+def test_species_to_ott_warns_on_unmatched():
+
+    # A species that cannot be matched should not vanish silently
+    with pytest.warns(UserWarning,match="Not really a species"):
+        ott_list, species_list, results = species_to_ott(["Homo sapiens",
+                                                          "Not really a species"])
+    assert ott_list[0] == 770315
+    assert ott_list[1] is None
+
+    # ... and one that can be matched should not warn
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        ott_list, species_list, results = species_to_ott(["Homo sapiens"])
+    assert ott_list[0] == 770315
 
 
 def test_species_to_ott_strains():

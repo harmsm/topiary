@@ -8,7 +8,6 @@ from .util import ott_to_species_tree
 
 from opentree import taxonomy_helpers
 import dendropy as dp
-import ete4 as ete
 
 import pandas as pd
 import numpy as np

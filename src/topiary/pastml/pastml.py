@@ -6,8 +6,6 @@ available at https://github.com/evolbioinfo/pastml. When citing topiary, please
 cite the original pastml paper: https://doi.org/10.1093/molbev/msz131. 
 """
 
-import ete4 as ete
-
 import numpy as np
 import pandas as pd
 import topiary

@@ -458,16 +458,36 @@ def test_write_trees_errors(tmpdir):
 def test_read_tree_format_loop(mocker):
     from topiary.io.tree import read_tree
     import ete4 as ete
+
+    real_Tree = ete.Tree
+    good_tree = real_Tree("(A:0.1,B:0.1):0.1;")
+
+    # read_tree imports ete4 inside the function body, so patch ete4 itself
+    # rather than topiary.io.tree. The replacement has to be a class (not a
+    # Mock) because read_tree also does isinstance(tree,ete.Tree).
+    calls = []
+
+    class FailOnceTree:
+        def __new__(cls,*args,**kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise Exception("fail")
+            return good_tree
+
     # Mock ete4.Tree to fail once then succeed
-    mock_tree = mocker.patch("topiary.io.tree.Tree", side_effect=[Exception("fail"), ete.Tree("(A:0.1,B:0.1):0.1;")])
-    
+    mocker.patch("ete4.Tree", FailOnceTree)
+
     # This should trigger the format loop (82-85)
     t = read_tree("(A,B);", fmt=None)
-    assert isinstance(t, ete.Tree)
-    assert mock_tree.call_count >= 2
+    assert isinstance(t, real_Tree)
+    assert len(calls) >= 2
 
     # Test full loop failure (90-92)
-    mocker.patch("topiary.io.tree.Tree", side_effect=Exception("always fail"))
+    class AlwaysFailTree:
+        def __new__(cls,*args,**kwargs):
+            raise Exception("always fail")
+
+    mocker.patch("ete4.Tree", AlwaysFailTree)
     with pytest.raises(ValueError, match="Could not parse tree!"):
         read_tree("(A,B);", fmt=None)
 

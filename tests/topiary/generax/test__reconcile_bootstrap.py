@@ -14,7 +14,7 @@ from topiary.generax._reconcile_bootstrap import _LocalValue
 from topiary.generax._reconcile_bootstrap import _get_timeout_config
 from topiary.generax._reconcile_bootstrap import _compute_replicate_timeout
 from topiary.generax._reconcile_bootstrap import _should_abort
-from topiary.generax._reconcile_bootstrap import _kill_process_group
+from topiary.generax._reconcile_bootstrap import _terminate_process
 from topiary.generax._reconcile_bootstrap import _launch_replicate
 from topiary.generax._reconcile_bootstrap import _DEFAULT_TIMEOUT_CONFIG
 from topiary.generax._generax import GENERAX_BINARY
@@ -33,7 +33,6 @@ import glob
 import shutil
 import copy
 import pathlib
-import signal
 import subprocess
 import time
 import multiprocessing as mp
@@ -831,31 +830,22 @@ def test__should_abort():
     assert _should_abort(10,100,config) is False
 
 
-def test__kill_process_group(tmpdir,monkeypatch):
+def test__terminate_process(tmpdir,monkeypatch):
 
     monkeypatch.chdir(tmpdir)
 
-    # Launch a shell that spawns a sleeping grandchild, all in a new session so
-    # they form their own process group.
-    proc = subprocess.Popen(["sh","-c","sleep 60"],start_new_session=True)
+    # A long-running process is terminated. We launch it in the SAME session as
+    # the test (no start_new_session) -- terminating it must not require a
+    # process-group kill.
+    proc = subprocess.Popen([sys.executable,"-c","import time; time.sleep(60)"])
+    time.sleep(0.2)
+    assert proc.poll() is None
 
-    # Let the group come up and grab its id.
-    time.sleep(0.3)
-    pgid = os.getpgid(proc.pid)
-
-    # signal 0 -> group currently exists
-    os.killpg(pgid,0)
-
-    _kill_process_group(proc)
+    _terminate_process(proc)
     proc.wait(timeout=10)
 
-    # The direct child is dead
+    # The process is dead
     assert proc.poll() is not None
-
-    # The whole group (including the sleep grandchild) is gone
-    time.sleep(0.3)
-    with pytest.raises(ProcessLookupError):
-        os.killpg(pgid,0)
 
 
 def test__launch_replicate(tmpdir,monkeypatch):
