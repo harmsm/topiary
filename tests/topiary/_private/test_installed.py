@@ -10,7 +10,6 @@ from topiary._private.installed import check_generax
 from topiary._private.installed import check_raxml
 from topiary._private.installed import check_blastp
 from topiary._private.installed import check_makeblastdb
-from topiary._private.installed import check_mpirun
 from topiary._private.installed import _compare_versions
 from topiary._private.installed import validate_stack
 
@@ -220,22 +219,6 @@ def test_check_git():
         raise RuntimeError("git is installed but we cannot parse its version string!")
 
 # mark for run_generax because that's why we worry about MPI in the first place.
-# this will avoid a warning on windows tests. 
-@pytest.mark.run_generax
-def test_check_mpirun():
-
-    binary, version, diagnostic = check_mpirun()
-
-    if version == (-2,-2,-2):
-        warnings.warn("mpirun not installed -- skipping test")
-
-    if version == (-1,-1,-1):
-        raise RuntimeError("mpirun is installed but not working!")
-
-    if version == (0,0,0):
-        raise RuntimeError("mpirun is installed but we cannot parse its version string!")
-
-
 def test__compare_versions():
 
     # good version string; only specified element (1,) matches

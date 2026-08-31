@@ -197,17 +197,7 @@ def check_generax(binary=None):
     if binary is None:
         binary = "generax"
 
-    path, version, diagnostic = _version_checker([binary],_version_slicer)
-
-    # If the binary is found but crashes, it may be because it was compiled
-    # natively with OpenMPI on a SLURM cluster and requires mpirun to execute.
-    if version == (-1, -1, -1):
-        _, mpi_version, _ = _version_checker(["mpirun", "-np", "1", binary], _version_slicer)
-        if mpi_version != (-2, -2, -2) and mpi_version != (-1, -1, -1):
-            version = mpi_version
-            diagnostic = None
-
-    return path, version, diagnostic
+    return _version_checker([binary],_version_slicer)
 
 
 def check_raxml(binary=None):
@@ -243,17 +233,7 @@ def check_raxml(binary=None):
     if binary is None:
         binary = "raxml-ng"
 
-    path, version, diagnostic = _version_checker([binary],_version_slicer)
-
-    # If the binary is found but crashes, it may be because it was compiled
-    # natively with OpenMPI on a SLURM cluster and requires mpirun to execute.
-    if version == (-1, -1, -1):
-        _, mpi_version, _ = _version_checker(["mpirun", "-np", "1", binary], _version_slicer)
-        if mpi_version != (-2, -2, -2) and mpi_version != (-1, -1, -1):
-            version = mpi_version
-            diagnostic = None
-
-    return path, version, diagnostic
+    return _version_checker([binary],_version_slicer)
 
 
 def check_blastp(binary=None):
@@ -349,37 +329,6 @@ def check_git(binary=None):
 
     return _version_checker([binary,"--version"],_version_slicer)
 
-def check_mpirun(binary=None):
-    """
-    Check for mpirun in the PATH and get its version.
-
-    Returns
-    -------
-    binary_path : str or None
-        path to binary. If program is not in the path, return None
-    version : tuple
-        output meanings:
-        + :code:`(-2,-2,-2)`, not found
-        + :code:`(-1,-1,-1)`, found but does not run
-        + :code:`(0,0,0)` found but could not figure out version
-        + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
-          the :code:`.` character, so this will always be a tuple but may have
-          any length > 1. Also, the elements will be :code:`str` not :code:`int`.
-    diagnostic : dict or None
-        None unless the binary was found but exited non-zero (the
-        :code:`(-1,-1,-1)` case), in which case this is a dict describing the
-        failure (return code, signal name, and captured stdout/stderr). See
-        :code:`_build_diagnostic`.
-    """
-
-    def _version_slicer(ret):
-        return ret.stdout.decode().split("\n")[0].split()[-1]
-
-    if binary is None:
-        binary = "mpirun"
-
-    return _version_checker([binary,"--version"],_version_slicer)
-
 def _compare_versions(installed,required):
     """
     Compare an installed version tuple to a required version tuple.
@@ -452,8 +401,7 @@ def validate_stack(to_check):
                     "raxml-ng":check_raxml,
                     "generax":check_generax,
                     "muscle":check_muscle,
-                    "git":check_git,
-                    "mpirun":check_mpirun}
+                    "git":check_git}
 
     out = []
     bad_prog = []

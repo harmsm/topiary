@@ -11,7 +11,6 @@ from topiary._private import installed
 from topiary._private import software_requirements
 from topiary._private import check
 from topiary._private import run_cleanly
-from topiary._private.mpi import check_mpi_configuration
 from topiary._private.interface import rmtree
 
 import pandas as pd
@@ -62,6 +61,7 @@ def alignment_to_ancestors(df,
                            restart=False,
                            overwrite=False,
                            num_threads=-1,
+                           generax_launch="",
                            raxml_binary=RAXML_BINARY,
                            generax_binary=GENERAX_BINARY):
     """
@@ -118,7 +118,12 @@ def alignment_to_ancestors(df,
     overwrite : bool, default=False
         whether or not to overwrite existing output. incompatible with restart
     num_threads : int, default=-1
-        number of threads to use. if -1 use all available
+        number of threads to use for RAxML-NG/PastML. if -1 use all available
+    generax_launch : str, default=""
+        launcher prefix prepended to the generax reconciliation command (e.g.
+        "mpirun -np 8"). Empty string runs generax as a single process. GeneRax
+        parallelism is MPI-only; the caller is responsible for the launcher and
+        for allocating the resources it needs.
     raxml_binary : str, optional
         raxml binary to use
     generax_binary : str, optional
@@ -250,16 +255,8 @@ def alignment_to_ancestors(df,
                             "binary":generax_binary,
                             "min_version":software_requirements["generax"],
                             "must_pass":True})
-        to_validate.append({"program":"mpirun",
-                            "min_version":software_requirements["mpirun"],
-                            "must_pass":True})
 
     installed.validate_stack(to_validate)
-
-    # If we got here, reconciliation software is ready to go. Now check to
-    # whether mpi can really grab the number of threads requested.
-    if do_reconcile:
-        check_mpi_configuration(num_threads)
 
     # --------------------------------------------------------------------------
     # Final sanity checks
@@ -381,7 +378,7 @@ def alignment_to_ancestors(df,
                               calc_dir=output,
                               allow_horizontal_transfer=horizontal_transfer,
                               generax_binary=generax_binary,
-                              num_threads=num_threads,
+                              generax_launch=generax_launch,
                               bootstrap=False)
         counter += 1
 

@@ -105,7 +105,9 @@ from (`quality`, `muscle`, `opentree`, `ncbi.blast`, `raxml`, `generax`, `io`).
   `_private/supervisor.py`'s `Supervisor` class, which manages the standardized
   `input/ working/ output/ run_parameters.json` run-directory layout used by every
   pipeline step that wraps external software. Also houses environment checks
-  (`installed.py`, `environment.py`), MPI helpers (`mpi/`), and threading utilities.
+  (`installed.py`, `environment.py`) and threading utilities. (topiary no longer
+  uses MPI itself; GeneRax parallelism, if wanted, is invoked via a user-supplied
+  launcher prefix — see below.)
 
 ### The three pipelines (`src/topiary/pipeline/`, exposed as `topiary-*` CLI scripts)
 
@@ -123,11 +125,20 @@ from (`quality`, `muscle`, `opentree`, `ncbi.blast`, `raxml`, `generax`, `io`).
 3. **bootstrap_reconcile** (`topiary-bootstrap-reconcile`): takes the bootstrap
    replicates from step 2 and reruns GeneRax reconciliation on each one to compute
    branch supports on the reconciled tree. Computationally heavy, split out as its
-   own step because it parallelizes differently (many independent GeneRax runs)
-   than step 2.
+   own step. It is a **re-entrant filesystem crawler** (`generax/_crawl.py`), not
+   an MPI job: launch as many copies as you like (e.g. a SLURM job array, one task
+   per node) pointing at the same run directory, and they coordinate through marker
+   files — one builds the replicate directories, all of them claim-and-run
+   replicates, one aggregates the supports. Re-running resumes (completed replicates
+   are skipped; interrupted ones resume from GeneRax's own on-disk checkpoint). Each
+   generax replicate runs single-core by default; to parallelize an individual
+   reconciliation, pass a launcher prefix via `--generax-launch "mpirun -np N"`
+   (GeneRax parallelism is MPI-only, and the user owns the launcher/allocation).
 
-All three pipelines support `--restart` to resume from the last completed step in
-an existing output directory (state is tracked via `Supervisor`/`run_parameters.json`).
+`seed_to_alignment` and `alignment_to_ancestors` support `--restart` to resume from
+the last completed step in an existing output directory (state is tracked via
+`Supervisor`/`run_parameters.json`); `bootstrap_reconcile` resumes automatically by
+being re-run (no flag).
 
 ### Run directories
 

@@ -40,7 +40,6 @@ def test_alignment_to_ancestors(tmpdir, mocker):
     
     mock_ott_to_mrca = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.opentree.ott_to_mrca", return_value={"is_microbial": False})
     mock_validate_stack = mocker.patch("topiary.pipeline.alignment_to_ancestors.installed.validate_stack")
-    mock_check_mpi = mocker.patch("topiary.pipeline.alignment_to_ancestors.check_mpi_configuration")
     mock_df_to_species = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.df_to_species_tree")
     
     mock_find_best_model = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.find_best_model")
@@ -123,7 +122,6 @@ def test_alignment_to_ancestors_reconciliation_logic(tmpdir, mocker):
     
     mock_ott_to_mrca = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.opentree.ott_to_mrca")
     mock_validate_stack = mocker.patch("topiary.pipeline.alignment_to_ancestors.installed.validate_stack")
-    mock_check_mpi = mocker.patch("topiary.pipeline.alignment_to_ancestors.check_mpi_configuration")
     mock_df_to_species = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.df_to_species_tree")
     
     mock_find_best_model = mocker.patch("topiary.pipeline.alignment_to_ancestors.topiary.find_best_model")

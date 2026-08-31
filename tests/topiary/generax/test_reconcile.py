@@ -1,5 +1,4 @@
 import pytest
-from unittest import mock
 import topiary
 
 from topiary.generax.reconcile import reconcile
@@ -44,7 +43,7 @@ def test_reconcile(small_phylo,tmpdir):
                        "bootstrap":False,
                        "calc_dir":"reconcile",
                        "overwrite":False,
-                       "num_threads":1,
+                       "generax_launch":"",
                        "generax_binary":GENERAX_BINARY,
                        "raxml_binary":RAXML_BINARY}
 
@@ -65,18 +64,6 @@ def test_reconcile(small_phylo,tmpdir):
     with pytest.raises(ValueError):
         reconcile(**kwargs)
     os.chdir("..")
-
-    # Test MPI threads check
-    os.mkdir("test1")
-    os.chdir("test1")
-    kwargs = copy.deepcopy(kwargs_template)
-    kwargs["num_threads"] = 99999999999999
-    with mock.patch("topiary.generax.reconcile.check_mpi_configuration",
-                    side_effect=RuntimeError("fail")):
-        with pytest.raises(RuntimeError):
-            reconcile(**kwargs)
-    os.chdir("..")
-
 
     # Make sure code looks for model
     os.mkdir("test2")
@@ -294,72 +281,17 @@ def test_reconcile(small_phylo,tmpdir):
     os.chdir("..")
 
     # -------------------------------------------------------------------------
-    # Previous calc, bootstrap
+    # Bootstrap reconciliation is no longer run through reconcile() -- it now
+    # lives in the topiary-bootstrap-reconcile crawler. Passing bootstrap=True
+    # raises a clear error.
 
     os.mkdir("test8.0")
     os.chdir("test8.0")
     kwargs = copy.deepcopy(kwargs_template)
     kwargs["prev_calculation"] = Supervisor(prev_bs)
     kwargs["bootstrap"] = True
-    reconcile(**kwargs)
-
-    out_dir = os.path.join("reconcile","output")
-    expected_files = ["dataframe.csv",
-                      "reconciled-tree.newick",
-                      "species-tree.newick",
-                      "reconciled-tree_events.newick",
-                      "reconciled-tree_supports.newick",
-                      "summary-tree.pdf"]
-    for e in expected_files:
-        assert os.path.isfile(os.path.join(out_dir,e))
-
-    json_file = os.path.join("reconcile","run_parameters.json")
-    f = open(json_file,"r")
-    param = json.load(f)
-    f.close()
-    assert param["calc_type"] == "reconcile_bootstrap"
-    assert param["model"] == model
-    assert param["allow_horizontal_transfer"] == True
-    # This should be set
-    param["bootstrap_converged"]
-
-    os.chdir("..")
-
-    # Try to bootstrap without a previous bootstrap
-    os.mkdir("test8.1")
-    os.chdir("test8.1")
-    kwargs = copy.deepcopy(kwargs_template)
-    kwargs["prev_calculation"] = Supervisor(prev_ml)
-    kwargs["bootstrap"] = True
     with pytest.raises(ValueError):
         reconcile(**kwargs)
-
-    os.chdir("..")
-
-    # Try to bootstrap but with mangled replicate directory
-    os.mkdir("test8.2")
-    os.chdir("test8.2")
-    shutil.copytree(prev_bs,"mangled-bs")
-    shutil.rmtree(os.path.join("mangled-bs","output","bootstrap_replicates"))
-    kwargs = copy.deepcopy(kwargs_template)
-    kwargs["prev_calculation"] = "mangled-bs"
-    kwargs["bootstrap"] = True
-    with pytest.raises(FileNotFoundError):
-        reconcile(**kwargs)
-
-    os.chdir("..")
-
-    # Try to bootstrap but with mangled reconciled-tree file
-    os.mkdir("test8.3")
-    os.chdir("test8.3")
-    shutil.copytree(prev_bs,"mangled-bs")
-    os.remove(os.path.join("mangled-bs","output","reconciled-tree.newick"))
-    kwargs = copy.deepcopy(kwargs_template)
-    kwargs["prev_calculation"] = "mangled-bs"
-    kwargs["bootstrap"] = True
-    with pytest.raises(FileNotFoundError):
-        reconcile(**kwargs)
-
     os.chdir("..")
 
     os.chdir(current_dir)

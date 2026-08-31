@@ -16,8 +16,6 @@ try:
 except ImportError:
     resource = None
 
-from topiary._private.mpi import get_mpi_env
-
 class WrappedFunctionException(Exception):
     pass
 
@@ -308,7 +306,7 @@ def launch(cmd,
             capture_output = True
         else:
             capture_output = False
-        ret = subprocess.run(cmd,capture_output=capture_output,env=get_mpi_env())
+        ret = subprocess.run(cmd,capture_output=capture_output,env=os.environ.copy())
 
     # Otherwise, run on it's own thread and capture output to standard out
     else:
@@ -317,14 +315,9 @@ def launch(cmd,
         # multiprocessing queue.
         queue = mp.Queue()
         
-        # pass get_mpi_env() to the worker thread via a wrapper if we wanted, 
-        # but the environment in the child process is inherited from this thread, 
-        # so simply let's wrap the subprocess in _follow_log_subproc_wrapper to use it.
-        # Actually, let's just let it inherit the env from main_process? 
-        # No, better: pass env to the wrapper.
         
         main_process = mp.Process(target=_follow_log_subproc_wrapper,
-                                  args=(cmd,subprocess.PIPE,queue,get_mpi_env()))
+                                  args=(cmd,subprocess.PIPE,queue,os.environ.copy()))
         main_process.start()
 
         # If queue is not empty, the job has finished and put its return value

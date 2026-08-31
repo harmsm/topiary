@@ -1,149 +1,85 @@
 """
-Final step on the pipeline. Run replicates in embarrassingly parallel fashion
-across compute nodes using MPI.
+Final step of the pipeline: compute gene/species-tree reconciliation bootstrap
+supports.
+
+Each bootstrap replicate is an independent generax reconciliation. This command
+is a re-entrant *crawler*: launch as many copies as you like (e.g. one per
+compute node via a SLURM job array), all pointing at the same previous run
+directory. They coordinate purely through the filesystem -- one builds the
+replicate directories, all of them run replicates, and one assembles the final
+supports. There is no MPI orchestration; parallelism across generax processes,
+if wanted, is left to the user via ``--generax-launch``.
 """
 
-import topiary
 from topiary.raxml import RAXML_BINARY
 from topiary.generax import GENERAX_BINARY
-from topiary.generax._reconcile_bootstrap import reconcile_bootstrap
+from topiary.generax import _crawl
 from topiary._private import installed
 from topiary._private import software_requirements
-from topiary._private.mpi import check_mpi_configuration
 from topiary._private import check
 from topiary._private import Supervisor
 from topiary._private import run_cleanly
-from topiary._private.interface import rmtree
 
 import os
-import datetime
 import glob
-import shutil
+
 
 @run_cleanly
 def bootstrap_reconcile(previous_run_dir,
-                        num_threads=None,
-                        threads_per_replicate=None,
+                        generax_launch="",
                         converge_cutoff=0.03,
                         replicate_timeout_factor=3.0,
                         replicate_max_hours=24.0,
                         replicate_min_seconds=300.0,
-                        max_failed_fraction=0.1,
-                        restart=False,
-                        overwrite=False,
                         raxml_binary=RAXML_BINARY,
                         generax_binary=GENERAX_BINARY):
     """
-    Perform a bootstrap branch support calculation for the gene/species tree
-    reconciliation portion of the analysis.
+    Compute bootstrap branch supports for the gene/species tree reconciliation.
 
+    This command is re-entrant and coordinates through the filesystem, so it is
+    safe (and intended) to run many copies at once against the same
+    ``previous_run_dir`` -- for example a SLURM job array with one task per node.
+    The first crawler builds the replicate directories; every crawler runs
+    replicates; the last one assembles the supports and writes the report. Re-run
+    it to resume an interrupted calculation -- completed replicates are skipped
+    and interrupted ones resume from GeneRax's own checkpoint. To start over,
+    delete the ``*_reconciled-tree-bootstraps`` directory first.
+
+    Parameters
+    ----------
     previous_run_dir : str
-        previous pipeline run directory. Should have a directory named 
-        xx_*bootstraps*, where xx is an integer and * are any value. 
-    num_threads : int, optional
-        total number of threads (slots, in MPI lingo) to use. If None, topiary
-        will infer the number of slots from the environment.
-    threads_per_replicate : int, optional
-        number of threads to use for each bootstrap replicate. To minimize
-        the impact of slow cross-node communication, topiary attempts to 
-        run each replicate on a single physical node or processor. 
-        threads_per_replicate sets the number of slots to use for each 
-        replicate. If this is not specified, topiary will choose a number of
-        threads based on the number of slots on each compute node. NOTE: if you 
-        manually set threads_per_replicate, choose a number that is a factor of
-        the number of slots on each compute node to avoid wasting slots. If you
-        have 24 slots per node, you could choose 2, 3, 4, 6, 8, 12, or 24.
+        previous pipeline run directory. Must contain a completed
+        ``xx_*bootstraps`` (ml_bootstrap) directory to use as input.
+    generax_launch : str, default=""
+        launcher prefix prepended to every generax command (e.g. "mpirun -np 8").
+        Empty runs each replicate as a single process. GeneRax parallelism is
+        MPI-only; if you set this, YOU are responsible for the launcher being
+        available and for allocating the resources it needs on each node.
     converge_cutoff : float, default=0.03
-        bootstrap convergence criterion. This is RAxML-NG default, passed
-        to --bs-cutoff.
+        bootstrap convergence criterion (RAxML-NG default, passed to --bs-cutoff).
     replicate_timeout_factor : float, default=3.0
-        a bootstrap replicate is killed (and dropped) if it runs longer than
-        this factor times the longest replicate observed so far. This is what
-        prevents a single hung generax/MPI replicate from wedging the whole
-        calculation.
+        a replicate is killed if it runs longer than this factor times the
+        longest replicate this crawler has seen. Guards against a hung generax.
     replicate_max_hours : float, default=24.0
-        maximum time (hours) a replicate may run before we have enough completed
-        replicates to estimate a runtime. Also the longest a first-block
-        replicate is allowed to run before the whole calculation is aborted with
-        an error.
+        per-replicate timeout used before a crawler has a runtime estimate.
     replicate_min_seconds : float, default=300.0
-        minimum per-replicate timeout (seconds), so fast replicates are not
-        killed by filesystem/scheduler/MPI-startup jitter on a busy cluster.
-    max_failed_fraction : float, default=0.1
-        abort the whole calculation if more than this fraction of replicates
-        fail. This catches systemic problems (bad node, MPI misconfiguration)
-        rather than letting the run silently produce supports from a broken
-        calculation.
-    restart : bool, default=False
-        restart job from where it stopped in output directory. incompatible with
-        overwrite
-    overwrite : bool, default=False
-        whether or not to overwrite existing output. incompatible with restart.
-        This will overwrite an existing 05_reconciliation-bootstraps directory,
-        not the rest of the pipeline directory.
+        minimum per-replicate timeout, so fast replicates are not killed by
+        filesystem/scheduler jitter.
     raxml_binary : str, optional
-        raxml binary to use
+        raxml binary to use (for the final --support step)
     generax_binary : str, optional
-        what generax binary to use
+        generax binary to use
     """
 
-    # Make sure pipeline directory is present
+    # --------------------------------------------------------------------------
+    # Argument checks
+
     if not os.path.isdir(previous_run_dir):
         err = f"\nprevious_run_dir '{previous_run_dir}' does not exist\n\n"
         raise FileNotFoundError(err)
 
-    # --------------------------------------------------------------------------
-    # Check sanity of num_threads and threads_per_replicate
-    
-    if num_threads is None:
-        num_threads = topiary._private.mpi.get_num_slots()
-
-    num_threads = check.check_int(num_threads,
-                                  "num_threads",
-                                  minimum_allowed=1)
-
-    if threads_per_replicate is None:
-        
-        # Get hosts to see how many slots per node
-        hosts = topiary._private.mpi.get_hosts(num_threads)
-        
-        # Get number of slots on the first node (assume homogeneous nodes)
-        # This counts how many times the first host appears in the list
-        slots_per_node = hosts.count(hosts[0])
-
-        # Find factor of slots_per_node closest to 10
-        best_factor = 1
-        best_diff = 10
-        for i in range(1, slots_per_node + 1):
-            if slots_per_node % i == 0:
-                diff = abs(i - 10)
-                if diff < best_diff:
-                    best_diff = diff
-                    best_factor = i
-                elif diff == best_diff:
-                    # If tie (e.g. 7 vs 13), pick smaller
-                    if i < best_factor:
-                        best_factor = i
-        
-        threads_per_replicate = best_factor
-
-    threads_per_replicate = check.check_int(threads_per_replicate,
-                                            "threads_per_replicate",
-                                            minimum_allowed=1)
-
-    # --------------------------------------------------------------------------
-    # Check sanity of overwrite, restart, and combination
-
-    overwrite = check.check_bool(overwrite,"overwrite")
-    restart = check.check_bool(restart,"restart")
-
-    if overwrite and restart:
-        err = "overwrite and restart flags are incompatible.\n"
-        raise ValueError(err)
-
-    # --------------------------------------------------------------------------
-    # Assemble per-replicate timeout / failure circuit-breaker configuration
-
+    converge_cutoff = check.check_float(converge_cutoff, "converge_cutoff",
+                                        minimum_allowed=0, maximum_allowed=1)
     replicate_timeout_factor = check.check_float(replicate_timeout_factor,
                                                  "replicate_timeout_factor",
                                                  minimum_allowed=1.0)
@@ -155,202 +91,118 @@ def bootstrap_reconcile(previous_run_dir,
                                               "replicate_min_seconds",
                                               minimum_allowed=0,
                                               minimum_inclusive=False)
-    max_failed_fraction = check.check_float(max_failed_fraction,
-                                            "max_failed_fraction",
-                                            minimum_allowed=0,
-                                            maximum_allowed=1)
 
-    timeout_config = {"factor":replicate_timeout_factor,
-                      "ceiling":replicate_max_hours*60*60,
-                      "floor":replicate_min_seconds,
-                      "max_failed_fraction":max_failed_fraction}
+    timeout_config = {"factor": replicate_timeout_factor,
+                      "ceiling": replicate_max_hours * 60 * 60,
+                      "floor": replicate_min_seconds}
 
     # --------------------------------------------------------------------------
-    # Validate software stack required for this pipeline
+    # Validate software stack (no mpirun -- topiary no longer orchestrates MPI)
 
-    to_validate = [{"program":"raxml-ng",
-                    "binary":raxml_binary,
-                    "min_version":software_requirements["raxml-ng"],
-                    "must_pass":True}]
-
-    to_validate.append({"program":"generax",
-                        "binary":generax_binary,
-                        "min_version":software_requirements["generax"],
-                        "must_pass":True})
-
-    to_validate.append({"program":"mpirun",
-                        "min_version":software_requirements["mpirun"],
-                        "must_pass":True})
-
+    to_validate = [{"program": "raxml-ng",
+                    "binary": raxml_binary,
+                    "min_version": software_requirements["raxml-ng"],
+                    "must_pass": True},
+                   {"program": "generax",
+                    "binary": generax_binary,
+                    "min_version": software_requirements["generax"],
+                    "must_pass": True}]
     installed.validate_stack(to_validate)
 
     # --------------------------------------------------------------------------
-    # Validate the previous calculation
-    
+    # Locate the completed ml_bootstrap directory to use as input
+
+    starting_dir = os.getcwd()
     os.chdir(previous_run_dir)
-
     try:
+        _run(previous_run_dir=previous_run_dir,
+             generax_launch=generax_launch,
+             converge_cutoff=converge_cutoff,
+             timeout_config=timeout_config,
+             generax_binary=generax_binary,
+             raxml_binary=raxml_binary)
+    finally:
+        os.chdir(starting_dir)
 
-        # All bootstrap directories
-        bootstrap_dirs = glob.glob("*bootstraps*")
-        if len(bootstrap_dirs) == 0:
-            raise ValueError
-        
-        bootstrap_dirs = [(int(b.split("_")[0]),b) for b in bootstrap_dirs]
-        bootstrap_dirs.sort()
-        
-        # Default behavior: find the highest-numbered bootstrap directory and 
-        # assume it's the input. 
-        bootstrap_directory = bootstrap_dirs[-1][1]
-        dir_counter = bootstrap_dirs[-1][0]
-        
-        # If we are restarting, we need to be more clever. 
-        if restart:
 
-            # If the highest-numbered directory is a reconciled-tree-bootstraps 
-            # directory, then WE are the restart. 
-            if bootstrap_directory.endswith("reconciled-tree-bootstraps"):
-                
-                # Check for input *before* this directory. 
-                if len(bootstrap_dirs) < 2:
-                    err = f"previous_run_dir '{previous_run_dir}' only has a\n"
-                    err += "reconciliation bootstrap directory. To restart, there\n"
-                    err += "must be an input bootstrap directory as well.\n\n"
-                    os.chdir("..")
-                    raise RuntimeError(err)
-                
-                # Find the highest-numbered bootstrap directory that is NOT 
-                # a reconciled-tree-bootstraps directory. 
-                found_input = False
-                for i in range(len(bootstrap_dirs)-2,-1,-1):
-                    if not bootstrap_dirs[i][1].endswith("reconciled-tree-bootstraps"):
-                        bootstrap_directory = bootstrap_dirs[i][1]
-                        found_input = True
-                        break
-                
-                if not found_input:
-                    err = f"previous_run_dir '{previous_run_dir}' does not have an\n"
-                    err += "input bootstrap directory (other than the reconciliation\n"
-                    err += "bootstrap directory itself).\n\n"
-                    os.chdir("..")
-                    raise RuntimeError(err)
+def _input_bootstrap_dir(previous_run_dir):
+    """
+    Find the highest-numbered ``*bootstraps`` directory that is NOT a
+    reconciliation-bootstrap directory (i.e. the ml_bootstrap input). Assumes cwd
+    is `previous_run_dir`.
+    """
 
-                # The directory we are restarting is the original highest-numbered
-                # directory.
-                calc_dir = bootstrap_dirs[-1][1]
+    cands = []
+    for b in glob.glob("*bootstraps*"):
+        if not os.path.isdir(b):
+            continue
+        if b.endswith("reconciled-tree-bootstraps"):
+            continue
+        try:
+            n = int(b.split("_")[0])
+        except ValueError:
+            continue
+        cands.append((n, b))
 
-            # If the highest-numbered directory is NOT a reconciled-tree-bootstraps
-            # directory, then we can't restart.
-            else:
-                err = f"previous_run_dir '{previous_run_dir}' does not have a\n"
-                err += "reconciliation bootstrap directory to restart. To start a\n"
-                err += "new calculation, do not specify --restart.\n\n"
-                os.chdir("..")
-                raise RuntimeError(err)
-
-        else:
-            calc_dir = f"{dir_counter+1:02d}_reconciled-tree-bootstraps"
-
-    except (ValueError,IndexError):
-        err = f"previous_run_dir '{previous_run_dir}' does not have any bootstraps\n"
-        err += "directory. This directory is necessary as the input to a\n"
-        err += "reconciliation bootstrap calculation.\n\n"
-        os.chdir("..")
+    if len(cands) == 0:
+        err = f"\nprevious_run_dir '{previous_run_dir}' does not contain an input\n"
+        err += "bootstraps directory (a completed ml_bootstrap run). This is\n"
+        err += "required as input to a reconciliation bootstrap calculation.\n\n"
         raise FileNotFoundError(err)
 
-    # Load calculation and make sure it completed
-    supervisor = Supervisor(bootstrap_directory)
-    if supervisor.status != "complete":
-        err = f"{previous_run_dir}/{bootstrap_directory} exists but has status '{supervisor.status}'\n"
-        if supervisor.status == "empty":
-            err += "It does not appear this calculation has been run.\n\n"
-        elif supervisor.status == "running":
-            err += "This job is either still running or crashed.\n\n"
-        else:
-            err += "This job crashed before completing.\n\n"
-        os.chdir("..")
+    cands.sort()
+    return cands[-1]
+
+
+def _run(previous_run_dir, generax_launch, converge_cutoff,
+         timeout_config, generax_binary, raxml_binary):
+    """
+    Core re-entrant crawler flow (cwd is `previous_run_dir`).
+    """
+
+    cid = _crawl.crawler_id()
+
+    input_num, input_dir = _input_bootstrap_dir(previous_run_dir)
+
+    # Make sure the input calculation completed.
+    input_supervisor = Supervisor(input_dir)
+    if input_supervisor.status != "complete":
+        err = f"\ninput '{previous_run_dir}/{input_dir}' has status\n"
+        err += f"'{input_supervisor.status}', not 'complete'. The ml_bootstrap\n"
+        err += "calculation must finish before computing reconciliation supports.\n\n"
         raise RuntimeError(err)
 
-    # Get number of replicates. Make sure user did not request more slots than
-    # replicates.
-    num_replicates = len(glob.glob(os.path.join(bootstrap_directory,
-                                                "output",
-                                                "bootstrap_replicates",
-                                                "*.phy")))
-    if num_threads > num_replicates:
-        print(f"\nWARNING: The number of requested threads (slots: {num_threads}) is\n"
-              f"greater than the number of bootstrap replicates ({num_replicates}).\n"
-              f"Dropping the number of threads to {num_replicates} to match.\n", flush=True)
-        num_threads = num_replicates
+    # Setup (runs exactly once across all crawlers): build the replicate dirs.
+    def _build():
+        calc_dir = f"{input_num + 1:02d}_reconciled-tree-bootstraps"
+        return _crawl.setup_bootstrap(input_bootstrap_dir=input_dir,
+                                      calc_dir=calc_dir,
+                                      converge_cutoff=converge_cutoff,
+                                      generax_binary=generax_binary)
 
-    # Now that we've potentially dropped the number of threads to match the
-    # number of replicates, check to see if mpirun can actually grab them.
-    check_mpi_configuration(num_threads)
+    # cwd is already previous_run_dir, so coordinate in "." (the calc directories
+    # and the setup lock all live directly under it).
+    calc_dir, _is_leader = _crawl.elect_setup(".", _build, cid=cid)
 
-    # Make sure the output either exists with --overwrite or --restart or
-    # does not exist
-    if os.path.isdir(calc_dir):
-        if overwrite:
-            rmtree(calc_dir)
+    replicate_dir = os.path.join(calc_dir, "working", "replicates")
 
-        if (not restart) and (not overwrite):
-            err = f"'{previous_run_dir}/{calc_dir}' already exists. Either remove\n"
-            err += "it, specify --overwrite, or specify --restart.\n\n"
-            os.chdir("..")
-            raise FileExistsError(err)
+    # Crawl: claim and run replicates until every replicate is terminal.
+    _crawl.crawl(replicate_dir,
+                 generax_launch=generax_launch,
+                 converge_cutoff=converge_cutoff,
+                 timeout_config=timeout_config,
+                 cid=cid)
 
-    if os.path.isdir(calc_dir) and restart:
+    # Aggregate: exactly one crawler assembles the supports and writes the report.
+    if _crawl.all_terminal(replicate_dir) and _crawl.elect_aggregate(calc_dir, cid):
+        _crawl.aggregate_bootstrap(calc_dir,
+                                   converge_cutoff=converge_cutoff,
+                                   raxml_binary=raxml_binary)
+        _crawl.mark_aggregate_done(calc_dir, cid)
 
-        if not os.path.isdir(os.path.join(calc_dir,"working","replicates")):
-            err = "\ncould not restart the calculation. Please delete the directory\n"
-            err += f"'{previous_run_dir}/{calc_dir}' and try again.\n\n"
-            os.chdir("..")
-            raise ValueError(err)
-
-        # Load existing supervisor for the directory we are restarting. 
-        supervisor = Supervisor(calc_dir)
-        supervisor.update("calc_status","running")
-        supervisor.event("Restarting calculation.")
-
-        reconcile_bootstrap(supervisor.df,
-                            supervisor.model,
-                            supervisor.gene_tree,
-                            supervisor.species_tree,
-                            supervisor.reconciled_tree,
-                            supervisor.run_parameters["allow_horizontal_transfer"],
-                            supervisor.seed,
-                            bootstrap_directory=None,
-                            converge_cutoff=converge_cutoff,
-                            restart="replicates",
-                            overwrite=False,
-                            supervisor=supervisor,
-                            num_threads=num_threads,
-                            threads_per_rep=threads_per_replicate,
-                            generax_binary=generax_binary,
-                            raxml_binary=raxml_binary,
-                            timeout_config=timeout_config)
-
-    else:
-
-        topiary.reconcile(prev_calculation=bootstrap_directory,
-                          calc_dir=calc_dir,
-                          bootstrap=True,
-                          converge_cutoff=converge_cutoff,
-                          overwrite=False,
-                          num_threads=num_threads,
-                          threads_per_rep=threads_per_replicate,
-                          raxml_binary=raxml_binary,
-                          generax_binary=generax_binary,
-                          timeout_config=timeout_config)
-
-    os.chdir('..')
-
-    # Imported here rather than at the top of the module because generating a
-    # report pulls in matplotlib and toytree, which are slow to import (see
-    # also topiary/__init__.py).
-    from topiary.reports import pipeline_report
-
-    # Create an html report for the calculation
-    pipeline_report(pipeline_directory=previous_run_dir,
-                    output_directory=os.path.join(previous_run_dir,"results"),
-                    overwrite=True)
+        # Imported here rather than at module top because report generation pulls
+        # in matplotlib and toytree, which are slow to import.
+        from topiary.reports import pipeline_report
+        pipeline_report(pipeline_directory=os.getcwd(),
+                        output_directory=os.path.join(os.getcwd(), "results"),
+                        overwrite=True)

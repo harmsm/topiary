@@ -20,7 +20,7 @@ def reconcile_no_bootstrap(df,
                            seed,
                            overwrite,
                            supervisor,
-                           num_threads,
+                           generax_launch,
                            generax_binary):
     """
     Reconcile the gene tree to the species tree using generax. This should be
@@ -47,8 +47,9 @@ def reconcile_no_bootstrap(df,
         whether or not to overwrite existing output directory
     supervisor : Supervisor
         supervisor instance to keep track of inputs and outputs
-    num_threads : int
-        number of threads to use. if -1 use all available.
+    generax_launch : str
+        launcher prefix prepended to the generax command (e.g. "mpirun -np 8").
+        Empty string runs generax as a single process.
     generax_binary : str
         what generax binary to use
 
@@ -75,7 +76,7 @@ def reconcile_no_bootstrap(df,
                       allow_horizontal_transfer=allow_horizontal_transfer,
                       seed=seed,
                       supervisor=supervisor,
-                      num_threads=num_threads,
+                      generax_launch=generax_launch,
                       generax_binary=generax_binary)
 
     # Get species tree used for this calculation
