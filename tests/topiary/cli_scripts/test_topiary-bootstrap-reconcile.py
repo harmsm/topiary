@@ -38,10 +38,19 @@ def test_main(small_phylo, tmpdir, monkeypatch):
     cmd = base_cmd[:]
     cmd.append("existing-run")
 
-    # A single crawler invocation sets up, runs all replicates, and aggregates.
+    # A single crawler invocation sets up, runs all replicates, aggregates, and
+    # writes the report.
     ret = subprocess.run(cmd)
     assert ret.returncode == 0
     assert os.getcwd() == os.path.join(tmpdir,"test0")
+
+    # The pipeline report (results directory) was generated.
+    assert os.path.isfile(os.path.join("existing-run","results","index.html"))
+
+    # The replicates directory was compressed and removed by the aggregator.
+    working = os.path.join("existing-run","06_reconciled-tree-bootstraps","working")
+    assert os.path.isfile(os.path.join(working,"replicates.tar.gz"))
+    assert not os.path.isdir(os.path.join(working,"replicates"))
 
     out_base = os.path.join("existing-run","06_reconciled-tree-bootstraps")
     expected_files = ["dataframe.csv",

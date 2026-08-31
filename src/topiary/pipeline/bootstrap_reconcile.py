@@ -193,16 +193,24 @@ def _run(previous_run_dir, generax_launch, converge_cutoff,
                  timeout_config=timeout_config,
                  cid=cid)
 
-    # Aggregate: exactly one crawler assembles the supports and writes the report.
-    if _crawl.all_terminal(replicate_dir) and _crawl.elect_aggregate(calc_dir, cid):
-        _crawl.aggregate_bootstrap(calc_dir,
-                                   converge_cutoff=converge_cutoff,
-                                   raxml_binary=raxml_binary)
-        _crawl.mark_aggregate_done(calc_dir, cid)
+    # Aggregate: exactly one crawler assembles the supports and writes the
+    # report. finalize_bootstrap heartbeats the aggregate lock for the whole
+    # (potentially long) operation and only marks the calculation done after the
+    # report succeeds, so it is safe against a slow filesystem and recoverable by
+    # re-running.
+    run_dir = os.getcwd()
 
+    def _report():
         # Imported here rather than at module top because report generation pulls
         # in matplotlib and toytree, which are slow to import.
         from topiary.reports import pipeline_report
-        pipeline_report(pipeline_directory=os.getcwd(),
-                        output_directory=os.path.join(os.getcwd(), "results"),
+        pipeline_report(pipeline_directory=run_dir,
+                        output_directory=os.path.join(run_dir, "results"),
                         overwrite=True)
+
+    if _crawl.all_terminal(replicate_dir) and _crawl.elect_aggregate(calc_dir, cid):
+        _crawl.finalize_bootstrap(calc_dir,
+                                  converge_cutoff=converge_cutoff,
+                                  raxml_binary=raxml_binary,
+                                  report_fn=_report,
+                                  cid=cid)

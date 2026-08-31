@@ -381,6 +381,68 @@ def mark_aggregate_done(calc_dir, cid=None):
     _atomic_create(os.path.join(calc_dir, "working", _AGGREGATE_DONE), cid)
 
 
+def finalize_bootstrap(calc_dir, converge_cutoff, raxml_binary, report_fn, cid=None):
+    """
+    Run the one-time finalization (aggregate supports + report) as the elected
+    aggregator, holding the aggregate lock the whole time.
+
+    The aggregate lock is heartbeated for the full duration so a long aggregation
+    (globbing/reading hundreds of replicate directories on a cluster filesystem
+    and compressing them can take many minutes) is never mistaken for a dead
+    aggregator and stolen by a second crawler -- which would race on deleting the
+    replicates directory.
+
+    The steps are idempotent so a crash is recoverable by simply re-running:
+    aggregation is skipped if the supports already exist, the report is
+    regenerated every time (it is cheap and overwrites), and the terminal
+    ``.aggregate-complete`` marker is written only after the report succeeds.
+
+    Parameters
+    ----------
+    calc_dir : str
+        the reconciliation-bootstrap calc directory
+    converge_cutoff : float
+        bootstrap convergence criterion
+    raxml_binary : str
+        raxml binary to use for --support
+    report_fn : callable
+        zero-argument callback that generates the pipeline report. Kept as a
+        callback so this module does not import the (heavy) reporting stack.
+    cid : str, optional
+        crawler id (defaults to hostname:pid)
+    """
+
+    if cid is None:
+        cid = crawler_id()
+
+    lock = os.path.join(calc_dir, "working", _AGGREGATE_LOCK)
+    stop = threading.Event()
+    hb = threading.Thread(target=_heartbeat_loop,
+                          args=(lock, stop, _HEARTBEAT_INTERVAL),
+                          daemon=True)
+    hb.start()
+    try:
+
+        # Aggregation is expensive and destructive (it consumes the replicates
+        # directory), so skip it if a previous attempt already produced the
+        # supports.
+        supports = os.path.join(calc_dir, "output",
+                                "reconciled-tree_supports.newick")
+        if not os.path.isfile(supports):
+            aggregate_bootstrap(calc_dir, converge_cutoff,
+                                raxml_binary=raxml_binary)
+
+        # Report generation is cheap and idempotent; always (re)generate it.
+        report_fn()
+
+        # Only now, after the report has succeeded, mark the calculation done so
+        # that a crash before this point is recoverable by re-running.
+        mark_aggregate_done(calc_dir, cid)
+
+    finally:
+        stop.set()
+
+
 def _heartbeat_loop(running_path, stop_event, interval):
     """
     Touch `running_path` every `interval` seconds until `stop_event` is set or
@@ -768,12 +830,14 @@ def aggregate_bootstrap(calc_dir, converge_cutoff, raxml_binary=RAXML_BINARY):
     supervisor.stash(os.path.join(replicate_dir, "00001", "species_tree.newick"),
                      "species-tree.newick")
 
-    # Compress the (large) replicates directory and drop it.
-    print("\nCompressing replicates.\n", flush=True)
-    f = tarfile.open("replicates.tar.gz", "w:gz")
-    f.add("replicates")
-    f.close()
-    rmtree("replicates")
+    # Compress the (large) replicates directory and drop it. Guarded so a
+    # re-run after the replicates were already consumed is a no-op.
+    if os.path.isdir("replicates"):
+        print("\nCompressing replicates.\n", flush=True)
+        f = tarfile.open("replicates.tar.gz", "w:gz")
+        f.add("replicates")
+        f.close()
+        rmtree("replicates")
 
     msg = "For more information on the reconciliation events (orthgroups,\n"
     msg += "event counts, full nhx files, etc.) please check the maximum\n"
@@ -833,10 +897,11 @@ def crawl(replicate_dir,
 
         if claimed is None:
 
-            # Nothing to claim. If everything is terminal we are done; otherwise
-            # other crawlers are still working -- wait and re-scan (a stale claim
-            # may free up).
-            if all_terminal(replicate_dir):
+            # We are done if every replicate is terminal, or if the replicates
+            # directory has already been consumed by the aggregator (it compresses
+            # and deletes it). Otherwise other crawlers are still working -- wait
+            # and re-scan (a stale claim may free up).
+            if not os.path.isdir(replicate_dir) or all_terminal(replicate_dir):
                 break
             time.sleep(_POLL_SECONDS)
             continue

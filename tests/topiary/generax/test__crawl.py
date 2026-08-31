@@ -439,3 +439,76 @@ def test_check_bootstrap_convergence(tmpdir, monkeypatch):
     converged, df = check_bootstrap_convergence("replicates", converge_cutoff=0.5)
     assert converged in (True, False)   # ran raxml without error
     assert df is not None
+
+
+# -----------------------------------------------------------------------------
+# finalize / robustness
+# -----------------------------------------------------------------------------
+
+def test_crawl_exits_when_replicates_gone(tmpdir, monkeypatch):
+    monkeypatch.chdir(tmpdir)
+    # The replicates directory does not exist (already consumed by the
+    # aggregator). crawl() must return immediately rather than spin forever.
+    n = crawl("replicates", generax_launch="", cid="solo")
+    assert n == 0
+
+
+def _prep_calc(calc):
+    os.makedirs(os.path.join(calc, "working"))
+    os.makedirs(os.path.join(calc, "output"))
+    # simulate elect_aggregate having claimed the aggregate lock
+    _atomic_create(os.path.join(calc, "working", _crawl._AGGREGATE_LOCK), "me")
+
+
+def test_finalize_bootstrap_idempotent(tmpdir, monkeypatch):
+    monkeypatch.chdir(tmpdir)
+    calc = "06_reconciled-tree-bootstraps"
+    _prep_calc(calc)
+
+    calls = {"aggregate": 0, "report": 0}
+
+    def fake_agg(calc_dir, converge_cutoff, raxml_binary=None):
+        calls["aggregate"] += 1
+        with open(os.path.join(calc_dir, "output",
+                               "reconciled-tree_supports.newick"), "w") as f:
+            f.write("(A,B);\n")
+    monkeypatch.setattr(_crawl, "aggregate_bootstrap", fake_agg)
+
+    def report():
+        calls["report"] += 1
+
+    _crawl.finalize_bootstrap(calc, 0.03, "raxml-ng", report, cid="me")
+    assert calls["aggregate"] == 1
+    assert calls["report"] == 1
+    assert os.path.exists(os.path.join(calc, "working", _crawl._AGGREGATE_DONE))
+
+    # Re-running: supports already exist -> aggregation is skipped, but the
+    # report is regenerated.
+    _crawl.finalize_bootstrap(calc, 0.03, "raxml-ng", report, cid="me")
+    assert calls["aggregate"] == 1
+    assert calls["report"] == 2
+
+
+def test_finalize_bootstrap_report_failure_recoverable(tmpdir, monkeypatch):
+    monkeypatch.chdir(tmpdir)
+    calc = "06_reconciled-tree-bootstraps"
+    _prep_calc(calc)
+
+    def fake_agg(calc_dir, converge_cutoff, raxml_binary=None):
+        with open(os.path.join(calc_dir, "output",
+                               "reconciled-tree_supports.newick"), "w") as f:
+            f.write("(A,B);\n")
+    monkeypatch.setattr(_crawl, "aggregate_bootstrap", fake_agg)
+
+    def bad_report():
+        raise RuntimeError("report boom")
+
+    with pytest.raises(RuntimeError):
+        _crawl.finalize_bootstrap(calc, 0.03, "raxml-ng", bad_report, cid="me")
+
+    # Aggregation produced the supports, but a report failure must NOT mark the
+    # calculation done -- so re-running can regenerate the report.
+    assert os.path.isfile(os.path.join(calc, "output",
+                                       "reconciled-tree_supports.newick"))
+    assert not os.path.exists(os.path.join(calc, "working",
+                                           _crawl._AGGREGATE_DONE))

@@ -21,9 +21,13 @@ def _fake_flow(mocker, input_status="complete",
     crawl = mocker.patch("topiary.generax._crawl.crawl")
     mocker.patch("topiary.generax._crawl.all_terminal", return_value=all_terminal)
     mocker.patch("topiary.generax._crawl.elect_aggregate", return_value=is_aggregator)
-    aggregate = mocker.patch("topiary.generax._crawl.aggregate_bootstrap")
-    mocker.patch("topiary.generax._crawl.mark_aggregate_done")
     report = mocker.patch("topiary.reports.pipeline_report")
+
+    # finalize_bootstrap runs the report via a callback; exercise that path.
+    def fake_finalize(calc_dir, converge_cutoff, raxml_binary, report_fn, cid=None):
+        report_fn()
+    aggregate = mocker.patch("topiary.generax._crawl.finalize_bootstrap",
+                             side_effect=fake_finalize)
 
     return {"crawl": crawl, "aggregate": aggregate, "report": report}
 
