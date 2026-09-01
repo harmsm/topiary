@@ -465,7 +465,7 @@ def test_finalize_bootstrap_idempotent(tmpdir, monkeypatch):
     calc = "06_reconciled-tree-bootstraps"
     _prep_calc(calc)
 
-    calls = {"aggregate": 0, "report": 0}
+    calls = {"aggregate": 0, "report": 0, "finalize": 0}
 
     def fake_agg(calc_dir, converge_cutoff, raxml_binary=None):
         calls["aggregate"] += 1
@@ -474,19 +474,31 @@ def test_finalize_bootstrap_idempotent(tmpdir, monkeypatch):
             f.write("(A,B);\n")
     monkeypatch.setattr(_crawl, "aggregate_bootstrap", fake_agg)
 
+    # When aggregation is skipped (supports already exist) the calc must still be
+    # finalized so the report will include it.
+    class _FakeSV:
+        status = "running"
+        def __init__(self, calc_dir):
+            pass
+        def finalize(self, successful=True, plot_if_success=True):
+            calls["finalize"] += 1
+    monkeypatch.setattr(_crawl, "Supervisor", _FakeSV)
+
     def report():
         calls["report"] += 1
 
     _crawl.finalize_bootstrap(calc, 0.03, "raxml-ng", report, cid="me")
     assert calls["aggregate"] == 1
     assert calls["report"] == 1
+    assert calls["finalize"] == 0   # aggregate_bootstrap does its own finalize
     assert os.path.exists(os.path.join(calc, "working", _crawl._AGGREGATE_DONE))
 
-    # Re-running: supports already exist -> aggregation is skipped, but the
-    # report is regenerated.
+    # Re-running: supports already exist -> aggregation is skipped, but the calc
+    # is still finalized and the report is regenerated.
     _crawl.finalize_bootstrap(calc, 0.03, "raxml-ng", report, cid="me")
     assert calls["aggregate"] == 1
     assert calls["report"] == 2
+    assert calls["finalize"] == 1
 
 
 def test_finalize_bootstrap_report_failure_recoverable(tmpdir, monkeypatch):

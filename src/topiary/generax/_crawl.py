@@ -425,12 +425,19 @@ def finalize_bootstrap(calc_dir, converge_cutoff, raxml_binary, report_fn, cid=N
 
         # Aggregation is expensive and destructive (it consumes the replicates
         # directory), so skip it if a previous attempt already produced the
-        # supports.
+        # supports. But we must still make sure the calculation is finalized
+        # (calc_status == "complete"): a previous attempt may have produced the
+        # supports and then been interrupted before finalizing, and the report
+        # ignores any calc directory that is not complete.
         supports = os.path.join(calc_dir, "output",
                                 "reconciled-tree_supports.newick")
         if not os.path.isfile(supports):
             aggregate_bootstrap(calc_dir, converge_cutoff,
                                 raxml_binary=raxml_binary)
+        else:
+            sv = Supervisor(calc_dir)
+            if sv.status != "complete":
+                sv.finalize(successful=True, plot_if_success=True)
 
         # Report generation is cheap and idempotent; always (re)generate it.
         report_fn()
@@ -830,14 +837,22 @@ def aggregate_bootstrap(calc_dir, converge_cutoff, raxml_binary=RAXML_BINARY):
     supervisor.stash(os.path.join(replicate_dir, "00001", "species_tree.newick"),
                      "species-tree.newick")
 
-    # Compress the (large) replicates directory and drop it. Guarded so a
-    # re-run after the replicates were already consumed is a no-op.
+    # Compress the (large) replicates directory and drop it. This is best-effort
+    # cleanup: on a big run over a network filesystem it can be slow or get
+    # interrupted, and it must never prevent the calculation from being finalized
+    # below. Guarded so a re-run after the replicates were already consumed is a
+    # no-op.
     if os.path.isdir("replicates"):
-        print("\nCompressing replicates.\n", flush=True)
-        f = tarfile.open("replicates.tar.gz", "w:gz")
-        f.add("replicates")
-        f.close()
-        rmtree("replicates")
+        try:
+            print("\nCompressing replicates.\n", flush=True)
+            f = tarfile.open("replicates.tar.gz", "w:gz")
+            f.add("replicates")
+            f.close()
+            rmtree("replicates")
+        except Exception as e:
+            print(f"\nWARNING: could not compress the replicates directory "
+                  f"({e}). Leaving it in place; the supports have already been "
+                  f"computed.\n", flush=True)
 
     msg = "For more information on the reconciliation events (orthgroups,\n"
     msg += "event counts, full nhx files, etc.) please check the maximum\n"
