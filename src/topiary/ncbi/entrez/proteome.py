@@ -125,7 +125,10 @@ def get_proteome_ids(taxid=None,species=None):
                                         retmax=50,
                                         term=query_text,
                                         idtype="acc")
-        search_record = Entrez.read(esearch_handle)
+        try:
+            search_record = Entrez.read(esearch_handle)
+        finally:
+            esearch_handle.close()
 
         # Get assembly ids
         try:
@@ -158,7 +161,10 @@ def _get_records(id_list):
     # Get summary data for these records.
     esummary_query = ",".join(id_list)
     esummary_handle = Entrez.esummary(db="assembly",id=esummary_query)
-    esummary_record = Entrez.read(esummary_handle,validate=False)
+    try:
+        esummary_record = Entrez.read(esummary_handle,validate=False)
+    finally:
+        esummary_handle.close()
 
     try:
         records = esummary_record["DocumentSummarySet"]["DocumentSummary"]

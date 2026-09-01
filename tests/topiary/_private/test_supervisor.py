@@ -400,11 +400,40 @@ def test_Supervisor_stash(tmpdir):
     assert os.path.isfile(os.path.join(sv.output_dir,"stash_d","file.txt"))
 
 
-def test_Supervisor_write_json():
+def test_Supervisor_write_json(tmpdir):
 
-    # Tested throughout the function. As of right now it's super simple, so
-    # not testing specifically
-    True
+    os.chdir(tmpdir)
+
+    sv = Supervisor()
+    sv.create_calc_dir("test_calc",calc_type="test")
+
+    json_file = os.path.join(sv.calc_dir,"run_parameters.json")
+
+    # create_calc_dir already writes the file out
+    assert os.path.isfile(json_file)
+
+    # A value written into run_parameters lands in the json on the next write
+    sv.update("some_key","some_value")
+    sv.update("a_number",42)
+    sv.write_json()
+
+    with open(json_file) as f:
+        written = json.load(f)
+
+    assert written["some_key"] == "some_value"
+    assert written["a_number"] == 42
+    assert written["calc_type"] == "test"
+
+    # write_json overwrites rather than appending -- a removed key must not
+    # survive in the file
+    del sv._run_parameters["some_key"]
+    sv.write_json()
+
+    with open(json_file) as f:
+        written = json.load(f)
+
+    assert "some_key" not in written
+    assert written["a_number"] == 42
 
 def test_Supervisor_event(tmpdir):
 

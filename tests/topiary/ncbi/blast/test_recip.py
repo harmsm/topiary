@@ -383,10 +383,4 @@ def test__make_recip_blast_calls(test_dataframes,recip_blast_hit_dfs):
         assert np.array_equal(np.array(out_df["recip_paralog"]),
                               np.array(["LY86","LY96","LY96","LY96","LY96"]))
 
-def test__run_blast():
 
-    pass
-
-def test_recip_blast():
-
-    pass

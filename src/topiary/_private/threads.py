@@ -146,11 +146,22 @@ def thread_manager(kwargs_list,
                 err = f"{shared_kwarg} not found in kwargs_list\n"
                 raise ValueError(err)
         
+            # Note on the dtype checks below: these used to be written as
+            # np.issubdtype(int,to_share), which has the arguments backwards --
+            # it asks numpy to interpret the *value* as a dtype. That raised
+            # TypeError for every python int, float and list, and returned
+            # False for a numpy bool array. It only worked at all because the
+            # single caller (quality.redundancy) happens to pass a numpy
+            # integer array, which numpy will accept as dtype-like.
+
             # Iterable, check for int or float and convert to Array
             if hasattr(to_share,"__iter__"):
-                if np.issubdtype(int,to_share[0]):
+
+                shared_dtype = np.asarray(to_share).dtype
+
+                if np.issubdtype(shared_dtype,np.integer):
                     to_share = manager.Array("i",np.array(to_share,dtype=int))
-                elif np.issubdtype(float,to_share[0]):
+                elif np.issubdtype(shared_dtype,np.floating):
                     to_share = manager.Array("d",np.array(to_share,dtype=float))
                 else:
                     err = "iterable must be float or int"
@@ -158,9 +169,12 @@ def thread_manager(kwargs_list,
 
             # Not iterable. Check for int or float and convert to Value
             else:
-                if np.issubdtype(int,to_share):
+
+                # bool is a python subclass of int, but a shared bool is almost
+                # certainly a mistake, so reject it explicitly.
+                if np.issubdtype(type(to_share),np.integer):
                     to_share = manager.Value("i",int(to_share))
-                elif np.issubdtype(float,to_share):
+                elif np.issubdtype(type(to_share),np.floating):
                     to_share = manager.Value("d",float(to_share))
                 else:
                     err = "shared value must be float or int\n"

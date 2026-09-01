@@ -38,7 +38,13 @@ def get_mrca_taxid(species_list):
 
     # Fetch lineages for all taxids
     handle = Entrez.efetch(db="taxonomy", id=",".join(taxids), retmode="xml")
-    records = Entrez.read(handle)
+    try:
+        records = Entrez.read(handle)
+    finally:
+        # Entrez handles wrap an http connection. Leaving them open leaks a
+        # socket per call (see the Open Tree of Life leak in tests/BASELINE.md
+        # for what that costs over a long run).
+        handle.close()
 
     lineages = []
     for record in records:

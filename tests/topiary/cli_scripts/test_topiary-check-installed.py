@@ -22,8 +22,13 @@ def test_main():
     else:
         base_cmd = [test_bin]
 
-    # basically make sure it runs without throwing an exception.
-    ret = subprocess.run(base_cmd)
+    # The console script has to exist on the PATH and exit cleanly.
+    ret = subprocess.run(base_cmd,capture_output=True)
+
+    assert ret.returncode == 0
+
+    # And it has to actually report on the stack rather than printing nothing
+    assert len(ret.stdout) > 0
 
 
 def test_main_surfaces_crash(mocker,capsys):

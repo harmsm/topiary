@@ -91,11 +91,16 @@ Modules with at least 10 branches, worst first. This is the Stage 4 worklist.
 
 ## Test audit baseline
 
-From `./tests/audit_tests.py tests`:
+From `./tests/audit_tests.py tests`, as recorded at Stage 0:
 
 ```
 351 test functions: 304 checked, 29 stub, 18 assertion-free, 1 shadowed
 ```
+
+**After Stage 3 this is `376 test functions: 376 checked, 0 stub, 0
+assertion-free, 0 shadowed`, and `run_all_tests.sh` now runs the audit with
+`--max-stub 0 --max-noassert 0`, so it is a hard gate.** The Stage 0 detail
+below is kept as the record of what was wrong.
 
 - **29 stub** — body is only `pass`. These report as passing and verify
   nothing. Includes `test_align`, `test_df_from_seed`, `test_recip_blast`,
@@ -115,7 +120,7 @@ Stage 3 drives stub and assertion-free toward zero. Ratchet the limits down as
 that happens:
 
 ```bash
-./tests/audit_tests.py tests --max-stub 29 --max-noassert 17
+./tests/audit_tests.py tests --max-stub 0 --max-noassert 0
 ```
 
 ## Test tiers (Stage 2)
@@ -266,3 +271,137 @@ to check before claiming a change is safe. Check it at a realistic descriptor
 limit too -- `bash -c 'ulimit -n 256; pytest ...'` -- since a developer box
 defaults to 256 and a leak that is invisible at a high limit is fatal there.
 
+
+
+## Stage 3: tests that verified nothing
+
+All 29 stubs and all 18 assertion-free tests are gone. Coverage moved with them.
+
+```
+                 Stage 0        Stage 3
+lines            88.3%          92.3%    (8244/8930)
+branches         84.0%          87.6%    (2991/3416)
+combined         87.1%          91%
+```
+
+Worklist modules, before -> after (combined line+branch):
+
+```
+util/create_nicknames.py      12%  ->  95%
+cli_scripts/seed_to_alignment      0%  -> 100%
+cli_scripts/alignment_to_ancestors 0%  -> 100%
+cli_scripts/create_report          0%  -> 100%
+muscle/muscle.py              56%  ->  86%
+io/seed.py                    48%  ->  71%
+raxml/model.py                71%  ->  93%
+raxml/ancestors.py            90%  ->  92%
+```
+
+How the stubs were resolved:
+
+- **5 were redundant** -- a real mocked test already existed under a different
+  name in the `*_mock.py` twin (`test_ncbi_blast`, `test__ncbi_blast_thread_function`,
+  `test_merge_and_annotate`, `test__run_blast`, `test_recip_blast`). Deleted.
+- **1 was an orphan** -- `tests/topiary/reports/test_quality.py` tested
+  `check_duplication` in `reports/quality.py`, a module that never existed. The
+  function is now `_check_duplication` in `reports/cards/duplications.py` and is
+  covered by `test_duplications`. File deleted.
+- **The remaining 23 got real tests**, mocked at the boundary following the
+  `*_mock.py` pattern already in the repo.
+
+Three placeholder tests (`test__thread`, `test__follow_log_generator`,
+`test__follow_log_subproc_wrapper`) existed only to stop the old completeness
+crawler flagging them -- they referenced the function without calling it. Since
+the crawler is gone, they were replaced with tests that actually exercise the
+code.
+
+### What is deliberately NOT done
+
+The Stage 3 plan called for folding each `*_mock.py` into its twin. **Skipped
+on purpose.** The plan assumed the collisions were stub-vs-real; measuring them
+showed 11 of them are real-vs-real (e.g. `test_local_blast` exists as both a
+live test and a mocked one). Folding would mean renaming 11 working tests for a
+purely cosmetic gain, now that the tier markers already express the
+unit/integration split that the filenames were standing in for. The genuine
+problem -- stubs shadowing real mock coverage -- was fixed by deleting those 5
+stubs.
+
+### Note on CLI coverage
+
+`cli_scripts/dataframe_from_fasta.py` and `cli_scripts/fasta_into_dataframe.py`
+still report 0% despite having passing tests. Those tests invoke the console
+script through `subprocess.run`, so the work happens in another process and
+coverage.py never sees it. The tests are real; the coverage number is an
+artifact of how they run.
+
+
+## Stage 4: branch coverage
+
+```
+                 Stage 0    Stage 3    Stage 4
+lines            88.3%      92.3%      93.5%   (8362/8942)
+branches         84.0%      87.6%      89.1%   (3046/3418)
+combined         87.1%      91%        92%
+```
+
+`run_all_tests.sh` now fails if combined coverage drops below **92%**
+(`coverage report --fail-under=92`). Ratchet it up as coverage improves, never
+down.
+
+Modules taken off the worklist:
+
+```
+ncbi/entrez/mrca.py       0% branch  -> 100%   (no test file existed at all)
+opentree/ott.py          41% branch  ->  98%
+_private/threads.py      72% branch  ->  ~95%
+_private/animation.py    67% branch  ->  ~95%
+reports/cards/ancestor.py 63% branch ->  100%
+quality/redundancy.py    80% branch  ->  ~90%
+```
+
+### Four product bugs the missing coverage was hiding
+
+1. **`thread_manager(shared_kwarg=...)` was broken for every documented input.**
+   The type checks were written `np.issubdtype(int,to_share)` -- arguments
+   backwards, so numpy tried to interpret the *value* as a dtype. Python ints,
+   floats and lists all raised `TypeError`; a numpy bool array raised
+   `ValueError`. It worked at all only because its single caller
+   (`quality/redundancy.py`) happens to pass a numpy *integer* array, the one
+   type numpy accepts as dtype-like. Fixed to check the dtype properly.
+
+2. **Three Entrez handles were never closed** (`mrca.py`, `taxid.py`,
+   `proteome.py` x2), leaking a socket per call. `sequences.py` already closed
+   its handle, so the pattern existed but had not been applied consistently.
+   Same class of bug as the Open Tree of Life leak.
+
+3. **The ancestor report card rendered a literal "None"** in the "Taxonomic
+   distribution of descendants" row when an ancestor had no taxonomic distance.
+   The neighbouring rows already rendered "N/A", and the card header already
+   guarded for None -- the table just did not.
+
+4. **A dead assertion in `test_check_iter`.** It built a list of valid
+   iterables, then looped over the *invalid* list a second time, so nothing ever
+   checked that a good value is accepted. Also three `check_iter` calls sat
+   inside a single `with pytest.raises` block, where only the first ever runs.
+
+### Parametrization
+
+`test_check_iter` was one 60-line function with 14 sequential `pytest.raises`
+blocks; it is now 50 independently-reported parametrized cases. That is what
+surfaced bug 4 above: sequential blocks hide both dead code and masked calls.
+
+15 other tests still have >= 6 sequential `pytest.raises` and are worth the same
+treatment (`test__prepare_for_blast` x3, `test_run_raxml`, `test_write_phy`,
+`test_write_fasta`, ...).
+
+### Still under 80% branch
+
+These are large orchestrators; they need pipeline-level fixtures rather than
+unit tests, and are the natural next target:
+
+```
+  66%   31 missed  io/seed.py
+  73%   31 missed  generax/_crawl.py
+  74%   18 missed  pipeline/alignment_to_ancestors.py
+  74%   17 missed  pipeline/seed_to_alignment.py
+```

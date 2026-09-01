@@ -2,6 +2,9 @@
 import pytest
 import topiary
 from topiary._private.wrap import wrap_function as wf
+from topiary._private.wrap import IterFromFile
+
+import argparse
 
 import numpy as np
 
@@ -178,8 +181,53 @@ def test_wrap_function(tmpdir):
     assert out.__dict__["extra"] == False
 def test_IterFromFile():
 
-    pass
+    # The action stores the type every parsed entry gets cast to.
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--nums",nargs="+",action=IterFromFile,value_type=int)
 
-def test_IterFromFile___call__():
+    action = [a for a in parser._actions if a.dest == "nums"][0]
+    assert action._value_type is int
 
-    pass
+def test_IterFromFile___call__(tmpdir):
+
+    def _parser(value_type):
+        p = argparse.ArgumentParser()
+        p.add_argument("--vals",nargs="+",action=IterFromFile,value_type=value_type)
+        return p
+
+    # Multiple arguments straight off the command line, cast to value_type
+    out = _parser(int).parse_args(["--vals","1","2","3"])
+    assert out.vals == [1,2,3]
+
+    out = _parser(str).parse_args(["--vals","a","b"])
+    assert out.vals == ["a","b"]
+
+    # A single argument that is not a file is still parsed as a value
+    out = _parser(int).parse_args(["--vals","5"])
+    assert out.vals == [5]
+
+    # An unparseable command line argument is an error
+    with pytest.raises(ValueError):
+        _parser(int).parse_args(["--vals","not_an_int"])
+
+    # A single argument that IS a file: read one value per line, dropping
+    # comments and blank lines
+    value_file = os.path.join(tmpdir,"values.txt")
+    with open(value_file,"w") as f:
+        f.write("1\n")
+        f.write("\n")           # blank line, skipped
+        f.write("2 # trailing comment\n")
+        f.write("# whole-line comment\n")
+        f.write("   \n")        # whitespace only, skipped
+        f.write("3\n")
+
+    out = _parser(int).parse_args(["--vals",value_file])
+    assert out.vals == [1,2,3]
+
+    # A file whose contents cannot be cast is an error
+    bad_file = os.path.join(tmpdir,"bad.txt")
+    with open(bad_file,"w") as f:
+        f.write("1\nnope\n")
+
+    with pytest.raises(ValueError):
+        _parser(int).parse_args(["--vals",bad_file])

@@ -87,5 +87,3 @@ def test_merge_blast_df(recip_blast_hit_dfs):
     with pytest.raises(ValueError):
         merge_blast_df([df_0,df_1])
 
-def test_merge_and_annotate():
-    pass

@@ -11,6 +11,34 @@ import toyplot
 import numpy as np
 
 
+def _rendered_size(pt):
+    """
+    Size of the tree rendered to html.
+
+    The drawing tests used to just call draw_* and assert nothing, so a draw
+    call that silently did nothing still passed. Rendering and comparing sizes
+    is a public-API way to show that a draw call actually put marks on the
+    canvas.
+    """
+
+    import toyplot.html
+    import xml.etree.ElementTree as ET
+
+    return len(_rendered_html(pt))
+
+
+def _rendered_html(pt):
+    """
+    The tree rendered to an html string, for asserting on what is drawn.
+    """
+
+    import toyplot.html
+    import xml.etree.ElementTree as ET
+
+    return ET.tostring(toyplot.html.render(pt.canvas)).decode()
+
+
+
 def test_PrettyTree():
 
     # Read as string
@@ -82,6 +110,12 @@ def test_integrated_single():
     pt.draw_scale_bar()
     pt.draw_node_legend()
 
+    # Every draw_* call above must have added marks, and the properties we
+    # plotted must be recorded.
+    assert "test_feature" in pt.plotted_properties
+    assert "other_feature" in pt.plotted_properties
+    assert _rendered_size(pt) > 0
+
 def test_integrated_gradient():
 
     T = toytree.rtree.rtree(50)
@@ -104,6 +138,11 @@ def test_integrated_gradient():
     pt.draw_scale_bar()
     pt.draw_node_legend()
 
+    # Every draw_* call above must have added marks, and the properties we
+    # plotted must be recorded.
+    assert "test_feature" in pt.plotted_properties
+    assert "other_feature" in pt.plotted_properties
+    assert _rendered_size(pt) > 0
 
 def test_integrated_categories():
 
@@ -127,7 +166,13 @@ def test_integrated_categories():
     pt.draw_node_labels("test_feature")
     pt.draw_scale_bar()
     pt.draw_node_legend()
-    
+
+    # Every draw_* call above must have added marks, and the properties we
+    # plotted must be recorded.
+    assert "test_feature" in pt.plotted_properties
+    assert "other_feature" in pt.plotted_properties
+    assert _rendered_size(pt) > 0
+
 def test_PrettyTree_canvas():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
     pt = prettytree.PrettyTree(T=tree)
@@ -188,8 +233,16 @@ def test_PrettyTree_draw_node_legend():
         n.add_prop("test", 1.0)
     pt = prettytree.PrettyTree(T=T)
     pt.draw_nodes("test", color=("white", "red"))
+
+    before = _rendered_size(pt)
     pt.draw_node_legend()
+    after = _rendered_size(pt)
+    assert after > before
+
+    # Renaming the label still draws, and changes what is rendered
+    renamed = _rendered_size(pt)
     pt.draw_node_legend(label_renamer={"test": "Renamed"})
+    assert _rendered_size(pt) > renamed
 
 def test_PrettyTree_draw_nodes():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
@@ -225,8 +278,14 @@ def test_PrettyTree_draw_nodes():
 def test_PrettyTree_draw_scale_bar():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
     pt = prettytree.PrettyTree(T=tree)
+
+    before = _rendered_size(pt)
     pt.draw_scale_bar()
+    assert _rendered_size(pt) > before
+
+    middle = _rendered_size(pt)
     pt.draw_scale_bar(bar_length=0.1, units="sites")
+    assert _rendered_size(pt) > middle
 
 def test_PrettyTree_legend_ax():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
@@ -325,6 +384,11 @@ def test_PrettyTree_draw_node_labels_complex():
     # This should trigger the TypeError and the hack
     pt.draw_node_labels("val", fmt_string="{:.2f}")
 
+    # The categorical labels actually reach the rendered output
+    html = _rendered_html(pt)
+    assert "X" in html or "Y" in html
+    assert _rendered_size(pt) > 0
+
 def test_PrettyTree_draw_node_labels_more():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
     T = ete.Tree(tree)
@@ -365,10 +429,15 @@ def test_PrettyTree_draw_node_labels_more():
 def test_PrettyTree_draw_scale_bar_more():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
     pt = prettytree.PrettyTree(T=tree)
+
     # length adjustment (782)
+    before = _rendered_size(pt)
     pt.draw_scale_bar(bar_length=1.0)
-    # Units (812) - hit with non-None
+    assert _rendered_size(pt) > before
+
+    # Units (812) - hit with non-None. The unit label makes it into the output.
     pt.draw_scale_bar(units="test_units")
+    assert "test_units" in _rendered_html(pt)
 
 def test_PrettyTree_draw_node_legend_more():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
@@ -381,7 +450,14 @@ def test_PrettyTree_draw_node_legend_more():
     pt.draw_nodes("v2", size=(5, 20))
     
     # Path through draw_node_legend (diverse blocks)
+    assert set(pt.plotted_properties) == {"v1","v2"}
+
     pt.draw_node_legend(label_renamer={"v1": "Value 1", "v2": "Value 2"})
+
+    # The renamed labels are what actually appear in the legend
+    html = _rendered_html(pt)
+    assert "Value 1" in html
+    assert "Value 2" in html
 
 def test_PrettyTree_draw_node_labels_errors():
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
@@ -405,6 +481,12 @@ def test_PrettyTree_draw_scale_bar_even_more():
     pt = prettytree.PrettyTree(T=tree)
     # round_to == 0 logic (782, 812)
     # Use 1.0 (max fraction) and 0.0 (min fraction)
-    pt.draw_scale_bar(bar_length=1.0) 
+    before = _rendered_size(pt)
+    pt.draw_scale_bar(bar_length=1.0)
+    assert _rendered_size(pt) > before
+
+    # A zero-length bar is degenerate but must not crash or wipe the canvas
+    middle = _rendered_size(pt)
     pt.draw_scale_bar(bar_length=0.0)
+    assert _rendered_size(pt) >= middle
 

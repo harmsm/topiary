@@ -18,10 +18,10 @@ flake8 src/topiary tests --count --exit-zero --max-complexity=10 --max-line-leng
 
 echo "Auditing tests that verify nothing"
 # Reports stub (`pass`-bodied) tests, tests with no assertion, and tests
-# silently shadowed by a duplicate function name. Exits non-zero only on
-# duplicates for now; --max-stub/--max-noassert can be ratcheted down as
-# these get fixed.
-./tests/audit_tests.py tests > reports/test-audit.txt
+# silently shadowed by a duplicate function name. As of Stage 3 all three are
+# at zero, so the limits are set to zero and this is a hard gate: a new test
+# that verifies nothing fails the build.
+./tests/audit_tests.py tests --max-stub 0 --max-noassert 0 > reports/test-audit.txt
 tail -1 reports/test-audit.txt
 grep DUPLICATE reports/test-audit.txt
 
@@ -33,6 +33,16 @@ coverage run -m pytest tests --run-network --run-raxml --run-generax --run-blast
 
 echo "Generating reports"
 coverage report > reports/coverage/coverage.txt
+
+# Coverage floor. Set to the measured value at the end of Stage 4; ratchet it
+# up as coverage improves, never down. This is a gate, not a badge: a change
+# that drops coverage below the floor fails here.
+coverage report --fail-under=92 > /dev/null
+if [[ $? -ne 0 ]]; then
+    echo "FAIL: coverage dropped below the floor of 92%"
+    coverage report | tail -2
+    exit 1
+fi
 coverage html
 coverage xml
 

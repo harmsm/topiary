@@ -12,20 +12,136 @@ import pandas as pd
 
 import os, json
 
-@pytest.mark.run_raxml
-def test__generate_parsimony_tree():
+def test__parse_raxml_info_for_aic(tmpdir,small_phylo):
+    """
+    _parse_raxml_info_for_aic is a pure parser over a raxml log file, so test it
+    against both a real log written by raxml and hand-built edge cases.
+    """
 
-    pass
+    # 1. A real raxml log from the committed test data
+    real_log = small_phylo["01_gene-tree/working/infer-ml-tree/alignment.phy.raxml.log"]
+    out = _parse_raxml_info_for_aic(real_log)
 
-@pytest.mark.run_raxml
-def test__model_thread_function():
+    assert out["L"] == pytest.approx(-294.266461)
+    assert out["N"] == 21
+    assert out["AIC"] == pytest.approx(630.532923)
+    assert out["AICc"] == pytest.approx(1092.532923)
+    assert out["BIC"] == pytest.approx(655.272053)
 
-    pass
+    # 2. Hand-built minimal file -- same keys, different values
+    info_file = os.path.join(tmpdir,"info.log")
+    with open(info_file,"w") as f:
+        f.write("some preamble we do not care about\n")
+        f.write("Final LogLikelihood: -100.5\n")
+        f.write("AIC score: 201.0 / AICc score: 202.0 / BIC score: 203.0\n")
+        f.write("Free parameters (model + branch lengths): 7\n")
 
-@pytest.mark.run_raxml
-def test__parse_raxml_info_for_aic():
+    out = _parse_raxml_info_for_aic(info_file)
+    assert out == {"L":pytest.approx(-100.5),
+                   "AIC":pytest.approx(201.0),
+                   "AICc":pytest.approx(202.0),
+                   "BIC":pytest.approx(203.0),
+                   "N":7}
 
-    pass
+    # 3. A log with none of the interesting lines yields an empty dict rather
+    #    than raising
+    empty_file = os.path.join(tmpdir,"empty.log")
+    with open(empty_file,"w") as f:
+        f.write("nothing to see here\n")
+
+    assert _parse_raxml_info_for_aic(empty_file) == {}
+
+    # 4. A missing file is an error
+    with pytest.raises(FileNotFoundError):
+        _parse_raxml_info_for_aic(os.path.join(tmpdir,"not-a-file.log"))
+
+
+def test__generate_parsimony_tree_builds_expected_command(mocker,tmpdir):
+    """
+    _generate_parsimony_tree is a thin wrapper that assembles a raxml command,
+    so check the command rather than running raxml.
+    """
+
+    run_raxml = mocker.patch("topiary.raxml.model.run_raxml")
+
+    _generate_parsimony_tree("alignment.phy",
+                             run_directory="parsimony-tree",
+                             seed=True,
+                             num_threads=1,
+                             raxml_binary="raxml-ng")
+
+    run_raxml.assert_called_once()
+    kwargs = run_raxml.call_args.kwargs
+
+    assert kwargs["algorithm"] == "--start"
+    assert kwargs["alignment_file"] == "alignment.phy"
+    assert kwargs["run_directory"] == "parsimony-tree"
+    assert kwargs["num_threads"] == 1
+    assert kwargs["raxml_binary"] == "raxml-ng"
+    assert "--tree pars{1}" in " ".join(kwargs["other_args"])
+
+
+def test__model_thread_function_returns_parsed_scores(mocker,tmpdir):
+    """
+    _model_thread_function runs raxml for one model and then parses the log it
+    produced. Mock the raxml call and hand it a log to parse.
+    """
+
+    os.chdir(tmpdir)
+
+    def _fake_run_raxml(**kwargs):
+        run_dir = kwargs["run_directory"]
+        os.makedirs(run_dir,exist_ok=True)
+        with open(os.path.join(run_dir,"alignment.phy.raxml.log"),"w") as f:
+            f.write("Final LogLikelihood: -50.0\n")
+            f.write("AIC score: 110.0 / AICc score: 120.0 / BIC score: 130.0\n")
+            f.write("Free parameters (model + branch lengths): 5\n")
+
+    mocker.patch("topiary.raxml.model.run_raxml",side_effect=_fake_run_raxml)
+
+    kwargs = {"alignment_file":"alignment.phy",
+              "tree_file":"tree.newick",
+              "model":"LG",
+              "run_directory":"model-LG",
+              "seed":12345,
+              "num_threads":1,
+              "raxml_binary":"raxml-ng"}
+
+    out = _model_thread_function(kwargs)
+
+    assert out["L"] == pytest.approx(-50.0)
+    assert out["N"] == 5
+    assert out["AIC"] == pytest.approx(110.0)
+    assert out["AICc"] == pytest.approx(120.0)
+    assert out["BIC"] == pytest.approx(130.0)
+
+    # The run directory is cleaned up on the way out
+    assert not os.path.exists("model-LG")
+
+
+def test__model_thread_function_returns_none_when_raxml_crashes(mocker,tmpdir):
+    """
+    A raxml crash for one model must not kill the whole model search -- the
+    thread returns None and find_best_model skips that model.
+    """
+
+    os.chdir(tmpdir)
+
+    def _crash(**kwargs):
+        os.makedirs(kwargs["run_directory"],exist_ok=True)
+        raise RuntimeError("raxml fell over")
+
+    mocker.patch("topiary.raxml.model.run_raxml",side_effect=_crash)
+
+    kwargs = {"alignment_file":"alignment.phy",
+              "tree_file":"tree.newick",
+              "model":"LG",
+              "run_directory":"model-LG",
+              "seed":12345,
+              "num_threads":1,
+              "raxml_binary":"raxml-ng"}
+
+    assert _model_thread_function(kwargs) is None
 
 
 @pytest.mark.run_raxml

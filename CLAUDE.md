@@ -43,9 +43,9 @@ to run:
 
 | tier | what it means | count | time |
 | --- | --- | ---: | ---: |
-| `unit` | hermetic: no network, no subprocess, no external binary | 226 | ~4s |
-| `smoke` | real data and real file I/O, deterministic | 77 | ~25s |
-| `integration` | needs an external binary or a live service | 56 | ~3min |
+| `unit` | hermetic: no network, no subprocess, no external binary | 245 | ~10s |
+| `smoke` | real data and real file I/O, deterministic | 80 | ~25s |
+| `integration` | needs an external binary or a live service | 51 | ~3min |
 
 ```
 pytest tests -m unit           # fast feedback loop -- use this while iterating
@@ -112,12 +112,17 @@ pinned to `src/topiary` and `branch = true`. Do not pass `--branch` or `--source
 on the command line; the config already handles it. Reports land in
 `reports/coverage/` and `reports/htmlcov/`.
 
+`run_all_tests.sh` enforces a **coverage floor of 92%** (`--fail-under=92`).
+Ratchet it up as coverage improves; never lower it to make a change pass.
+
 Tests mirror the `src/topiary` package layout under `tests/topiary/` (e.g.
 `src/topiary/quality/shrink.py` ↔ `tests/topiary/quality/test_shrink.py`).
 `tests/audit_tests.py` reports tests that pass without verifying anything —
 `pass`-bodied stubs, tests with no assertion, and tests silently shadowed by a
-duplicate function name. Run it as `./tests/audit_tests.py tests`; the
-`--max-stub` / `--max-noassert` flags turn it into a gate.
+duplicate function name. All three are currently **zero**, and
+`run_all_tests.sh` enforces that with `--max-stub 0 --max-noassert 0`, so a new
+test that checks nothing fails the build. Run it as
+`./tests/audit_tests.py tests`.
 
 ## Architecture
 

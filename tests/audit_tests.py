@@ -36,6 +36,9 @@ import sys
 FAILING_CALLS = {
     "raises", "warns", "deprecated_call", "fail", "xfail", "exit",
     "approx", "raises_group",
+    # pytester's result object: these raise on mismatch, so a test using them
+    # can genuinely fail even with no bare `assert` in sight.
+    "fnmatch_lines", "re_match_lines", "no_fnmatch_line",
 }
 
 # Any attribute call whose name starts with one of these counts as an
@@ -76,7 +79,54 @@ def _is_trivial(stmt):
     return False
 
 
-def classify(node):
+def checking_helpers(tree):
+    """
+    Names of module-level helper functions whose bodies can fail.
+
+    A test that calls `_load_check_html(out)` is checked, even though the
+    assertion lives one frame down. Without this, factoring a check out into a
+    helper -- which is good practice -- would look like a missing assertion.
+    Only one level deep, which covers the pattern in this codebase.
+    """
+
+    helpers = set()
+
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if node.name.startswith("test_"):
+            continue
+        if _body_can_fail(node):
+            helpers.add(node.name)
+
+    return helpers
+
+
+def _body_can_fail(node):
+    """
+    True if anything in this function's body could raise an assertion-style
+    failure.
+    """
+
+    for sub in ast.walk(node):
+
+        if isinstance(sub, ast.Assert):
+            return True
+
+        if isinstance(sub, ast.Raise):
+            return True
+
+        if isinstance(sub, ast.Call):
+            name = _call_name(sub)
+            if name is None:
+                continue
+            if name in FAILING_CALLS or name.startswith(ASSERT_PREFIXES):
+                return True
+
+    return False
+
+
+def classify(node, helpers=frozenset()):
     """
     Classify a test function node as "stub", "noassert", or "ok".
 
@@ -84,6 +134,9 @@ def classify(node):
     ----------
     node : ast.FunctionDef or ast.AsyncFunctionDef
         the test function to classify
+    helpers : set of str
+        names of module-level helpers that can themselves fail; calling one
+        counts as checking
 
     Returns
     -------
@@ -110,6 +163,8 @@ def classify(node):
             if name in FAILING_CALLS:
                 return "ok"
             if name.startswith(ASSERT_PREFIXES):
+                return "ok"
+            if name in helpers:
                 return "ok"
 
         # `with pytest.raises(...)` used without a call we caught above, and
@@ -181,6 +236,8 @@ def audit(test_dir):
                 print(f"SYNTAX-ERROR {path}: {e}", file=sys.stderr)
                 continue
 
+            helpers = checking_helpers(tree)
+
             seen = {}
             for node in collect(tree):
 
@@ -194,7 +251,7 @@ def audit(test_dir):
                         f"(shadows definition at line {seen[node.name]})")
                 seen[node.name] = node.lineno
 
-                verdict = classify(node)
+                verdict = classify(node, helpers)
                 results[verdict].append(f"{path}:{node.lineno} {node.name}")
 
     return results

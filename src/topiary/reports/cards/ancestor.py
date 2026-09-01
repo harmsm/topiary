@@ -221,6 +221,14 @@ def create_ancestor_card(anc_dict,
         else:
             bs_support = f"{int(round(float(bs_support),0))}"
 
+        # The header above already guards against a missing taxonomic
+        # distribution; do the same in the table so the report shows N/A rather
+        # than a literal "None", consistent with mean_pp and bs_support.
+        if taxonomic is None:
+            taxonomic_str = "N/A"
+        else:
+            taxonomic_str = taxonomic
+
         num_ambig_seq = np.sum(np.array(df.alt_pp > alt_cutoff))
         num_ambig_gap = np.sum(np.array(df.site_type == "possible gap"))
         
@@ -234,7 +242,7 @@ def create_ancestor_card(anc_dict,
                                                  "Branch support"],
                                 "values":       [event_html,
                                                  anc_dict[a]["num_descendants"],
-                                                 taxonomic,
+                                                 taxonomic_str,
                                                  paralogs,
                                                  mean_pp_str,
                                                  f"{num_ambig_seq}",

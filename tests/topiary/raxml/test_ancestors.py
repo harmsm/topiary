@@ -14,13 +14,88 @@ import os
 import copy
 import json
 
-def test__make_ancestor_summary_trees():
+def test__make_ancestor_summary_trees(tmpdir):
+    """
+    Writes two newick files from a labeled raxml tree: one with internal nodes
+    renamed to ancestor names, one with them replaced by average posterior
+    probability.
+    """
 
-    pass
+    from ete4 import Tree
 
-def test__parse_raxml_anc_output():
+    os.chdir(tmpdir)
 
-    pass
+    # Internal nodes named the way raxml labels them
+    labeled = "((A:0.1,B:0.1)Node1:0.5,(C:0.1,D:0.1)Node2:0.5)Node3:1.0;"
+    with open("labeled.newick","w") as f:
+        f.write(labeled)
+
+    avg_pp_dict = {"anc1":0.95,"anc2":0.85,"anc3":0.75}
+
+    _make_ancestor_summary_trees(None,avg_pp_dict,"labeled.newick")
+
+    assert os.path.isfile("tree_anc-label.newick")
+    assert os.path.isfile("tree_anc-pp.newick")
+
+    # Label tree: NodeN becomes ancN
+    t_label = Tree(open("tree_anc-label.newick").read(),parser=1)
+    internal_names = set([n.name for n in t_label.traverse() if not n.is_leaf])
+    assert "anc1" in internal_names
+    assert "anc2" in internal_names
+    assert "Node1" not in internal_names
+
+    # Leaves are untouched
+    assert set([n.name for n in t_label.leaves()]) == {"A","B","C","D"}
+
+    # pp tree: internal nodes carry the posterior probabilities
+    t_pp = Tree(open("tree_anc-pp.newick").read(),parser=1)
+    pp_names = set([n.name for n in t_pp.traverse() if not n.is_leaf])
+    assert "0.95" in pp_names
+    assert "0.85" in pp_names
+
+
+def test__parse_raxml_anc_output(tmpdir,small_phylo):
+    """
+    Parse a real raxml marginal-ancestor run out of the committed test data and
+    check the human-readable outputs it is supposed to produce.
+    """
+
+    os.chdir(tmpdir)
+
+    df = topiary.read_dataframe(small_phylo["02_gene-tree-ancestors/input/dataframe.csv"])
+    anc_prob_file = small_phylo["02_gene-tree-ancestors/working/00_inference/alignment.phy.raxml.ancestralProbs"]
+    alignment_file = small_phylo["02_gene-tree-ancestors/working/00_inference/alignment.phy"]
+    tree_with_labels = small_phylo["02_gene-tree-ancestors/working/00_inference/alignment.phy.raxml.ancestralTree"]
+
+    # The caller (generate_ancestors, via Supervisor) creates the output
+    # directory before handing it to the parser.
+    os.mkdir("ancestors")
+
+    _parse_raxml_anc_output(df,
+                            anc_prob_file,
+                            alignment_file,
+                            tree_with_labels,
+                            run_directory="ancestors")
+
+    # The parser writes a directory of human-readable ancestor output
+    assert os.path.isdir("ancestors")
+
+    written = os.listdir("ancestors")
+
+    # A fasta of ancestral sequences and a csv of per-site probabilities
+    assert any(f.endswith(".fasta") for f in written)
+    assert any(f.endswith(".csv") for f in written)
+
+    # Plus the two summary trees
+    assert "tree_anc-label.newick" in written
+    assert "tree_anc-pp.newick" in written
+
+    # The fasta must actually contain ancestor sequences, not be empty
+    fasta = [f for f in written if f.endswith(".fasta")][0]
+    with open(os.path.join("ancestors",fasta)) as f:
+        contents = f.read()
+    assert contents.startswith(">")
+    assert len(contents.strip().split("\n")) >= 2
 
 def test__get_bad_columns(tmpdir):
 
