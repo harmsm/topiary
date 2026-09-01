@@ -5,9 +5,6 @@ Draw a species tree with tips labeled by species name.
 import topiary
 from .prettytree import PrettyTree
 
-import ete4 as ete
-
-
 def species_tree(species_tree,
                  output_file=None,
                  font_size=15,

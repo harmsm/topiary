@@ -11,7 +11,6 @@ import glob
 @pytest.mark.run_blast
 def test_make_blast_db(make_blast_db_files,tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
     expected_extensions = ["pin","phr","psq"]
 
@@ -55,4 +54,3 @@ def test_make_blast_db(make_blast_db_files,tmpdir):
     # Make sure it's really a blast database...
     topiary.ncbi.blast.local_blast(sequence="SOMESEQVENCE",db=out)
 
-    os.chdir(cwd)

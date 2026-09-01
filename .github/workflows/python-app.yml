@@ -1,31 +1,138 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+# CI for topiary.
+#
+# Split by test tier (see CLAUDE.md and tests/BASELINE.md):
+#
+#   unit         hermetic -- no network, no subprocess, no external binary.
+#                Needs nothing but a pip install, so it runs on the full
+#                matrix in parallel and gives feedback in a couple of minutes.
+#   smoke        real data and real file I/O. Needs muscle/blast from conda,
+#                but not the compiled RAxML-NG or GeneRax.
+#   integration  needs the compiled binaries *and* live network access (BLAST,
+#                NCBI, and Open Tree of Life -- note that --run-generax and
+#                --run-raxml both reach OTL, because setting up a GeneRax run
+#                annotates the species tree from it).
+#
+# Only `integration` is serialized. It contends for external services, which
+# was the reason the whole workflow used to run with max-parallel: 1.
 
 name: topiary
 
 on:
   push:
-    branches: [ main   ]
+    branches: [ main ]
   pull_request:
-    branches: [ main   ]
-
-concurrency:
-  group: topiary-ci-group
-  cancel-in-progress: false
+    branches: [ main ]
+  schedule:
+    # Nightly full-matrix integration run, 07:00 UTC
+    - cron: '0 7 * * *'
+  workflow_dispatch:
 
 jobs:
-  build-nix:
+
+  # ---------------------------------------------------------------------------
+  # Fast, hermetic. Full matrix, fully parallel, no conda and no compilation.
+  # ---------------------------------------------------------------------------
+  unit:
+    name: unit (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.12', '3.13']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: pip
+
+    - name: install
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install ".[test]" pytest-mock
+
+    - name: flake8
+      run: |
+        flake8 src/topiary tests --count --select=E9,F63,F7,F82 --show-source --statistics
+
+    - name: audit tests that verify nothing
+      run: |
+        ./tests/audit_tests.py tests --max-stub 0 --max-noassert 0
+
+    - name: run unit tests
+      run: |
+        pytest tests -m unit -q
+
+  # ---------------------------------------------------------------------------
+  # Real data and real file I/O. Needs muscle/blast from conda, but does not
+  # need RAxML-NG or GeneRax, so it skips the expensive compile.
+  # ---------------------------------------------------------------------------
+  smoke:
+    name: smoke (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.12', '3.13']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: set up miniconda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        activate-environment: topiary
+        environment-file: environment.yml
+        channel-priority: strict
+        python-version: ${{ matrix.python-version }}
+        auto-activate-base: false
+        miniconda-version: "latest"
+
+    - name: install topiary
+      shell: bash -l {0}
+      run: |
+        python -m pip install ".[test]" pytest-mock
+
+    - name: run smoke tests
+      shell: bash -l {0}
+      run: |
+        pytest tests -m smoke -q
+
+  # ---------------------------------------------------------------------------
+  # External binaries and live services. This is the slow, flaky-by-nature tier,
+  # so it is the only one that is serialized and the only one that compiles
+  # RAxML-NG and GeneRax.
+  #
+  # On a push/PR: one OS, one python. Nightly: the full matrix.
+  # ---------------------------------------------------------------------------
+  integration:
+    name: integration (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    # Serialize across the whole repo: these tests share NCBI and Open Tree of
+    # Life, and running several at once gets us rate limited.
+    concurrency:
+      group: topiary-integration
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        os: [ubuntu-latest,macos-latest]
-        python-version: ['3.11', '3.12', '3.13']
+        # Push/PR: one representative configuration. Nightly: the full matrix.
+        os: >-
+          ${{ github.event_name == 'schedule'
+              && fromJSON('["ubuntu-latest","macos-latest"]')
+              || fromJSON('["ubuntu-latest"]') }}
+        python-version: >-
+          ${{ github.event_name == 'schedule'
+              && fromJSON('["3.11","3.12","3.13"]')
+              || fromJSON('["3.13"]') }}
 
     steps:
-    - name: checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: set up miniconda
       uses: conda-incubator/setup-miniconda@v3
@@ -51,54 +158,91 @@ jobs:
       uses: actions/cache@v4
       with:
         path: bin-cache/generax
-        key: ${{ runner.os }}-generax-${{ steps.get-hashes.outputs.generax_hash }}
+        key: ${{ runner.os }}-generax-${{ steps.get-hashes.outputs.generax_hash }}-${{ hashFiles('dependencies/compile-generax.sh') }}
 
     - name: cache raxml-ng
       id: cache-raxml
       uses: actions/cache@v4
       with:
         path: bin-cache/raxml-ng
-        key: ${{ runner.os }}-raxml-${{ steps.get-hashes.outputs.raxml_hash }}
+        key: ${{ runner.os }}-raxml-${{ steps.get-hashes.outputs.raxml_hash }}-${{ hashFiles('dependencies/compile-raxml-ng.sh') }}
 
-    - name: install topiary
+    - name: install topiary and external binaries
       shell: bash -l {0}
       run: |
-        # platform specific packages
         conda install -c conda-forge cmake
-        python -m pip install .[dev] -vv
-        python -m pip install coverage flake8 pytest genbadge[tests] pytest-mock
+        python -m pip install ".[test]" pytest-mock -vv
 
-        # Ensure bin-cache exists
         mkdir -p bin-cache
 
-        # compile generax if not cached
-        if [ ! -f bin-cache/generax ]; then
-            cd dependencies
-            conda run -n topiary bash compile-generax.sh
-            cp $CONDA_PREFIX/bin/generax ../bin-cache/
-            cd ..
-        else
-            cp bin-cache/generax $CONDA_PREFIX/bin/
-        fi
+        # Does this binary actually run here? Uses topiary's own checker, which
+        # distinguishes "not in PATH" from "present but crashes".
+        validate () {
+            python - "$1" <<'PYEOF'
+        import sys
+        from topiary._private import installed
+        checker = {"raxml-ng": installed.check_raxml,
+                   "generax": installed.check_generax}[sys.argv[1]]
+        _, version, _ = checker()
+        # (-2,-2,-2) not found; (-1,-1,-1) found but does not run
+        sys.exit(1 if tuple(version) in ((-1,-1,-1),(-2,-2,-2)) else 0)
+        PYEOF
+        }
 
-        # compile raxml if not cached
-        if [ ! -f bin-cache/raxml-ng ]; then
-            cd dependencies
-            conda run -n topiary bash compile-raxml-ng.sh
-            cp $CONDA_PREFIX/bin/raxml-ng ../bin-cache/
-            cd ..
-        else
-            cp bin-cache/raxml-ng $CONDA_PREFIX/bin/
-        fi
+        # A cached binary is only usable if it runs on *this* runner. GitHub
+        # runners are heterogeneous, and a binary built on a machine with a
+        # newer instruction set dies with SIGILL on an older one -- which the
+        # cache key cannot see. So validate before trusting the cache, and
+        # rebuild on the spot if it does not run. Compiling on the machine that
+        # will run it is always correct.
+        install_or_build () {
+            name="$1"
+            script="$2"
 
-    - name: run flake8
+            if [ -f "bin-cache/$name" ]; then
+                cp "bin-cache/$name" "$CONDA_PREFIX/bin/"
+                if validate "$name"; then
+                    echo "$name: cached binary runs on this runner"
+                    return 0
+                fi
+                echo "::warning::$name from cache does not run on this runner (likely built on a different CPU); rebuilding"
+                rm -f "bin-cache/$name" "$CONDA_PREFIX/bin/$name"
+            fi
+
+            ( cd dependencies && conda run -n topiary bash "$script" )
+            cp "$CONDA_PREFIX/bin/$name" bin-cache/
+        }
+
+        install_or_build generax compile-generax.sh
+        install_or_build raxml-ng compile-raxml-ng.sh
+
+    # Fail here, with topiary's own diagnostic, rather than through a dozen
+    # confusing test failures further down.
+    - name: verify the external stack
       shell: bash -l {0}
       run: |
-        flake8 src/topiary tests --count --select=E9,F63,F7,F82 --show-source --statistics
+        topiary-check-installed
+        python -c "
+        from topiary._private import installed
+        installed.validate_stack([{'program':'raxml-ng','min_version':(1,1,0),'must_pass':True},
+                                  {'program':'generax','min_version':(2,0,0),'must_pass':True}])
+        print('external stack OK')
+        "
 
-    - name: run pytest
+    # --run-ncbi-server is deliberately left out of the per-push run: NCBI
+    # rate-limits unauthenticated traffic, and hitting it on every push gets
+    # the runner throttled. The nightly job below covers it.
+    - name: run integration tests
+      if: github.event_name != 'schedule'
       shell: bash -l {0}
-      env:
-        TOPIARY_MPI_OVERSUBSCRIBE: "1"
       run: |
-        pytest tests/ --run-raxml --run-generax --run-blast 
+        pytest tests --run-raxml --run-generax --run-blast --run-network -q
+
+    - name: run integration tests (nightly, everything)
+      if: github.event_name == 'schedule'
+      shell: bash -l {0}
+      run: |
+        coverage run -m pytest tests \
+          --run-raxml --run-generax --run-blast --run-ncbi-server --run-network -q
+        coverage report
+        coverage report --fail-under=92

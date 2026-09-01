@@ -10,6 +10,7 @@ import pandas as pd
 
 import random, os
 
+@pytest.mark.network
 def test__prep_species_tree(test_dataframes):
 
     df = test_dataframes["good-df"].copy()
@@ -116,6 +117,7 @@ def test__even_merge_blocks():
     blocks = tx._even_merge_blocks(T, 3)
     assert len(blocks) > 0
 
+@pytest.mark.network
 def test_get_merge_blocks(test_dataframes):
     df = test_dataframes["good-df"].copy()
     df["recip_paralog"] = "P1"

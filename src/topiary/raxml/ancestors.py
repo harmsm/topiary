@@ -14,9 +14,6 @@ from topiary._private import run_cleanly
 
 from topiary.pastml import get_ancestral_gaps
 
-import ete4 as ete
-from ete4 import Tree
-
 import pandas as pd
 import numpy as np
 
@@ -62,6 +59,10 @@ def _make_ancestor_summary_trees(df,
         output from RAxML that has nodes labeled by their ancestor identity.
         Tree Should also have branch lengths.
     """
+
+    # Imported here rather than at the top of the module because importing ete4
+    # pulls in scipy, which is slow (see also topiary/__init__.py).
+    from ete4 import Tree
 
     # Create label trees
     t_labeled = Tree(tree_file_with_labels,parser=1)

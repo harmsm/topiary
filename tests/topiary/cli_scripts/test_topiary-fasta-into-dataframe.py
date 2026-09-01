@@ -7,6 +7,7 @@ import pandas as pd
 
 import os, subprocess, sys
 
+@pytest.mark.smoke
 def test_main(test_dataframes,tmpdir):
 
     df = test_dataframes["good-df"].copy()

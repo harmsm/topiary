@@ -5,10 +5,7 @@ Reconcile a gene tree with a species tree using generax.
 import topiary
 from topiary._private import Supervisor
 from topiary._private import check
-from topiary._private.mpi import get_num_slots
-from topiary._private.mpi import check_mpi_configuration
 
-from ._reconcile_bootstrap import reconcile_bootstrap
 from ._reconcile_no_bootstrap import reconcile_no_bootstrap
 
 from ._generax import GENERAX_BINARY
@@ -26,14 +23,11 @@ def reconcile(prev_calculation=None,
               allow_horizontal_transfer=None,
               seed=None,
               bootstrap=False,
-              converge_cutoff=0.03,
               calc_dir="reconcile",
               overwrite=False,
-              num_threads=-1,
-              threads_per_rep=1,
+              generax_launch="",
               generax_binary=GENERAX_BINARY,
-              raxml_binary=RAXML_BINARY,
-              timeout_config=None):
+              raxml_binary=RAXML_BINARY):
     """
     Reconcile the gene tree to the species tree using generax.
 
@@ -74,30 +68,23 @@ def reconcile(prev_calculation=None,
     seed : bool,int,str
         If true, pass a randomly generated seed to raxml. If int or str, use
         that as the seed. (passed via --seed)
-    bootstrap: bool, default=False
-        whether or not to do bootstrap replicates. if True, prev_calculation must
-        point to a raxml ml_bootstrap run
-    converge_cutoff : float, default=0.03
-        bootstrap convergence criterion. only used of bootstrap = True. This is
-        RAxML-NG default, passed to --bs-cutoff.
+    bootstrap : bool, default=False
+        deprecated. Bootstrap reconciliation is now run via the
+        topiary-bootstrap-reconcile crawler; passing True here raises an error.
     calc_dir: str, default="reconcile"
         name of calc_dir directory
     overwrite : bool, default=False
         whether or not to overwrite existing calc_dir directory
     supervisor : Supervisor, optional
         supervisor instance to keep track of inputs and outputs
-    num_threads : int, default=-1
-        number of threads to use. if -1 use all available.
-    threads_per_rep : int, default=1
-        number of threads to use per replicate. only used if bootstrap = True
+    generax_launch : str, default=""
+        launcher prefix prepended to the generax command (e.g. "mpirun -np 8").
+        Empty string runs generax as a single process. The caller owns the
+        launcher and the resources it needs.
     generax_binary : str, optional
         what generax binary to use
     raxml_binary : str, optional
         what raxml binary to use
-    timeout_config : dict, optional
-        overrides for the per-replicate timeout / failure circuit breaker used
-        during bootstrap reconciliation (only used if bootstrap = True). See
-        `topiary.generax._reconcile_bootstrap._DEFAULT_TIMEOUT_CONFIG`.
 
     Returns
     -------
@@ -120,12 +107,12 @@ def reconcile(prev_calculation=None,
         err = f"\nraxml binary '{raxml_binary}' not found in path\n\n"
         raise ValueError(err)
 
-    # Get number of slots
-    if num_threads == -1:
-        num_threads = get_num_slots()
-
-    # Check sanity of mpi configuration/number of slots
-    check_mpi_configuration(num_threads)
+    # Bootstrap reconciliation moved to its own re-entrant, MPI-free crawler.
+    if bootstrap:
+        err = "\nbootstrap reconciliation is no longer run through reconcile().\n"
+        err += "Use the topiary-bootstrap-reconcile command (a filesystem\n"
+        err += "crawler) instead.\n\n"
+        raise ValueError(err)
 
     # --------------------------------------------------------------------------
     # Load/parse calculation inputs
@@ -139,13 +126,8 @@ def reconcile(prev_calculation=None,
         supervisor = Supervisor(calc_dir=prev_calculation)
 
     # Create a calculation directory
-    if bootstrap:
-        calc_type = "reconcile_bootstrap"
-    else:
-        calc_type = "reconcile"
-
     supervisor.create_calc_dir(calc_dir=calc_dir,
-                               calc_type=calc_type,
+                               calc_type="reconcile",
                                overwrite=overwrite,
                                df=df,
                                gene_tree=gene_tree,
@@ -173,62 +155,13 @@ def reconcile(prev_calculation=None,
 
     allow_ht = supervisor.run_parameters["allow_horizontal_transfer"]
 
-    if not bootstrap:
-
-        return reconcile_no_bootstrap(df=supervisor.df,
-                                      model=supervisor.model,
-                                      gene_tree=supervisor.gene_tree,
-                                      species_tree=supervisor.species_tree,
-                                      allow_horizontal_transfer=allow_ht,
-                                      seed=supervisor.seed,
-                                      overwrite=overwrite,
-                                      supervisor=supervisor,
-                                      num_threads=num_threads,
-                                      generax_binary=generax_binary)
-
-    else:
-
-        try:
-            prev_calc_type = supervisor.previous_entries[-1]["calc_type"]
-        except:
-            prev_calc_type = None
-
-        if prev_calc_type != "ml_bootstrap":
-            err = "\nboostrap reconciliation can only be started using a\n"
-            err += "previous 'ml_bootstrap' run as its input.\n"
-            raise ValueError(err)
-
-        # Make sure bootstrap directory exists
-        prev_calc_dir = supervisor.get_previous_calc_dir(-1)
-        bs_dir = os.path.join(prev_calc_dir,"output","bootstrap_replicates")
-
-        if not os.path.isdir(bs_dir):
-            err = f"\ninput directory '{prev_calc_dir}'\n"
-            err += "does not have an output/bootstrap_replicates directory. Was\n"
-            err += "this calculation run with bootstrap=True?\n\n"
-            raise FileNotFoundError(err)
-
-        # Make sure the supervisor has a reconciled tree loaded. This is needed
-        # because this is what the bootstraps will be mapped onto. Generally
-        # this will the ML reconciled tree from a previous reconciliation
-        # calculation in the pipeline.
-        supervisor.check_required(required_files=["reconciled-tree.newick"])
-        supervisor.update('converge_cutoff',converge_cutoff)
-
-        return reconcile_bootstrap(df=supervisor.df,
-                                   model=supervisor.model,
-                                   gene_tree=supervisor.gene_tree,
-                                   species_tree=supervisor.species_tree,
-                                   reconciled_tree=supervisor.reconciled_tree,
-                                   allow_horizontal_transfer=allow_ht,
-                                   seed=supervisor.seed,
-                                   bootstrap_directory=bs_dir,
-                                   converge_cutoff=converge_cutoff,
-                                   restart=None,
-                                   overwrite=overwrite,
-                                   supervisor=supervisor,
-                                   num_threads=num_threads,
-                                   threads_per_rep=threads_per_rep,
-                                   generax_binary=generax_binary,
-                                   raxml_binary=raxml_binary,
-                                   timeout_config=timeout_config)
+    return reconcile_no_bootstrap(df=supervisor.df,
+                                  model=supervisor.model,
+                                  gene_tree=supervisor.gene_tree,
+                                  species_tree=supervisor.species_tree,
+                                  allow_horizontal_transfer=allow_ht,
+                                  seed=supervisor.seed,
+                                  overwrite=overwrite,
+                                  supervisor=supervisor,
+                                  generax_launch=generax_launch,
+                                  generax_binary=generax_binary)

@@ -5,6 +5,7 @@ from topiary.io.tree import load_trees
 import os
 import pandas as pd
 
+@pytest.mark.smoke
 def test_duplications(tiny_phylo):
     
     # Initialize supervisor from tiny_phylo dir

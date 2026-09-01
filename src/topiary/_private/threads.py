@@ -133,75 +133,97 @@ def thread_manager(kwargs_list,
 
 
     manager = mp.Manager()
-    queue = manager.Queue()
-    lock =  manager.Lock()
+    try:
+        queue = manager.Queue()
+        lock =  manager.Lock()
 
-    # If passing a shared kwarg
-    if shared_kwarg is not None:
-
-        try:
-            to_share = kwargs_list[0][shared_kwarg]
-        except KeyError:
-            err = f"{shared_kwarg} not found in kwargs_list\n"
-            raise ValueError(err)
-        
-        # Iterable, check for int or float and convert to Array
-        if hasattr(to_share,"__iter__"):
-            if np.issubdtype(int,to_share[0]):
-                to_share = manager.Array("i",np.array(to_share,dtype=int))
-            elif np.issubdtype(float,to_share[0]):
-                to_share = manager.Array("d",np.array(to_share,dtype=float))
-            else:
-                err = "iterable must be float or int"
-                raise ValueError(err)
-
-        # Not iterable. Check for int or float and convert to Value
-        else:
-            if np.issubdtype(int,to_share):
-                to_share = manager.Value("i",int(to_share))
-            elif np.issubdtype(float,to_share):
-                to_share = manager.Value("d",float(to_share))
-            else:
-                err = "shared value must be float or int\n"
-                raise ValueError(err)
-
-    all_args = []
-    for i in range(len(kwargs_list)):
-
-        # Append lock to kwargs if requested
-        if pass_lock:
-            kwargs_list[i]["lock"] = lock
-
-        # Updated shared_kwarg to point to shared object if requested
+        # If passing a shared kwarg
         if shared_kwarg is not None:
-            kwargs_list[i][shared_kwarg] = to_share
 
-        all_args.append((i,fcn,kwargs_list[i],queue))
+            try:
+                to_share = kwargs_list[0][shared_kwarg]
+            except KeyError:
+                err = f"{shared_kwarg} not found in kwargs_list\n"
+                raise ValueError(err)
+        
+            # Note on the dtype checks below: these used to be written as
+            # np.issubdtype(int,to_share), which has the arguments backwards --
+            # it asks numpy to interpret the *value* as a dtype. That raised
+            # TypeError for every python int, float and list, and returned
+            # False for a numpy bool array. It only worked at all because the
+            # single caller (quality.redundancy) happens to pass a numpy
+            # integer array, which numpy will accept as dtype-like.
 
-    with mp.Pool(num_threads) as pool:
+            # Iterable, check for int or float and convert to Array
+            if hasattr(to_share,"__iter__"):
 
-        # Black magic. pool.imap() runs a function on elements in iterable,
-        # filling threads as each job finishes. (Calls _blast_thread
-        # on every args tuple in all_args). tqdm gives us a status bar.
-        # By wrapping pool.imap iterator in tqdm, we get a status bar that
-        # updates as each thread finishes.
-        if progress_bar:
-            list(tqdm(pool.imap(_thread,all_args),total=len(all_args)))
-        else:
-            list(pool.imap(_thread,all_args))
+                shared_dtype = np.asarray(to_share).dtype
 
-    # Get results out of the queue.
-    results = []
-    while not queue.empty():
-        results.append(queue.get())
+                if np.issubdtype(shared_dtype,np.integer):
+                    to_share = manager.Array("i",np.array(to_share,dtype=int))
+                elif np.issubdtype(shared_dtype,np.floating):
+                    to_share = manager.Array("d",np.array(to_share,dtype=float))
+                else:
+                    err = "iterable must be float or int"
+                    raise ValueError(err)
 
-    # Sort results
-    results.sort()
+            # Not iterable. Check for int or float and convert to Value
+            else:
 
-    # Final results; a list holding the output of each function call
-    results = [r[1] for r in results]
+                # bool is a python subclass of int, but a shared bool is almost
+                # certainly a mistake, so reject it explicitly.
+                if np.issubdtype(type(to_share),np.integer):
+                    to_share = manager.Value("i",int(to_share))
+                elif np.issubdtype(type(to_share),np.floating):
+                    to_share = manager.Value("d",float(to_share))
+                else:
+                    err = "shared value must be float or int\n"
+                    raise ValueError(err)
 
-    return results
+        all_args = []
+        for i in range(len(kwargs_list)):
+
+            # Append lock to kwargs if requested
+            if pass_lock:
+                kwargs_list[i]["lock"] = lock
+
+            # Updated shared_kwarg to point to shared object if requested
+            if shared_kwarg is not None:
+                kwargs_list[i][shared_kwarg] = to_share
+
+            all_args.append((i,fcn,kwargs_list[i],queue))
+
+        with mp.Pool(num_threads) as pool:
+
+            # Black magic. pool.imap() runs a function on elements in iterable,
+            # filling threads as each job finishes. (Calls _blast_thread
+            # on every args tuple in all_args). tqdm gives us a status bar.
+            # By wrapping pool.imap iterator in tqdm, we get a status bar that
+            # updates as each thread finishes.
+            if progress_bar:
+                list(tqdm(pool.imap(_thread,all_args),total=len(all_args)))
+            else:
+                list(pool.imap(_thread,all_args))
+
+        # Get results out of the queue.
+        results = []
+        while not queue.empty():
+            results.append(queue.get())
+
+        # Sort results
+        results.sort()
+
+        # Final results; a list holding the output of each function call
+        results = [r[1] for r in results]
+
+        return results
+    finally:
+        # A Manager spawns a server process holding a unix socket.
+        # Without this it is only reclaimed whenever the garbage
+        # collector happens to run, so repeated calls leak file
+        # descriptors -- which is how a long test session or a big
+        # pipeline run exhausts the process fd limit.
+        manager.shutdown()
 
 def _thread(args):
     """

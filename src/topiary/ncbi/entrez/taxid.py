@@ -61,7 +61,10 @@ def get_taxid(species_list):
                             retmax=len(species_list)*2,
                             term=search_term,
                             idtype="uilist")
-    record = Entrez.read(handle)
+    try:
+        record = Entrez.read(handle)
+    finally:
+        handle.close()
 
     # See how many records we pulled down
     count = int(record["Count"])

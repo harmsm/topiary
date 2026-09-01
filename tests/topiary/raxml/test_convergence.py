@@ -10,6 +10,7 @@ import pandas as pd
 import os
 import shutil
 
+@pytest.mark.smoke
 def test__parse_convergence_file(raxml_output):
 
     c, df = _parse_convergence_file(raxml_output["bs-trees.log_converged"])
@@ -27,7 +28,6 @@ def test__parse_convergence_file(raxml_output):
 @pytest.mark.run_raxml
 def test_check_convergence(tiny_phylo,tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     shutil.copy(tiny_phylo["05_reconcile-bootstraps_toy/working/bs-trees.newick"],
@@ -85,4 +85,3 @@ def test_check_convergence(tiny_phylo,tmpdir):
     shutil.rmtree("save-tmp")
 
 
-    os.chdir(current_dir)

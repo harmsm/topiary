@@ -1,6 +1,7 @@
 import pytest
 
 import topiary
+from topiary._private import interface
 from topiary._private.interface import gen_seed
 from topiary._private.interface import launch
 from topiary._private.interface import create_new_dir
@@ -16,7 +17,6 @@ import time
 
 def test_run_cleanly(tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Make sure we can send in args, kwargs, and get return values
@@ -49,17 +49,32 @@ def test_run_cleanly(tmpdir):
     test_function_chdir()
     assert os.path.abspath(os.getcwd()) == os.path.abspath(os.path.join(tmpdir,"stupid"))
 
-    os.chdir(cwd)
 
     
 
 def test_MockTqdm():
 
-    pass
+    # MockTqdm stands in for tqdm wherever we do not want a progress bar, so it
+    # has to swallow whatever tqdm would have been given without complaint.
+    # Constructing with any tqdm-shaped arguments must work and hand back a
+    # usable object rather than raising.
+    for args, kwargs in [((),{}),
+                         ((range(10),),{}),
+                         ((range(10),),{"total":10,"desc":"x","leave":False})]:
+        m = interface.MockTqdm(*args,**kwargs)
+        assert isinstance(m,interface.MockTqdm)
 
 def test_MockTqdm___enter__():
 
-    pass
+    # The whole point is that `with MockTqdm(...) as x` works the way
+    # `with tqdm(...) as x` does: __enter__ hands back the object itself and
+    # __exit__ swallows normal completion.
+    with interface.MockTqdm(range(3)) as m:
+        assert isinstance(m,interface.MockTqdm)
+
+    m = interface.MockTqdm()
+    assert m.__enter__() is m
+    assert m.__exit__(None,None,None) is None
 
 def test_gen_seed():
 
@@ -70,7 +85,6 @@ def test_gen_seed():
 
 def test_create_new_dir(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     dir_name = create_new_dir()
@@ -87,11 +101,10 @@ def test_create_new_dir(tmpdir):
 
     create_new_dir("cool_dir",overwrite=True)
 
-    os.chdir(current_dir)
 
+@pytest.mark.smoke
 def test_copy_input_file(tmpdir,test_dataframes):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     test_file = "test_file_to_copy.txt"
@@ -129,23 +142,76 @@ def test_copy_input_file(tmpdir,test_dataframes):
     copy_input_file(test_file,os.path.join("target_dir","input"))
     assert os.path.isfile(os.path.join("target_dir","input",test_file))
 
-    os.chdir(current_dir)
+
+@pytest.mark.smoke
+def test__follow_log_subproc_wrapper(tmpdir):
+    """
+    Runs a command and puts the CompletedProcess onto the queue so the parent
+    thread knows the job finished. Shells out, hence smoke.
+    """
+
+    import queue as queue_module
+    import subprocess as sp
+
+    q = queue_module.Queue()
+
+    _follow_log_subproc_wrapper(["echo","hello"],sp.DEVNULL,q)
+
+    assert q.qsize() == 1
+    ret = q.get()
+    assert ret.returncode == 0
+
+    # A failing command still reports back rather than hanging the parent
+    q = queue_module.Queue()
+    _follow_log_subproc_wrapper(["bash","-c","exit 3"],sp.DEVNULL,q)
+    assert q.get().returncode == 3
 
 
-def test__follow_log_subproc_wrapper():
-    # Super simple function that would require lots of test infrastructure to
-    # run. Touch without calling to test crawler does not flag as missing
-    _follow_log_subproc_wrapper
-    return None
+def test__follow_log_generator(tmpdir):
+    """
+    Yields lines from an open log file until something lands in the queue, then
+    drains whatever trailing output was written after the job finished.
+    """
 
-def test__follow_log_generator():
-    # Function that would require lots of test infrastructure to run. Logging
-    # not critical to results, so skipping for now. Touch without calling so 
-    # test crawler does not flag as missing
-    _follow_log_generator
-    return None
+    import queue as queue_module
+
+    log_file = os.path.join(tmpdir,"run.log")
+    with open(log_file,"w") as f:
+        f.write("line one\n")
+        f.write("line two\n")
+
+    # A queue that is already non-empty means "the job is done" -- the
+    # generator should read what is there and stop rather than blocking.
+    q = queue_module.Queue()
+    q.put("done")
+
+    with open(log_file) as f:
+        lines = list(_follow_log_generator(f,q))
+
+    # found_line starts False and the queue is already full, so the loop exits
+    # immediately without yielding
+    assert lines == []
+
+    # Now the realistic case: the generator is following a live file. Prime it
+    # with an empty queue so it reads, then fill the queue to stop it.
+    class _StopsAfter:
+        """Queue stand-in that reports empty until asked n times."""
+
+        def __init__(self,n):
+            self._n = n
+
+        def empty(self):
+            self._n -= 1
+            return self._n > 0
+
+    with open(log_file) as f:
+        lines = list(_follow_log_generator(f,_StopsAfter(3)))
+
+    assert len(lines) > 0
+    assert lines[0] == "line one\n"
 
 
+@pytest.mark.smoke
 def test_launch(tmpdir,programs):
     """
     Test the launcher.
@@ -177,7 +243,6 @@ def test_launch(tmpdir,programs):
 
 def test_rmtree(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     os.mkdir("testdir")
@@ -201,4 +266,3 @@ def test_rmtree(tmpdir):
     # fail. Kind of incomplete as a test. 
 
 
-    os.chdir(current_dir)

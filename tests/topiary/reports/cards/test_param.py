@@ -3,6 +3,7 @@ from topiary.reports.cards.param import create_param_card
 from topiary._private.supervisor import Supervisor
 import os
 
+@pytest.mark.smoke
 def test_create_param_card(tiny_phylo):
     
     # Initialize supervisor from tiny_phylo dir

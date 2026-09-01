@@ -37,6 +37,7 @@ def _blast_args_to_keys(blast_args):
 
     return out_dict      
 
+@pytest.mark.smoke
 def test__prepare_for_blast(test_dataframes,tmpdir):
 
     # Make a fake blast db so code passes "file exists" check
@@ -226,6 +227,7 @@ def test__prepare_for_blast(test_dataframes,tmpdir):
     blast_kwargs = _blast_args_to_keys(blast_args)
     assert blast_kwargs["-extra_kwarg"] == "7"
 
+@pytest.mark.smoke
 def test__construct_args(test_dataframes,tmpdir):
 
     # Make a fake blast db so code passes "file exists" check
@@ -340,8 +342,6 @@ def test__construct_args(test_dataframes,tmpdir):
                                         keep_blast_xml=False,
                                         num_threads=-1,
                                         manual_num_cores=1)
-
-
 
 
     all_args, num_threads = _construct_args(sequence_list,
@@ -468,6 +468,7 @@ def test__construct_args(test_dataframes,tmpdir):
                                         num_threads=b,
                                         manual_num_cores=None)
 
+@pytest.mark.smoke
 def test__combine_hits(local_blast_output):
 
     # This is a set of two dataframes that have three and two outputs,
@@ -497,7 +498,6 @@ def test__local_blast_thread_function(test_dataframes,
                                       tmpdir):
 
     # Move into temporary directory
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Make a blast database
@@ -539,7 +539,6 @@ def test__local_blast_thread_function(test_dataframes,
     for f in xml_files:
         os.remove(f)
 
-    os.chdir(cwd)
 
 @pytest.mark.skipif(os.name == "nt",reason="blast cannot be installed via conda on windows")
 @pytest.mark.run_blast
@@ -552,7 +551,6 @@ def test_local_blast(test_dataframes,
     # test file. 
 
     # Move into temporary directory
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Make a blast database
@@ -568,4 +566,3 @@ def test_local_blast(test_dataframes,
 
     assert len(sequence) == len(query_hits)
 
-    os.chdir(cwd)

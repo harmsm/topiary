@@ -1,145 +1,119 @@
 import pytest
-import topiary
-import os
-import glob
+
 from topiary.pipeline.bootstrap_reconcile import bootstrap_reconcile
+from topiary.pipeline.bootstrap_reconcile import _input_bootstrap_dir
 from topiary._private.interface import WrappedFunctionException
 
-def test_bootstrap_reconcile(tmpdir, mocker):
-    
-    # Mock all the things!
-    mock_check_int = mocker.patch("topiary.pipeline.bootstrap_reconcile.check.check_int", side_effect=lambda x, y, minimum_allowed=None: x)
-    mock_check_bool = mocker.patch("topiary.pipeline.bootstrap_reconcile.check.check_bool", side_effect=lambda x, y: x)
-    mock_validate_stack = mocker.patch("topiary.pipeline.bootstrap_reconcile.installed.validate_stack")
-    mock_check_mpi = mocker.patch("topiary.pipeline.bootstrap_reconcile.check_mpi_configuration")
-    
-    mock_supervisor_class = mocker.patch("topiary.pipeline.bootstrap_reconcile.Supervisor")
-    mock_reconcile = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary.reconcile")
-    mock_reconcile_bootstrap = mocker.patch("topiary.pipeline.bootstrap_reconcile.reconcile_bootstrap")
-    mock_pipeline_report = mocker.patch("topiary.pipeline.bootstrap_reconcile.pipeline_report")
-    
-    # Mock mpi functions
-    mock_get_num_slots = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_num_slots", return_value=56)
-    mock_get_hosts = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_hosts", return_value=["n1"]*56)
-    
-    # Mock os/glob functions
-    mocker.patch("os.path.isdir", return_value=True)
-    mocker.patch("glob.glob", side_effect=[
-        ["04_bootstraps"], # bootstrap_dirs
-        ["rep1.phy", "rep2.phy"] # num_replicates
-    ])
-    
-    # Setup Supervisor mock
-    mock_supervisor = mocker.Mock()
-    mock_supervisor.status = "complete"
-    mock_supervisor.previous_entries = []
-    mock_supervisor.run_parameters = {"allow_horizontal_transfer": False}
-    mock_supervisor.df = mocker.Mock()
-    mock_supervisor.model = "LG+G8"
-    mock_supervisor.gene_tree = "((a,b),c);"
-    mock_supervisor.species_tree = "((a,b),c);"
-    mock_supervisor.reconciled_tree = "((a,b),c);"
-    mock_supervisor.seed = 12345
-    mock_supervisor_class.return_value = mock_supervisor
+import os
 
-    # Define a flexible isdir mock
-    isdir_returns = {"prev_dir": True, "05_reconciled-tree-bootstraps": False}
-    def side_effect_isdir(path):
-        return isdir_returns.get(path, False)
-    
-    mocker.patch("os.path.isdir", side_effect=side_effect_isdir)
-    mocker.patch("os.chdir")
 
-    # Case 1: Normal run (not restart)
-    bootstrap_reconcile("prev_dir", num_threads=2)
-    
-    mock_reconcile.assert_called_with(
-        prev_calculation="04_bootstraps",
-        calc_dir="05_reconciled-tree-bootstraps",
-        bootstrap=True,
-        converge_cutoff=0.03,
-        overwrite=False,
-        num_threads=2,
-        threads_per_rep=8, # Closest factor of 56 to 10
-        raxml_binary=mocker.ANY,
-        generax_binary=mocker.ANY,
-        timeout_config=mocker.ANY
-    )
-    mock_pipeline_report.assert_called()
+def _fake_flow(mocker, input_status="complete",
+               is_leader=True, all_terminal=True, is_aggregator=True):
+    """Mock out the crawler engine + software validation for the pipeline flow."""
+    mocker.patch("topiary.pipeline.bootstrap_reconcile.installed.validate_stack")
 
-    # Case 2: Restart
-    mock_reconcile.reset_mock()
-    isdir_returns["05_reconciled-tree-bootstraps"] = True
-    isdir_returns["05_reconciled-tree-bootstraps/working/replicates"] = True
-    mocker.patch("glob.glob", side_effect=[
-        ["04_bootstraps", "05_reconciled-tree-bootstraps"], # bootstrap_dirs
-        ["rep1.phy", "rep2.phy"] # num_replicates
-    ])
-    
-    bootstrap_reconcile("prev_dir", num_threads=2, restart=True)
-    
-    mock_reconcile_bootstrap.assert_called()
-    assert mock_reconcile.call_count == 0
+    sv = mocker.Mock()
+    sv.status = input_status
+    mocker.patch("topiary.pipeline.bootstrap_reconcile.Supervisor", return_value=sv)
 
-    # Case 3: Error cases
-    
-    # previous_run_dir doesn't exist
-    isdir_returns["prev_dir"] = False
+    mocker.patch("topiary.generax._crawl.elect_setup",
+                 return_value=("06_reconciled-tree-bootstraps", is_leader))
+    crawl = mocker.patch("topiary.generax._crawl.crawl")
+    mocker.patch("topiary.generax._crawl.all_terminal", return_value=all_terminal)
+    mocker.patch("topiary.generax._crawl.elect_aggregate", return_value=is_aggregator)
+    report = mocker.patch("topiary.reports.pipeline_report")
+
+    # finalize_bootstrap runs the report via a callback; exercise that path.
+    def fake_finalize(calc_dir, converge_cutoff, raxml_binary, report_fn, cid=None):
+        report_fn()
+    aggregate = mocker.patch("topiary.generax._crawl.finalize_bootstrap",
+                             side_effect=fake_finalize)
+
+    return {"crawl": crawl, "aggregate": aggregate, "report": report}
+
+
+def _make_run_dir(tmpdir, input_name="05_gene-tree-bootstraps"):
+    pdir = os.path.join(tmpdir, "run")
+    os.makedirs(os.path.join(pdir, input_name))
+    return pdir
+
+
+def test_bootstrap_reconcile_flow(tmpdir, mocker):
+
+    mocks = _fake_flow(mocker)
+    pdir = _make_run_dir(tmpdir)
+
+    bootstrap_reconcile(pdir)
+
+    # crawler ran, aggregation ran, report written
+    mocks["crawl"].assert_called_once()
+    mocks["aggregate"].assert_called_once()
+    mocks["report"].assert_called_once()
+
+    # the launch prefix is threaded into crawl
+    assert mocks["crawl"].call_args.kwargs["generax_launch"] == ""
+
+
+def test_bootstrap_reconcile_generax_launch(tmpdir, mocker):
+
+    mocks = _fake_flow(mocker)
+    pdir = _make_run_dir(tmpdir)
+
+    bootstrap_reconcile(pdir, generax_launch="mpirun -np 8")
+    assert mocks["crawl"].call_args.kwargs["generax_launch"] == "mpirun -np 8"
+
+
+def test_bootstrap_reconcile_follower_no_aggregate(tmpdir, mocker):
+
+    # A crawler that is neither leader nor the elected aggregator crawls but does
+    # not aggregate or write the report.
+    mocks = _fake_flow(mocker, is_leader=False, is_aggregator=False)
+    pdir = _make_run_dir(tmpdir)
+
+    bootstrap_reconcile(pdir)
+    mocks["crawl"].assert_called_once()
+    mocks["aggregate"].assert_not_called()
+    mocks["report"].assert_not_called()
+
+
+def test_bootstrap_reconcile_no_aggregate_until_terminal(tmpdir, mocker):
+
+    # If replicates are not all terminal, this crawler does not aggregate.
+    mocks = _fake_flow(mocker, all_terminal=False)
+    pdir = _make_run_dir(tmpdir)
+
+    bootstrap_reconcile(pdir)
+    mocks["crawl"].assert_called_once()
+    mocks["aggregate"].assert_not_called()
+
+
+def test_bootstrap_reconcile_errors(tmpdir, mocker):
+
+    # previous_run_dir does not exist
     with pytest.raises(WrappedFunctionException):
-        bootstrap_reconcile("prev_dir", num_threads=2)
+        bootstrap_reconcile(os.path.join(tmpdir, "nope"))
 
-    # No bootstrap dirs
-    isdir_returns["prev_dir"] = True
-    mocker.patch("glob.glob", return_value=[])
+    # previous_run_dir exists but has no input bootstraps directory
+    mocker.patch("topiary.pipeline.bootstrap_reconcile.installed.validate_stack")
+    empty = os.path.join(tmpdir, "empty")
+    os.mkdir(empty)
     with pytest.raises(WrappedFunctionException):
-        bootstrap_reconcile("prev_dir", num_threads=2)
+        bootstrap_reconcile(empty)
 
-    # Supervisor not complete
-    mocker.patch("glob.glob", return_value=["04_bootstraps"])
-    mock_supervisor.status = "incomplete"
+    # input calculation not complete
+    _fake_flow(mocker, input_status="running")
+    pdir = _make_run_dir(tmpdir)
     with pytest.raises(WrappedFunctionException):
-        bootstrap_reconcile("prev_dir", num_threads=2)
+        bootstrap_reconcile(pdir)
 
-    # num_threads > replicates
-    mock_supervisor.status = "complete"
-    mocker.patch("glob.glob", side_effect=[
-        ["04_bootstraps"], # bootstrap_dirs
-        ["rep1.phy"] # num_replicates
-    ])
-    with pytest.raises(WrappedFunctionException):
-        bootstrap_reconcile("prev_dir", num_threads=2)
 
-    # Test threads_per_replicate passed correctly
-    isdir_returns["05_reconciled-tree-bootstraps"] = False
-    mocker.patch("glob.glob", side_effect=[
-        ["04_bootstraps"], # bootstrap_dirs
-        ["rep1.phy", "rep2.phy"] # num_replicates
-    ])
-    mock_reconcile.reset_mock()
-    bootstrap_reconcile("prev_dir", num_threads=4, threads_per_replicate=2)
-    mock_reconcile.assert_called()
-    
-    # Test auto-detection
-    mock_get_num_slots = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_num_slots", return_value=56)
-    mock_get_hosts = mocker.patch("topiary.pipeline.bootstrap_reconcile.topiary._private.mpi.get_hosts", return_value=["n1"]*56)
-    
-    mocker.patch("glob.glob", side_effect=[
-        ["04_bootstraps"], # bootstrap_dirs
-        ["rep"]*100 # many replicates
-    ])
-    mock_reconcile.reset_mock()
-    bootstrap_reconcile("prev_dir") # num_threads=-1, threads_per_replicate=None
-    
-    # 56 cores -> factor of 56 closest to 10 is 8.
-    mock_reconcile.assert_called_with(
-        prev_calculation="04_bootstraps",
-        calc_dir="05_reconciled-tree-bootstraps",
-        bootstrap=True,
-        converge_cutoff=0.03,
-        overwrite=False,
-        num_threads=56,
-        threads_per_rep=8,
-        raxml_binary=mocker.ANY,
-        generax_binary=mocker.ANY,
-        timeout_config=mocker.ANY
-    )
+def test__input_bootstrap_dir(tmpdir, monkeypatch):
+
+    monkeypatch.chdir(tmpdir)
+    os.mkdir("03_gene-tree-bootstraps")
+    os.mkdir("05_gene-tree-bootstraps")
+    os.mkdir("06_reconciled-tree-bootstraps")   # must be ignored as input
+
+    num, name = _input_bootstrap_dir(".")
+    assert num == 5
+    assert name == "05_gene-tree-bootstraps"

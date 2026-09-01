@@ -10,8 +10,8 @@ from topiary.reports.reports import _find_directories
 from topiary.reports.reports import tree_report
 from topiary.reports.reports import pipeline_report
 
+@pytest.mark.smoke
 def test__find_directories(tmpdir, small_phylo):
-    cwd = os.getcwd()
     
     # 3. single calculation directory (DO THIS BEFORE CHDIR TO TMPDIR)
     # This ensures absolute paths work correctly.
@@ -82,8 +82,8 @@ def test__find_directories(tmpdir, small_phylo):
     out = _find_directories("test_no_prefix")
     assert out['gene']['tree'] is None
 
-    os.chdir(cwd)
 
+@pytest.mark.smoke
 def test_tree_report(tmpdir, small_phylo, mocker):
     
     output_dir = os.path.join(tmpdir, "test_report")
@@ -134,6 +134,7 @@ def test_tree_report(tmpdir, small_phylo, mocker):
     assert os.path.exists(os.path.join(output_dir, "index.html"))
     assert os.path.exists(f"{output_dir}.zip")
 
+@pytest.mark.smoke
 def test_pipeline_report(tmpdir, small_phylo, mocker):
     
     pipeline_dir = os.path.join(tmpdir, "pipeline")

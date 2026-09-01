@@ -92,79 +92,122 @@ def test_check_int():
     value = check_int(1,minimum_allowed=1,maximum_inclusive=True)
     assert value == 1
 
-def test_check_iter():
+_ITER_DF = pd.DataFrame({"test":[1,2,3]})
 
-    value = check_iter([1])
-    assert np.array_equal(value,[1])
+# Values check_iter must reject as not-an-iterable
+BAD_ITERABLES = [None,0,list,float,int,np.inf,np.nan,1.3]
 
-    bad_value = [None,0,list,float,int,np.inf,np.nan,1.3]
-    for b in bad_value:
-        print(b)
-        with pytest.raises(ValueError):
-            value = check_iter(b)
+# Values check_iter must accept
+GOOD_ITERABLES = [[],(),"test",{},_ITER_DF,np.arange(10)]
 
 
-    df = pd.DataFrame({"test":[1,2,3]})
-    good_value = [[],(),"test",{},df,np.arange(10)]
-    for g in bad_value:
-        with pytest.raises(ValueError):
-            value = check_iter(g)
-
-    value = check_iter([1,2,3],required_iter_type=list)
-    for t in [str,tuple,type(df),type(np.arange(1))]:
-        with pytest.raises(ValueError):
-            value = check_iter([1,2,3],required_iter_type=t)
-
-    value = check_iter(tuple([1,2,3]),required_iter_type=tuple)
-    for t in [str,list,type(df),type(np.arange(1))]:
-        with pytest.raises(ValueError):
-            value = check_iter(tuple([1,2,3]),required_iter_type=t)
-
-    value = check_iter(np.arange(5),required_iter_type=type(np.arange(1)))
-    for t in [str,tuple,type(df),list]:
-        with pytest.raises(ValueError):
-            value = check_iter(np.arange(5),required_iter_type=t)
-
-    value = check_iter(df,required_iter_type=type(df))
-    for t in [str,tuple,type(np.arange(1)),list]:
-        with pytest.raises(ValueError):
-            value = check_iter(df,required_iter_type=t)
-
-    # Check required value type check
-    value = check_iter([1,2,3],required_value_type=int)
-    for v in [["test"],[1.0],[None],[1,1.0]]:
-        with pytest.raises(ValueError):
-            value = check_iter(v,required_value_type=int)
-
-    # Check limits checks
-    with pytest.raises(ValueError):
-        check_iter([1],minimum_allowed=2)
+@pytest.mark.parametrize("bad",BAD_ITERABLES)
+def test_check_iter_rejects_non_iterables(bad):
 
     with pytest.raises(ValueError):
-        check_iter([1],minimum_allowed=1,minimum_inclusive=False)
+        check_iter(bad)
 
-    value = check_iter([1],minimum_allowed=1,minimum_inclusive=True)
+
+@pytest.mark.parametrize("good",GOOD_ITERABLES)
+def test_check_iter_accepts_iterables(good):
+
+    # Note: this case used to be dead. The original test built a list of good
+    # values and then looped over the *bad* list a second time, so nothing ever
+    # checked that a valid iterable is accepted.
+    out = check_iter(good)
+
+    # check_iter hands the value back, so the caller can use its return
+    assert out is not None or len(good) == 0
+
+
+@pytest.mark.parametrize("value,required_type",[
+    ([1,2,3],list),
+    (tuple([1,2,3]),tuple),
+    (np.arange(5),type(np.arange(1))),
+    (_ITER_DF,type(_ITER_DF)),
+])
+def test_check_iter_accepts_matching_required_iter_type(value,required_type):
+
+    out = check_iter(value,required_iter_type=required_type)
+    assert isinstance(out,required_type)
+
+
+@pytest.mark.parametrize("value,wrong_type",[
+    ([1,2,3],str),   ([1,2,3],tuple),   ([1,2,3],type(_ITER_DF)),
+    (tuple([1,2,3]),str), (tuple([1,2,3]),list), (tuple([1,2,3]),type(_ITER_DF)),
+    (np.arange(5),str), (np.arange(5),tuple), (np.arange(5),list),
+    (_ITER_DF,str), (_ITER_DF,tuple), (_ITER_DF,list),
+])
+def test_check_iter_rejects_wrong_required_iter_type(value,wrong_type):
 
     with pytest.raises(ValueError):
-        check_iter([1,2],maximum_allowed=1)
+        check_iter(value,required_iter_type=wrong_type)
+
+
+@pytest.mark.parametrize("value",[["test"],[1.0],[None],[1,1.0]])
+def test_check_iter_rejects_wrong_required_value_type(value):
 
     with pytest.raises(ValueError):
-        check_iter([1,2],maximum_allowed=2,maximum_inclusive=False)
+        check_iter(value,required_value_type=int)
 
-    value = check_iter([1,2],maximum_allowed=2,maximum_inclusive=True)
 
-    # check is_not_type
-    check_iter([1],is_not_type=str)
+def test_check_iter_accepts_matching_required_value_type():
+
+    assert np.array_equal(check_iter([1,2,3],required_value_type=int),[1,2,3])
+
+
+@pytest.mark.parametrize("kwargs",[
+    {"minimum_allowed":2},
+    {"minimum_allowed":1,"minimum_inclusive":False},
+])
+def test_check_iter_rejects_values_below_minimum(kwargs):
+
     with pytest.raises(ValueError):
-        check_iter("test",is_not_type=str)
+        check_iter([1],**kwargs)
+
+
+@pytest.mark.parametrize("kwargs",[
+    {"maximum_allowed":1},
+    {"maximum_allowed":2,"maximum_inclusive":False},
+])
+def test_check_iter_rejects_values_above_maximum(kwargs):
 
     with pytest.raises(ValueError):
-        check_iter("test",is_not_type=[str,list])
+        check_iter([1,2],**kwargs)
 
+
+def test_check_iter_accepts_inclusive_bounds():
+
+    assert np.array_equal(check_iter([1],minimum_allowed=1,minimum_inclusive=True),[1])
+    assert np.array_equal(check_iter([1,2],maximum_allowed=2,maximum_inclusive=True),[1,2])
+
+
+@pytest.mark.parametrize("value,is_not_type",[
+    ("test",str),
+    ("test",[str,list]),
+    ([1,2],[str,list]),
+])
+def test_check_iter_rejects_is_not_type(value,is_not_type):
+
+    # In the original these three lived inside a single `with pytest.raises`
+    # block, so only the first ever executed -- the other two were dead.
     with pytest.raises(ValueError):
-        check_iter([1,2],is_not_type=[str,list])
+        check_iter(value,is_not_type=is_not_type)
 
-    check_iter(tuple([1,2]),is_not_type=[str,list])
+
+@pytest.mark.parametrize("value,is_not_type",[
+    ([1],str),
+    (tuple([1,2]),[str,list]),
+])
+def test_check_iter_accepts_allowed_is_not_type(value,is_not_type):
+
+    assert np.array_equal(check_iter(value,is_not_type=is_not_type),value)
+
+
+def test_check_iter_returns_the_value():
+
+    assert np.array_equal(check_iter([1]),[1])
+
 
 def test_column_to_bool():
 

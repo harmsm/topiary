@@ -3,6 +3,7 @@ from topiary.reports.cards.species_tree import create_species_tree_card
 from topiary._private.supervisor import Supervisor
 import os
 
+@pytest.mark.smoke
 def test_create_species_tree_card(tiny_phylo, tmpdir, mocker):
     
     # Initialize supervisor from tiny_phylo dir

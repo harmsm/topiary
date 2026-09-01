@@ -38,7 +38,10 @@ class WaitingAnimation:
             self._status.append(" ".join(this_status))
         self._clear = num_stack*10*" " + "\r"
 
-        self._stop_queue = mp.Queue()
+        # Created in start() and torn down in stop() rather than here, so the
+        # queue's pipe and feeder thread are not held open for the lifetime of
+        # an animation object that may never be started.
+        self._stop_queue = None
         self._proc = None
 
     def _iterate(self,stop_queue):
@@ -67,6 +70,7 @@ class WaitingAnimation:
         sys.stdout.write(self._clear)
         sys.stdout.flush()
 
+        self._stop_queue = mp.Queue()
         self._proc = mp.Process(target=self._iterate,args=(self._stop_queue,))
         self._proc.start()
 
@@ -75,8 +79,27 @@ class WaitingAnimation:
         Stop the animation.
         """
 
-        self._stop_queue.put(True)
-        self._proc.join()
+        if self._proc is None:
+            return
+
+        try:
+            self._stop_queue.put(True)
+            self._proc.join()
+        finally:
+
+            # Release the queue's pipe/feeder thread and the process sentinel
+            # fd rather than waiting on the garbage collector. Without this,
+            # code that shows a spinner once per step leaks descriptors for
+            # the life of the run.
+            if self._proc.is_alive():
+                self._proc.terminate()
+                self._proc.join()
+            self._proc.close()
+            self._proc = None
+
+            self._stop_queue.close()
+            self._stop_queue.join_thread()
+            self._stop_queue = None
 
         sys.stdout.write(self._clear)
         sys.stdout.write("\n")

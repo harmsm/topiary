@@ -7,8 +7,6 @@ import topiary
 from topiary.quality import score_alignment
 from topiary._private import check
 
-import ete4 as ete
-
 import numpy as np
 import pandas as pd
 

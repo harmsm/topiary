@@ -9,7 +9,6 @@ from topiary.draw.core import get_round_to
 from topiary.draw.core import ete4_to_toytree
 from topiary.draw.core import parse_position_string
 from topiary.draw.core import color_to_css
-import ete4 as ete
 import topiary._private.check as check
 
 import toytree
@@ -87,6 +86,10 @@ class PrettyTree:
 
         # ----------------------------------------------------------------------
         # Load tree and give pretty tip names
+
+        # Imported here rather than at the top of the module because importing ete4
+        # pulls in scipy, which is slow (see also topiary/__init__.py).
+        import ete4 as ete
 
         # Convert tree into a toytree tree from ete4,
         if isinstance(T,toytree.ToyTree):

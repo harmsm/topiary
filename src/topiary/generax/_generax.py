@@ -7,7 +7,6 @@ GENERAX_BINARY = "generax"
 
 import topiary
 from topiary._private import interface
-from topiary._private.mpi import check_mpi_configuration
 from topiary._private import check
 
 import numpy as np
@@ -19,6 +18,7 @@ import time
 import random
 import string
 import shutil
+import shlex
 import copy
 
 def _annotate_species_tree(df,species_tree,out_dir):
@@ -244,7 +244,7 @@ def run_generax(run_directory,
                 other_args=[],
                 write_to_script=None,
                 supervisor=None,
-                num_threads=1,
+                generax_launch="",
                 generax_binary=GENERAX_BINARY):
 
     """
@@ -274,8 +274,11 @@ def run_generax(run_directory,
         :code:`bash script_file`.
     supervisor : Supervisor, optional
         supervisor instance to keep track of calculation inputs and outputs
-    num_threads : int, default=1
-        number of threads. if > 1, execute by mpirun -np num_threads
+    generax_launch : str, default=""
+        launcher prefix prepended verbatim to the generax command (e.g.
+        "mpirun -np 8"). Empty means run generax directly as a single process.
+        The caller is responsible for making sure whatever launcher is named is
+        available and that the necessary resources have been allocated.
     generax_binary : str, optional
         generax binary to use
 
@@ -299,27 +302,12 @@ def run_generax(run_directory,
         raise FileNotFoundError(err)
 
 
-    if num_threads != 1:
-
-        # Make sure we have this number of threads
-        check_mpi_configuration(num_threads)
-
-        # Get hosts and build mpirun command. 
-        hosts = topiary._private.mpi.get_hosts(num_threads)
-        
-        cmd = ["mpirun"]
-        cmd.extend(topiary._private.mpi.get_mpi_flags())
-        if topiary._private.mpi._get_mpi_oversubscribe():
-            cmd.append("--oversubscribe")
-        
-        cmd.extend(["-np", f"{num_threads:d}"])
-        if not all([h == "localhost" for h in hosts]):
-            cmd.extend(["--host",",".join(hosts)])
-            
-        cmd.append(abs_path_generax_binary)
-
-    else:
-        cmd = [abs_path_generax_binary]
+    # Prepend the (optional) user-supplied launcher prefix. Empty string means
+    # run generax directly as a single process. topiary does not interpret or
+    # validate the prefix -- the user owns their parallel launcher and resource
+    # allocation.
+    cmd = shlex.split(generax_launch)
+    cmd.append(abs_path_generax_binary)
 
     cmd.extend(["--families","control.txt"])
     cmd.extend(["--species-tree","species_tree.newick"])
@@ -386,7 +374,7 @@ def run_generax(run_directory,
     if supervisor is not None:
         supervisor.event("launching generax",
                          cmd=cmd,
-                         num_threads=num_threads)
+                         generax_launch=generax_launch)
 
     # Launch run
     try:

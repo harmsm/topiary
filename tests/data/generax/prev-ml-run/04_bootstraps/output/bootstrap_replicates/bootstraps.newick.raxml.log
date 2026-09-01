@@ -1,0 +1,55 @@
+
+RAxML-NG v. 1.1.0 released on 29.11.2021 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Apple M1 Pro, 10 cores, 16 GB RAM
+
+RAxML-NG was called at 13-Aug-2022 22:22:08 as follows:
+
+raxml-ng --bsconverge --bs-trees tests/data/generax/prev-ml-run/04_bootstraps/output/bootstrap_replicates/bootstraps.newick
+
+Analysis options:
+  run mode: A posteriori bootstrap convergence test
+  start tree(s): 
+  random seed: 1660454528
+  SIMD kernels: SSE3
+  parallelization: coarse-grained (auto), PTHREADS (auto)
+
+Reading bootstrap trees from file: tests/data/generax/prev-ml-run/04_bootstraps/output/bootstrap_replicates/bootstraps.newick
+Loaded 1000 trees with 14 taxa.
+
+Performing bootstrap convergence assessment using autoMRE criterion
+
+ # trees        avg WRF       avg WRF in %       # perms: wrf <= 3.00 %     converged?  
+      50         59.988             10.907                            4        NO
+     100         57.078              5.189                          190        NO
+     150        135.629              8.220                           26        NO
+     200        152.973              6.953                          158        NO
+     250        113.788              4.138                          408        NO
+     300        140.030              4.243                          289        NO
+     350        173.776              4.514                          189        NO
+     400        145.646              3.310                          367        NO
+     450        149.403              3.018                          480        NO
+     500        162.413              2.953                          509        NO
+     550        168.730              2.789                          552        NO
+     600        165.160              2.502                          615        NO
+     650        184.021              2.574                          604        NO
+     700        221.351              2.875                          530        NO
+     750        244.427              2.963                          544        NO
+     800        250.856              2.851                          578        NO
+     850        247.258              2.644                          612        NO
+     900        240.257              2.427                          614        NO
+     950        254.735              2.438                          610        NO
+    1000        300.622              2.733                          602        NO
+Bootstopping test did not converge after 1000 trees
+
+
+Execution log saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/generax/prev-ml-run/04_bootstraps/output/bootstrap_replicates/bootstraps.newick.raxml.log
+
+Analysis started: 13-Aug-2022 22:22:08 / finished: 13-Aug-2022 22:22:10
+
+Elapsed time: 1.943 seconds
+

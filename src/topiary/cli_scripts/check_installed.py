@@ -24,11 +24,16 @@ def main(argv=None):
 
     try:
         topiary._private.installed.validate_stack(to_check)
-    except RuntimeError:
-        print("\nNot all external programs are visible to topiary. Please make")
-        print("sure they are installed and that the $PATH environment variable")
-        print("has the directories containing the installed software.\n")
-        print("The current $PATH visible to topiary contains the following")
+    except RuntimeError as e:
+
+        # validate_stack raises a RuntimeError whose message already
+        # distinguishes between programs that are missing from the $PATH,
+        # programs whose version is too low, and programs that are present but
+        # crash when run (e.g. a binary compiled for a different architecture).
+        # Surface that message directly rather than assuming a $PATH problem.
+        print(str(e))
+
+        print("\nThe current $PATH visible to topiary contains the following")
         print("directories:")
 
         path_dirs = os.environ["PATH"].split(os.pathsep)

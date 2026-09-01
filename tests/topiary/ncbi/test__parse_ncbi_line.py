@@ -8,6 +8,7 @@ import numpy as np
 from topiary.ncbi._parse_ncbi_line import _grab_line_meta_data
 from topiary.ncbi._parse_ncbi_line import parse_ncbi_line
 
+@pytest.mark.smoke
 def test__grab_line_meta_data(ncbi_lines):
 
     # This function is implicitly and rigorously tested by test_parse_ncbi_line.
@@ -18,6 +19,7 @@ def test__grab_line_meta_data(ncbi_lines):
     assert out["structure"] is True
     assert out["isoform"] is False
 
+@pytest.mark.smoke
 def test_parse_ncbi_line(ncbi_lines):
 
     input_lines = ncbi_lines[0]

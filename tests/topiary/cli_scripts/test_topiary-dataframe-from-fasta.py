@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import os, subprocess, sys
 
+@pytest.mark.smoke
 def test_main(tmpdir):
 
     # Create fasta file

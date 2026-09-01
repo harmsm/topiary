@@ -14,15 +14,10 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
 
-    # Set arg types for args with None as default
-    optional_arg_types = {"num_threads": int,
-                          "threads_per_replicate": int}
-
     # Wrap and run function
     wrap_function(bootstrap_reconcile,
                   argv=argv,
-                  description=bootstrap_reconcile.__doc__,
-                  optional_arg_types=optional_arg_types)
+                  description=bootstrap_reconcile.__doc__)
 
 if __name__ == "__main__":
     main()

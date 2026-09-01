@@ -36,11 +36,17 @@ def test__construct_args():
     _construct_args(["S"]*11, {"db":"nr"}, max_query_length=1000, num_tries_allowed=3, keep_blast_xml=False, num_threads=3)
     _construct_args(["S"]*5, {"db":"nr"}, max_query_length=1000, num_tries_allowed=3, keep_blast_xml=False, num_threads=2)
 
-def test__ncbi_blast_thread_function(mocker):
-    
+def test__ncbi_blast_thread_function(mocker,tmpdir):
+
+    # This test mocks out os.remove, so the temporary blast xml the function
+    # writes never gets cleaned up. Run in tmpdir so those files land there
+    # instead of in whatever directory pytest was started from -- otherwise
+    # every run drops *_ncbi-blast-result.xml files into the repo root.
+    os.chdir(tmpdir)
+
     import topiary.ncbi
     topiary.ncbi.NCBI_REQUEST_FREQ = 0
-    
+
     mock_qblast = mocker.patch("Bio.Blast.NCBIWWW.qblast")
     mock_handle = mocker.MagicMock()
     mock_handle.read.return_value = "<xml>fake</xml>"
@@ -62,6 +68,7 @@ def test__ncbi_blast_thread_function(mocker):
     mock_qblast.side_effect = [mock_handle]
     assert _ncbi_blast_thread_function(this_query, num_tries_allowed=1, keep_blast_xml=False, lock=lock) is None
 
+@pytest.mark.smoke
 def test_ncbi_blast(mocker):
     
     mocker.patch("topiary.ncbi.blast.ncbi.threads.get_num_threads", return_value=2)

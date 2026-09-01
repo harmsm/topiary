@@ -17,8 +17,9 @@ dependencies:
   - toytree
   - blast>=2.2
   - muscle>=5.0
+  # openmpi is only needed because the bundled generax binary is compiled
+  # against it; topiary itself no longer uses MPI. (mpi4py has been removed.)
   - openmpi<5
-  - mpi4py
   - sphinx
   - sphinx_rtd_theme
   - pydata-sphinx-theme

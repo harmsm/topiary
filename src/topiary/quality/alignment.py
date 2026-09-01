@@ -239,11 +239,21 @@ def score_alignment(df,
 
     sparse_columns = _get_sparse_columns(seqs,sparse_column_cutoff)
     non_gap_sparse = np.logical_and(seqs != 20,sparse_columns)
-    fx_in_sparse = np.sum(non_gap_sparse,axis=1)/seqs.shape[1]
 
     dense_columns = np.logical_not(sparse_columns)
     gap_dense = np.logical_and(seqs == 20,dense_columns)
-    fx_missing_dense = np.sum(gap_dense,axis=1)/np.sum(dense_columns)
+
+    # Both of these ratios are 0/0 for a degenerate alignment: the first when
+    # there are no columns left at all (every column was gaps-only and got
+    # dropped), the second when every column is sparse so there are no dense
+    # columns to be missing from. NaN is the correct answer for an undefined
+    # fraction, and is already the sentinel these two columns use -- they are
+    # initialized to np.nan below and only filled in for kept sequences. So
+    # take the NaN deliberately rather than letting numpy warn about it on
+    # every run.
+    with np.errstate(invalid="ignore",divide="ignore"):
+        fx_in_sparse = np.sum(non_gap_sparse,axis=1)/seqs.shape[1]
+        fx_missing_dense = np.sum(gap_dense,axis=1)/np.sum(dense_columns)
 
     sparse_run_length = np.zeros(len(seqs))
     run_lengths, start_positions, values = _rle(dense_columns)

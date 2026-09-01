@@ -121,6 +121,7 @@ def test__synchronize_tree_rooting():
                 count += 1
     assert count == 1
 
+@pytest.mark.smoke
 def test_load_trees(tiny_phylo):
 
     # Reconciled trees
@@ -154,7 +155,6 @@ def test_load_trees(tiny_phylo):
 
 def test_load_trees_errors(tmpdir):
     import ete4 as ete
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Test mismatching leaves. Need 4+ leaves to be extra safe with ete4 unroot
@@ -184,11 +184,9 @@ def test_load_trees_errors(tmpdir):
     T = load_trees("empty_dir")
     assert T is None
 
-    os.chdir(cwd)
 
 def test_load_trees_topology_mismatch(tmpdir):
     import ete4 as ete
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Trees with different topologies.
@@ -204,7 +202,6 @@ def test_load_trees_topology_mismatch(tmpdir):
     with pytest.raises(ValueError, match="Cannot merge trees with different topologies"):
         load_trees(".", prefix="gene")
 
-    os.chdir(cwd)
 
 def test__merge_tree_features_missing_dist_support(tmpdir):
     import ete4 as ete
@@ -222,7 +219,6 @@ def test__merge_tree_features_missing_dist_support(tmpdir):
 
 def test_load_trees_unrooted(tmpdir):
     import ete4 as ete
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Create unrooted tree (3+ children at root) with distances for midpoint rooting
@@ -238,8 +234,8 @@ def test_load_trees_unrooted(tmpdir):
     assert T is not None
     assert len(T.children) == 2 # Should be binary rooted now
 
-    os.chdir(cwd)
 
+@pytest.mark.smoke
 def test_write_trees(small_phylo,tmpdir):
     cwd = os.getcwd()
     os.chdir(tmpdir)
@@ -351,8 +347,8 @@ def test_synchronize_rooting_edge_cases():
     T_list, root_on = _synchronize_tree_rooting([t], "gene")
     assert len(T_list) == 1
 
+@pytest.mark.smoke
 def test_write_trees_extended(small_phylo,tmpdir):
-    cwd = os.getcwd()
     os.chdir(tmpdir)
     T = load_trees(small_phylo["06_reconciled-tree-bootstraps/output"],prefix="reconciled")
     newick = write_trees(T,
@@ -426,12 +422,10 @@ def test_write_trees_extended(small_phylo,tmpdir):
     found = re.search("x",newick)
     assert found is None
     
-    os.chdir(cwd)
 
 def test_write_trees_errors(tmpdir):
     from topiary.io.tree import write_trees
     import ete4 as ete
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     t = ete.Tree("(A:0.1,B:0.1):0.1;")
@@ -453,21 +447,40 @@ def test_write_trees_errors(tmpdir):
     with pytest.raises(FileExistsError, match="exists but is a directory"):
         write_trees(t, out_file="is_dir")
 
-    os.chdir(cwd)
 
 def test_read_tree_format_loop(mocker):
     from topiary.io.tree import read_tree
     import ete4 as ete
+
+    real_Tree = ete.Tree
+    good_tree = real_Tree("(A:0.1,B:0.1):0.1;")
+
+    # read_tree imports ete4 inside the function body, so patch ete4 itself
+    # rather than topiary.io.tree. The replacement has to be a class (not a
+    # Mock) because read_tree also does isinstance(tree,ete.Tree).
+    calls = []
+
+    class FailOnceTree:
+        def __new__(cls,*args,**kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise Exception("fail")
+            return good_tree
+
     # Mock ete4.Tree to fail once then succeed
-    mock_tree = mocker.patch("topiary.io.tree.Tree", side_effect=[Exception("fail"), ete.Tree("(A:0.1,B:0.1):0.1;")])
-    
+    mocker.patch("ete4.Tree", FailOnceTree)
+
     # This should trigger the format loop (82-85)
     t = read_tree("(A,B);", fmt=None)
-    assert isinstance(t, ete.Tree)
-    assert mock_tree.call_count >= 2
+    assert isinstance(t, real_Tree)
+    assert len(calls) >= 2
 
     # Test full loop failure (90-92)
-    mocker.patch("topiary.io.tree.Tree", side_effect=Exception("always fail"))
+    class AlwaysFailTree:
+        def __new__(cls,*args,**kwargs):
+            raise Exception("always fail")
+
+    mocker.patch("ete4.Tree", AlwaysFailTree)
     with pytest.raises(ValueError, match="Could not parse tree!"):
         read_tree("(A,B);", fmt=None)
 

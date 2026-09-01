@@ -4,6 +4,7 @@ from topiary._private.supervisor import Supervisor
 import os
 import shutil
 
+@pytest.mark.smoke
 def test_create_model_card(tiny_phylo, tmpdir):
     
     # Initialize supervisor from tiny_phylo dir

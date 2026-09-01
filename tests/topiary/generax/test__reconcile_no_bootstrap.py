@@ -13,7 +13,6 @@ import os
 @pytest.mark.run_generax
 def test_reconcile_no_bootstrap(generax_data,tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     input_dir = os.path.join(generax_data["toy-input"],"toy-ml","output")
@@ -34,7 +33,7 @@ def test_reconcile_no_bootstrap(generax_data,tmpdir):
               "allow_horizontal_transfer":True,
               "seed":True,
               "overwrite":False,
-              "num_threads":1,
+              "generax_launch":"",
               "generax_binary":GENERAX_BINARY}
 
     tT = reconcile_no_bootstrap(**kwargs)
@@ -60,4 +59,3 @@ def test_reconcile_no_bootstrap(generax_data,tmpdir):
     # Correct toplogy
     assert output_T.robinson_foulds(correct_T,unrooted_trees=True)[0] == 0
 
-    os.chdir(current_dir)

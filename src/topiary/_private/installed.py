@@ -8,6 +8,75 @@ import subprocess
 import shutil
 import os
 import re
+import signal
+
+
+def _build_diagnostic(ret):
+    """
+    Build a diagnostic dictionary describing why a binary failed to run.
+
+    Parameters
+    ----------
+    ret : subprocess.CompletedProcess
+        return value from a subprocess.run call that exited non-zero (or was
+        killed by a signal).
+
+    Returns
+    -------
+    diagnostic : dict
+        dictionary with keys:
+        + :code:`returncode` : int. The process return code. When the process
+          was killed by a signal, this is negative (:code:`-signal_number`).
+        + :code:`signal` : str or None. Name of the signal that killed the
+          process (e.g. :code:`"SIGILL"`) or None if it exited normally with a
+          non-zero code.
+        + :code:`stdout` : str. Captured standard output.
+        + :code:`stderr` : str. Captured standard error.
+    """
+
+    def _decode(stream):
+        if stream is None:
+            return ""
+        try:
+            return stream.decode()
+        except (AttributeError, UnicodeDecodeError):
+            return str(stream)
+
+    signal_name = None
+    if ret.returncode < 0:
+        try:
+            signal_name = signal.Signals(-ret.returncode).name
+        except (ValueError, KeyError):
+            signal_name = f"signal {-ret.returncode}"
+
+    return {"returncode": ret.returncode,
+            "signal": signal_name,
+            "stdout": _decode(ret.stdout),
+            "stderr": _decode(ret.stderr)}
+
+
+def _format_diagnostic(diagnostic):
+    """
+    Build a short, human-readable, one-line summary of a failure diagnostic.
+
+    Parameters
+    ----------
+    diagnostic : dict or None
+        diagnostic dict returned by :code:`_build_diagnostic`, or None.
+
+    Returns
+    -------
+    summary : str
+        one-line description of how the binary failed.
+    """
+
+    if diagnostic is None:
+        return "found but did not run"
+
+    if diagnostic["signal"] is not None:
+        return f"killed by signal {diagnostic['signal']}"
+
+    return f"exited with non-zero return code {diagnostic['returncode']}"
 
 
 def _version_checker(cmd,version_slicer):
@@ -34,17 +103,22 @@ def _version_checker(cmd,version_slicer):
         + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
           the :code:`.` character, so this will always be a tuple but may have
           any length > 1. Also, the elements will be :code:`str` not :code:`int`.
+    diagnostic : dict or None
+        None unless the binary was found but exited non-zero (the
+        :code:`(-1,-1,-1)` case), in which case this is the dict returned by
+        :code:`_build_diagnostic` describing the failure (return code, signal,
+        and captured stdout/stderr).
     """
 
     # Get path to binary file
     binary_path = shutil.which(cmd[0])
     if binary_path is None:
-        return None, (-2,-2,-2)
+        return None, (-2,-2,-2), None
 
     # Run and attempt to get version
     ret = subprocess.run(cmd,capture_output=True)
     if ret.returncode != 0:
-        return binary_path, (-1,-1,-1)
+        return binary_path, (-1,-1,-1), _build_diagnostic(ret)
 
     try:
         version = version_slicer(ret)
@@ -52,9 +126,9 @@ def _version_checker(cmd,version_slicer):
             version = version[1:]
         version = tuple(version.split("."))
     except:
-        return binary_path, (0,0,0)
+        return binary_path, (0,0,0), None
 
-    return binary_path, version
+    return binary_path, version, None
 
 
 def check_muscle(binary=None):
@@ -73,6 +147,11 @@ def check_muscle(binary=None):
         + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
           the :code:`.` character, so this will always be a tuple but may have
           any length > 1. Also, the elements will be :code:`str` not :code:`int`.
+    diagnostic : dict or None
+        None unless the binary was found but exited non-zero (the
+        :code:`(-1,-1,-1)` case), in which case this is a dict describing the
+        failure (return code, signal name, and captured stdout/stderr). See
+        :code:`_build_diagnostic`.
     """
 
     def _version_slicer(ret):
@@ -100,6 +179,11 @@ def check_generax(binary=None):
         + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
           the :code:`.` character, so this will always be a tuple but may have
           any length > 1. Also, the elements will be :code:`str` not :code:`int`.
+    diagnostic : dict or None
+        None unless the binary was found but exited non-zero (the
+        :code:`(-1,-1,-1)` case), in which case this is a dict describing the
+        failure (return code, signal name, and captured stdout/stderr). See
+        :code:`_build_diagnostic`.
     """
 
     def _version_slicer(ret):
@@ -113,16 +197,7 @@ def check_generax(binary=None):
     if binary is None:
         binary = "generax"
 
-    path, version = _version_checker([binary],_version_slicer)
-    
-    # If the binary is found but crashes, it may be because it was compiled
-    # natively with OpenMPI on a SLURM cluster and requires mpirun to execute.
-    if version == (-1, -1, -1):
-        _, mpi_version = _version_checker(["mpirun", "-np", "1", binary], _version_slicer)
-        if mpi_version != (-2, -2, -2) and mpi_version != (-1, -1, -1):
-            version = mpi_version
-
-    return path, version
+    return _version_checker([binary],_version_slicer)
 
 
 def check_raxml(binary=None):
@@ -141,6 +216,11 @@ def check_raxml(binary=None):
         + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
           the :code:`.` character, so this will always be a tuple but may have
           any length > 1. Also, the elements will be :code:`str` not :code:`int`.
+    diagnostic : dict or None
+        None unless the binary was found but exited non-zero (the
+        :code:`(-1,-1,-1)` case), in which case this is a dict describing the
+        failure (return code, signal name, and captured stdout/stderr). See
+        :code:`_build_diagnostic`.
     """
 
     def _version_slicer(ret):
@@ -153,16 +233,7 @@ def check_raxml(binary=None):
     if binary is None:
         binary = "raxml-ng"
 
-    path, version = _version_checker([binary],_version_slicer)
-    
-    # If the binary is found but crashes, it may be because it was compiled
-    # natively with OpenMPI on a SLURM cluster and requires mpirun to execute.
-    if version == (-1, -1, -1):
-        _, mpi_version = _version_checker(["mpirun", "-np", "1", binary], _version_slicer)
-        if mpi_version != (-2, -2, -2) and mpi_version != (-1, -1, -1):
-            version = mpi_version
-
-    return path, version
+    return _version_checker([binary],_version_slicer)
 
 
 def check_blastp(binary=None):
@@ -181,6 +252,11 @@ def check_blastp(binary=None):
         + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
           the :code:`.` character, so this will always be a tuple but may have
           any length > 1. Also, the elements will be :code:`str` not :code:`int`.
+    diagnostic : dict or None
+        None unless the binary was found but exited non-zero (the
+        :code:`(-1,-1,-1)` case), in which case this is a dict describing the
+        failure (return code, signal name, and captured stdout/stderr). See
+        :code:`_build_diagnostic`.
     """
 
     def _version_slicer(ret):
@@ -207,6 +283,11 @@ def check_makeblastdb(binary=None):
         + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
           the :code:`.` character, so this will always be a tuple but may have
           any length > 1. Also, the elements will be :code:`str` not :code:`int`.
+    diagnostic : dict or None
+        None unless the binary was found but exited non-zero (the
+        :code:`(-1,-1,-1)` case), in which case this is a dict describing the
+        failure (return code, signal name, and captured stdout/stderr). See
+        :code:`_build_diagnostic`.
     """
 
     def _version_slicer(ret):
@@ -233,6 +314,11 @@ def check_git(binary=None):
         + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
           the :code:`.` character, so this will always be a tuple but may have
           any length > 1. Also, the elements will be :code:`str` not :code:`int`.
+    diagnostic : dict or None
+        None unless the binary was found but exited non-zero (the
+        :code:`(-1,-1,-1)` case), in which case this is a dict describing the
+        failure (return code, signal name, and captured stdout/stderr). See
+        :code:`_build_diagnostic`.
     """
 
     def _version_slicer(ret):
@@ -240,32 +326,6 @@ def check_git(binary=None):
 
     if binary is None:
         binary = "git"
-
-    return _version_checker([binary,"--version"],_version_slicer)
-
-def check_mpirun(binary=None):
-    """
-    Check for mpirun in the PATH and get its version.
-
-    Returns
-    -------
-    binary_path : str or None
-        path to binary. If program is not in the path, return None
-    version : tuple
-        output meanings:
-        + :code:`(-2,-2,-2)`, not found
-        + :code:`(-1,-1,-1)`, found but does not run
-        + :code:`(0,0,0)` found but could not figure out version
-        + :code:`(major,minor,patch)` i.e. (3.8.1). This is done by splitting on
-          the :code:`.` character, so this will always be a tuple but may have
-          any length > 1. Also, the elements will be :code:`str` not :code:`int`.
-    """
-
-    def _version_slicer(ret):
-        return ret.stdout.decode().split("\n")[0].split()[-1]
-
-    if binary is None:
-        binary = "mpirun"
 
     return _version_checker([binary,"--version"],_version_slicer)
 
@@ -341,11 +401,11 @@ def validate_stack(to_check):
                     "raxml-ng":check_raxml,
                     "generax":check_generax,
                     "muscle":check_muscle,
-                    "git":check_git,
-                    "mpirun":check_mpirun}
+                    "git":check_git}
 
     out = []
     bad_prog = []
+    crashed = []
     for check in to_check:
 
         program = check["program"]
@@ -364,7 +424,7 @@ def validate_stack(to_check):
 
         fcn = binary_tests[program]
 
-        binary, version = fcn(binary)
+        binary, version, diagnostic = fcn(binary)
 
         if version == (-2,-2,-2):
             installed =   "N"
@@ -410,19 +470,51 @@ def validate_stack(to_check):
         out.append(f"    minimum version: {min_version_str}")
         out.append(f"    passes:          {passes}")
 
-        if passes == "N" or (passes == "?" and must_pass):
+        # Binary was found but crashed when run. This is a distinct failure
+        # mode from "not in the $PATH" or "version too low" -- surface the
+        # captured error so it is not silently absorbed as a version/$PATH
+        # problem.
+        if version == (-1,-1,-1):
+            out.append(f"    binary error:    {_format_diagnostic(diagnostic)}")
+            crashed.append((program,binary_path,diagnostic))
+        elif passes == "N" or (passes == "?" and must_pass):
             bad_prog.append((program,min_version_str))
 
         out.append("")
 
     print("\n".join(out),flush=True)
 
-    if len(bad_prog) > 0:
-        err = "\nNot all programs available. Please make sure that the following\n"
-        err += "programs are in the $PATH.\n"
-        for b, v in bad_prog:
-            err += f" + {b}>={v}\n"
-        err += "\n"
+    if len(bad_prog) > 0 or len(crashed) > 0:
+
+        err = "\n"
+
+        if len(bad_prog) > 0:
+            err += "Not all programs available. Please make sure that the following\n"
+            err += "programs are in the $PATH with a sufficient version.\n"
+            for b, v in bad_prog:
+                err += f" + {b}>={v}\n"
+            err += "\n"
+
+        if len(crashed) > 0:
+            err += "The following programs were found in the $PATH but crashed when\n"
+            err += "run. This usually means the binary is incompatible with this\n"
+            err += "machine -- most often because it was compiled for a different\n"
+            err += "CPU/architecture than the one it is running on. On a cluster,\n"
+            err += "this happens when a binary is compiled on the head node but run\n"
+            err += "on a compute node with a different architecture (or vice versa).\n"
+            err += "Make sure raxml-ng and generax are compiled on the same type of\n"
+            err += "node they will run on.\n\n"
+            for program, binary_path, diagnostic in crashed:
+                err += f" + {program} ({binary_path}): {_format_diagnostic(diagnostic)}\n"
+                if diagnostic is not None:
+                    detail = diagnostic["stderr"].strip()
+                    if detail == "":
+                        detail = diagnostic["stdout"].strip()
+                    if detail != "":
+                        for line in detail.splitlines():
+                            err += f"     {line}\n"
+                err += "\n"
+
         err += "The current $PATH visible to python is:\n"
         err += f"    {os.environ['PATH']}"
         err += "\n"

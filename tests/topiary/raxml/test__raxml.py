@@ -27,7 +27,6 @@ def test_run_raxml(tiny_phylo,tmpdir):
     alignment = tiny_phylo["final-output/alignment.phy"]
     raxml_binary = shutil.which(RAXML_BINARY)
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     # Real functionality is tested for specific phylogenetic situations via
@@ -348,7 +347,6 @@ def test_run_raxml(tiny_phylo,tmpdir):
     # dir
     assert os.getcwd() == tmpdir
 
-    os.chdir(current_dir)
 
 @pytest.mark.run_raxml
 def test_integrated_run_raxml(tiny_phylo,tmpdir):
@@ -360,7 +358,6 @@ def test_integrated_run_raxml(tiny_phylo,tmpdir):
     alignment = tiny_phylo["final-output/alignment.phy"]
     raxml_binary = shutil.which(RAXML_BINARY)
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     # Real functionality is tested for specific phylogenetic situations via
@@ -398,4 +395,3 @@ def test_integrated_run_raxml(tiny_phylo,tmpdir):
     assert os.path.isfile(os.path.join("test22","alignment.phy.raxml.bestTree"))
 
 
-    os.chdir(current_dir)

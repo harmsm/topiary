@@ -6,6 +6,7 @@ from topiary._private.check import check_topiary_dataframe
 import numpy as np
 import pandas as pd
 
+@pytest.mark.smoke
 def test_check_topiary_dataframe(test_dataframes):
     """
     Test check for topiary dataframe.

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing
 
+@pytest.mark.smoke
 def test__get_quality_scores(test_dataframes):
 
     # Get copy of the dataframe -- we're going to hack it
@@ -100,6 +101,7 @@ def test__construct_args():
     assert np.array_equal(kwargs_list[0]["i_block"],(0,4))
     assert np.array_equal(kwargs_list[0]["j_block"],(0,4))
 
+@pytest.mark.smoke
 def test__compare_seqs(test_dataframes):
 
     A_seq = "TEST"
@@ -191,6 +193,7 @@ def test__redundancy_thread_function():
     assert keep_array[2] == 1
 
 
+@pytest.mark.smoke
 def test_remove_redundancy(test_dataframes):
 
     df = test_dataframes["good-df"].copy()
@@ -299,6 +302,7 @@ def test_remove_redundancy(test_dataframes):
     out_df = remove_redundancy(df=df,cutoff=0.2)
     assert np.sum(out_df.keep) == 1
 
+@pytest.mark.smoke
 def test_find_redundancy_cutoff(test_dataframes):
     df = test_dataframes["good-df"].copy()
     
@@ -324,3 +328,95 @@ def test_find_redundancy_cutoff(test_dataframes):
 
     # Test min == max returns immediately
     assert find_redundancy_cutoff(df, target_seq_number=3, min_cutoff=0.5, max_cutoff=0.5) == 0.5
+
+def _graded_similarity_df(n=10):
+    """
+    Sequences with graded divergence, so different identity cutoffs give
+    genuinely different keep counts. Needed to make find_redundancy_cutoff
+    actually search rather than hitting one of its early returns.
+    """
+
+    base = "MASTPDLLKWAQRSTVYNEGHIKLMNPQRSTV"
+
+    seqs = []
+    for i in range(n):
+        s = list(base)
+        for j in range(i):
+            s[j] = "A"
+        seqs.append("".join(s))
+
+    return pd.DataFrame({
+        "name":[f"s{i}" for i in range(n)],
+        "species":[f"Species {i}" for i in range(n)],
+        "sequence":seqs,
+        "keep":[True]*n,
+        "uid":[f"uid{i:07d}" for i in range(n)],
+    })
+
+
+@pytest.mark.smoke
+def test_find_redundancy_cutoff_searches_between_bounds():
+    """
+    The interesting path: the target lies strictly between what max_cutoff and
+    min_cutoff produce, so the function has to run its binary search.
+
+    sample_fx=1.0 so the whole dataframe is used and the result is
+    deterministic (the default samples a random half).
+    """
+
+    df = _graded_similarity_df()
+
+    # cutoff 0.99 keeps 9, cutoff 0.25 keeps 1 -- so a target of 3 is reachable
+    # only by searching.
+    cutoff = find_redundancy_cutoff(df,
+                                    target_seq_number=3,
+                                    sample_fx=1.0,
+                                    max_cutoff=0.99,
+                                    min_cutoff=0.25,
+                                    num_threads=1)
+
+    assert 0.25 <= cutoff <= 0.99
+
+    # And the cutoff it found actually gets near the target
+    out = remove_redundancy(df.copy(),cutoff=cutoff,silent=True,num_threads=1)
+    assert abs(np.sum(out.keep) - 3) <= 2
+
+
+@pytest.mark.smoke
+def test_find_redundancy_cutoff_respects_max_iterations():
+    """
+    With a tiny iteration budget the search stops early and returns the best
+    cutoff seen so far rather than looping forever.
+    """
+
+    df = _graded_similarity_df()
+
+    cutoff = find_redundancy_cutoff(df,
+                                    target_seq_number=3,
+                                    sample_fx=1.0,
+                                    max_cutoff=0.99,
+                                    min_cutoff=0.25,
+                                    max_iterations=1,
+                                    num_threads=1)
+
+    assert 0.25 <= cutoff <= 0.99
+
+
+@pytest.mark.smoke
+def test_find_redundancy_cutoff_exact_hit_returns_immediately():
+    """
+    If a probed cutoff lands exactly on the target, that cutoff is returned
+    without further searching.
+    """
+
+    df = _graded_similarity_df()
+
+    # cutoff 0.99 keeps exactly 9, so asking for 9 returns max_cutoff directly
+    cutoff = find_redundancy_cutoff(df,
+                                    target_seq_number=9,
+                                    sample_fx=1.0,
+                                    max_cutoff=0.99,
+                                    min_cutoff=0.25,
+                                    num_threads=1)
+
+    assert cutoff == 0.99

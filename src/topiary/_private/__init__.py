@@ -15,8 +15,7 @@ software_requirements = {"blastp":(2,0),
                          "makeblastdb":(2,0),
                          "muscle":(5,0),
                          "generax":(2,0),
-                         "raxml-ng":(1,1),
-                         "mpirun":(0,0)}
+                         "raxml-ng":(1,1)}
 
 
 from .uid import generate_uid

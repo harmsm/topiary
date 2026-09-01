@@ -8,13 +8,25 @@ from topiary._private import check
 import opentree
 from opentree import OT, taxonomy_helpers
 import dendropy as dp
-import ete4 as ete
+
+# The opentree client keeps every API response forever: each call appends a
+# record to OT.ws.call_history, and each record holds the requests.Response
+# object, which pins the underlying socket open. Nothing ever releases them, so
+# a process leaks one file descriptor per Open Tree of Life call and eventually
+# dies with "Too many open files".
+#
+# That bites real runs -- seed_to_alignment makes an OTL call per species block
+# -- and not just the test suite. topiary never reads call_history, so turn the
+# recording off. See tests/topiary/opentree/test_ott_leak.py for the regression
+# test.
+OT.ws._store_api_calls = False
 
 import pandas as pd
 import numpy as np
 
 import re
 import time
+import warnings
 
 def _validate_ott_or_species(ott_list=None,species_list=None):
     """
@@ -74,6 +86,140 @@ def _validate_ott_or_species(ott_list=None,species_list=None):
     return final_ott_list
 
 
+# Taxonomic context used for all TNRS queries. OpenTree's TNRS infers a context
+# from the batch of names it is sent. A batch dominated by one clade narrows
+# that context, and species outside it then come back with zero matches even
+# though they match fine on their own (e.g. adding "Homo sapiens" to
+# ["Octopus sinensis","Hypanus sabinus"] narrows the context to Mammals and
+# drops both of the others). Asking for the widest context keeps every species
+# in scope, while still leaving genuinely ambiguous names as multiple matches.
+_TNRS_CONTEXT = "All life"
+
+def _tnrs_query(species_list,context_name=_TNRS_CONTEXT):
+    """
+    Run a TNRS query against opentree, returning matches keyed to the query
+    name.
+
+    Parameters
+    ----------
+    species_list : list
+        list of species names (str) to query
+    context_name : str
+        taxonomic context to search within
+
+    Returns
+    -------
+    matches : dict
+        dictionary of match lists keyed to the queried species name. Species
+        that opentree did not return at all are absent from the dictionary.
+    """
+
+    if len(species_list) == 0:
+        return {}
+
+    ot_matches = OT.tnrs_match(species_list,
+                               context_name=context_name,
+                               do_approximate_matching=True)
+
+    # Key the results by the query string each result carries rather than by
+    # position in the response. opentree does not promise to return results in
+    # the order they were sent, or to return one result per query; keying by
+    # name means a reordered or short response can never silently attach
+    # matches to the wrong species.
+    matches = {}
+    for result in ot_matches.response_dict["results"]:
+        matches[result["name"]] = result["matches"]
+
+    return matches
+
+def _parse_tnrs_matches(s,matches):
+    """
+    Build the results entry for a single species from its TNRS matches.
+
+    Parameters
+    ----------
+    s : str
+        species name that was queried
+    matches : list
+        list of matches opentree returned for that species (may be empty)
+
+    Returns
+    -------
+    result : dict
+        dictionary with matched, num_matches, msg, ret, ott_id, ott_name, and
+        taxid keys
+    """
+
+    # Parse matches: 0, 1, or many
+    if len(matches) == 0:
+        msg = f"No match for '{s}'.\n"
+        return {"matched":False,
+                "num_matches":0,
+                "msg":msg,
+                "ret":matches,
+                "ott_id":None,
+                "ott_name":None,
+                "taxid":None}
+
+    elif len(matches) == 1:
+        taxon = matches[0]["taxon"]
+        result = {"matched":not matches[0]["is_approximate_match"],
+                  "num_matches":1,
+                  "msg":"success",
+                  "ret":matches}
+    else:
+
+        taxon = matches[0]["taxon"]
+
+        if matches[0]["is_approximate_match"]:
+
+            msg = f"No exact match for '{s}'. Approximate matches:\n"
+            for m in matches:
+                msg += f"    {m['matched_name']}\n"
+            msg += "\n"
+
+        else:
+
+            ambiguous_match = False
+            for j in range(1,len(matches)):
+                if not matches[j]["is_synonym"]:
+                    ambiguous_match = True
+                    break
+
+            if ambiguous_match:
+                msg = "multiple matches"
+            else:
+                msg = "success"
+
+        result = {"matched":not matches[0]["is_approximate_match"],
+                  "num_matches":len(matches),
+                  "msg":msg,
+                  "ret":matches}
+
+    result["ott_id"] = taxon["ott_id"]
+    result["ott_name"] = taxon["name"]
+
+    # Try to get taxid from the ott taxon entry
+    taxid = None
+    try:
+        tax_sources = taxon["tax_sources"]
+        for t in tax_sources:
+            if t.startswith("ncbi"):
+                taxid = int(t.split(":")[1])
+                break
+    except KeyError:
+        pass
+
+    if taxid is None:
+        try:
+            taxid = topiary.ncbi.entrez.get_taxid(s)
+        except RuntimeError:
+            pass
+
+    result["taxid"] = taxid
+
+    return result
+
 def species_to_ott(species):
     """
     Return ott ids (and other information) given a list of species.
@@ -108,11 +254,13 @@ def species_to_ott(species):
      + taxid: NCBI taxid or None if no NCBI taxid associated with record
      + resolved: bool. whether or not species is resolved on synthetic tree
 
-    The opentree tnrs_match api is smart enough to infer context from
-    the species you pass in. If you pass in an ambiguous species name, it
-    will select the species based on the other species in the list. If the
-    species cannot be inferred from the other species context, this function
-    will return no ott for the ambiguous species.
+    The opentree tnrs_match api infers a taxonomic context from the species
+    you pass in, which helps it disambiguate ambiguous names but also means a
+    batch dominated by one clade can drop species that fall outside that clade.
+    To avoid this, queries are made against the widest context ("All life") and
+    any species that still comes back unmatched is re-queried on its own.
+    Species that cannot be matched are returned with an ott of None and raise a
+    warning naming them.
     """
 
     # Make sure species list is sane
@@ -138,87 +286,23 @@ def species_to_ott(species):
     unique_species = list(set(clean_species))
     unique_species.sort()
 
-    # Grab species names
-    ot_matches = OT.tnrs_match(unique_species,do_approximate_matching=True)
+    # Grab species names, forcing the widest taxonomic context so that the
+    # composition of the batch cannot narrow the search (see _TNRS_CONTEXT).
+    matches = _tnrs_query(unique_species)
+
+    # Give any species that still did not match a second look on its own. A
+    # solo query can succeed where a batch query failed, and this also covers
+    # any species opentree simply left out of its response.
+    for s in unique_species:
+        if len(matches.get(s,[])) == 0:
+            solo_matches = _tnrs_query([s])
+            if len(solo_matches.get(s,[])) > 0:
+                matches[s] = solo_matches[s]
 
     results = {}
-    for i, result in enumerate(ot_matches.response_dict["results"]):
+    for s in unique_species:
+        results[s] = _parse_tnrs_matches(s,matches.get(s,[]))
 
-        s = unique_species[i]
-
-        # Parse matches: 0, 1, or many
-        matches = result["matches"]
-        if len(matches) == 0:
-            msg = f"Not match for '{s}'.\n"
-            results[s] = {"matched":False,
-                          "num_matches":0,
-                          "msg":msg,
-                          "ret":matches,
-                          "ott_id":None,
-                          "ott_name":None,
-                          "taxid":None}
-            continue
-
-        elif len(matches) == 1:
-            taxon = matches[0]["taxon"]
-            results[s] = {"matched":not matches[0]["is_approximate_match"],
-                          "num_matches":1,
-                          "msg":"success",
-                          "ret":matches}
-        else:
-
-            taxon = matches[0]["taxon"]
-
-            if matches[0]["is_approximate_match"]:
-
-                msg = f"No exact match for '{s}'. Approximate matches:\n"
-                for m in matches:
-                    msg += f"    {m['matched_name']}\n"
-                msg += "\n"
-
-            else:
-
-                ambiguous_match = False
-                for j in range(1,len(matches)):
-                    if not matches[j]["is_synonym"]:
-                        ambiguous_match = True
-                        break
-
-                if ambiguous_match:
-                    msg = "multiple matches"
-                else:
-                    msg = "success"
-
-            results[s] = {"matched":not matches[0]["is_approximate_match"],
-                          "num_matches":len(matches),
-                          "msg":msg,
-                          "ret":matches}
-
-        results[s]["ott_id"] = taxon["ott_id"]
-        results[s]["ott_name"] = taxon["name"]
-
-        # Try to get taxid from the ott taxon entry
-        taxid = None
-        try:
-            tax_sources = taxon["tax_sources"]
-            for t in tax_sources:
-                if t.startswith("ncbi"):
-                    taxid = int(t.split(":")[1])
-                    break
-        except KeyError:
-            pass
-
-        if taxid is None:
-            try:
-                taxid = topiary.ncbi.entrez.get_taxid(s)
-            except RuntimeError:
-                pass
-
-        results[s]["taxid"] = taxid
-
-    # Create list of ott from these results
-    ott_list = []
-    species_list = []
     # Map all original species names back to the results for the cleaned names
     for i in range(len(species)):
         results[species[i]] = results[clean_species[i]]
@@ -229,7 +313,7 @@ def species_to_ott(species):
     for i in range(len(species)):
         s_clean = clean_species[i]
         s_orig = species[i]
-        
+
         m = results[s_clean]
         if m["msg"] == "success":
             ott_list.append(m["ott_id"])
@@ -237,6 +321,21 @@ def species_to_ott(species):
         else:
             ott_list.append(None)
             species_list.append(s_orig)
+
+    # Tell the caller about anything we could not assign. Without this, a query
+    # for 68 species that resolves 66 of them comes back looking fine.
+    no_ott = []
+    for i in range(len(species)):
+        if ott_list[i] is None and species[i] not in no_ott:
+            no_ott.append(species[i])
+
+    if len(no_ott) > 0:
+        w = f"\n{len(no_ott)} of {len(set(species))} species could not be assigned\n"
+        w += "an ott id and will have ott set to None:\n\n"
+        for s in no_ott:
+            w += f"    {s}: {results[s]['msg'].strip()}\n"
+        w += "\n"
+        warnings.warn(w)
 
     return ott_list, species_list, results
 
@@ -320,6 +419,10 @@ def ott_to_species_tree(ott_list=None,species_list=None):
     for bad in ret["non-monophyletic_taxa"].keys():
         ott_id = ret["non-monophyletic_taxa"][bad]["ott_id"]
         not_monophyletic.append(ott_id)
+
+    # Imported here rather than at the top of the module because importing ete4
+    # pulls in scipy, which is slow (see also topiary/__init__.py).
+    import ete4 as ete
 
     # Write out without all the ancestor junk returned by opentree
     t = ret["labelled_tree"].as_string(schema="newick",

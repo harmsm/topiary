@@ -67,10 +67,57 @@ exclude = ["tests*"]
 topiary = ["reports/assets/*"]
 
 [tool.pytest.ini_options]
-filterwarnings = ["ignore:invalid escape sequence:DeprecationWarning"]
+filterwarnings = [
+    # A warning that escapes a test is a failure. If a test expects a warning,
+    # assert on it with pytest.warns(...) instead of letting it print -- that
+    # turns noise into a checked contract.
+    #
+    # If a *dependency* starts emitting a deprecation warning on some platform,
+    # add a narrow ignore for that specific warning here. Do not delete the
+    # "error" line to make it pass.
+    "error",
+
+    # ete4 parses newick files with `data = open(data).read()` and lets
+    # refcounting close the handle. Under CPython the file is closed
+    # immediately, so this is third-party noise rather than a descriptor leak
+    # (confirmed: fd counts stay flat -- see tests/BASELINE.md). Fixing it
+    # would mean rewriting every ete4 call site in topiary to pass strings.
+    # Use `pytest --fd-report` to hunt real descriptor leaks; this filter does
+    # not hide those.
+    "ignore::ResourceWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+]
 markers = [
     "run_generax: marks tests as involving generax",
     "run_raxml: marks tests as involving raxml",
     "run_blast: marks tests as involving blast",
     "run_ncbi_server: marks tests as accessing the NCBI server",
+    "network: marks tests that require live internet access",
+    "unit: hermetic and fast -- no network, no subprocess, no external binary (assigned automatically)",
+    "smoke: real data and real file I/O, deterministic, takes a moment",
+    "integration: needs an external binary or a live service (derived from the --run-* markers)",
 ]
+
+[tool.coverage.run]
+# Measure topiary only. Without this, coverage.py instruments everything it
+# imports -- including installed dependencies (e.g. an editable ete4 checkout)
+# and the test files themselves -- which makes the reported total meaningless.
+source = ["src/topiary"]
+branch = true
+
+[tool.coverage.report]
+# Belt and braces: even if something outside src/topiary sneaks into the data
+# file, keep it out of the report.
+include = ["src/topiary/*"]
+omit = ["*/__pycache__/*"]
+show_missing = true
+exclude_also = [
+    # Script entry points are exercised via the console scripts, not by import.
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.html]
+directory = "reports/htmlcov"
+
+[tool.coverage.xml]
+output = "reports/coverage/coverage.xml"

@@ -56,6 +56,12 @@ reports/*
 # Django stuff:
 *.log
 
+# ...but raxml/generax logs under tests/data are committed test fixtures, not
+# run output. They are part of the real run directories the tests read, and
+# without this negation they exist only on the machine that generated them --
+# tests referencing them pass locally and KeyError in CI.
+!tests/data/**/*.log
+
 # Sphinx documentation
 docs/_build/
 

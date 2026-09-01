@@ -92,28 +92,36 @@ def align(input_seqs,
             output_fasta = "topiary-tmp_{}_align-out.fasta".format(tmp_file_root)
             temporary_output = True
 
-        # Do the alignment
-        _run_muscle(input_fasta,output_fasta,super5,silent,muscle_cmd_args,muscle_binary)
-
-        # Read alignment back into the dataframe
-        df = topiary.read_fasta_into(df,output_fasta)
-
-        # Delete temporary input file
+        # Do the alignment and read it back into the dataframe. The cleanup
+        # below is in a finally block because muscle can fail (or be
+        # interrupted) -- without it, a failed alignment leaves
+        # topiary-tmp_*_align-in.fasta behind in whatever directory the caller
+        # happened to be in.
         try:
-            os.remove(input_fasta)
-        except FileNotFoundError:
-            pass
+            _run_muscle(input_fasta,output_fasta,super5,silent,muscle_cmd_args,muscle_binary)
 
-        # Delete temporary output file
-        if not silent:
-            print("\nSuccess. Alignment written to the `alignment` column in the dataframe.",flush=True)
-        if temporary_output:
+            # Read alignment back into the dataframe
+            df = topiary.read_fasta_into(df,output_fasta)
+
+        finally:
+
+            # Delete temporary input file
             try:
-                os.remove(output_fasta)
+                os.remove(input_fasta)
             except FileNotFoundError:
                 pass
-        else:
-            if not silent:
+
+            # Delete temporary output file
+            if temporary_output:
+                try:
+                    os.remove(output_fasta)
+                except FileNotFoundError:
+                    pass
+
+        if not silent:
+            if temporary_output:
+                print("\nSuccess. Alignment written to the `alignment` column in the dataframe.",flush=True)
+            else:
                 print(f"\nSuccess. Alignment written to '{output_fasta}'.",flush=True)
 
         return df
@@ -158,15 +166,16 @@ def _run_muscle(input_fasta,
     """
 
     # Check muscle version
-    binary, muscle_version = installed.check_muscle()
+    binary, muscle_version, muscle_diagnostic = installed.check_muscle()
     if muscle_version == (-2,-2,-2):
         err = f"\nmuscle not found in the PATH ({os.environ['PATH']})\n\n"
         raise RuntimeError(err)
 
     if muscle_version == (-1,-1,-1):
-        ret = subprocess.run([muscle_binary],capture_output=True)
-        err = f"\nmuscle is in the PATH, but is crashing. The output of \n"
-        err += f"`muscle` follows:\n\n {ret.stderr.decode()}\n\n"
+        err = f"\nmuscle is in the PATH ({binary}), but is crashing. The output\n"
+        err += "of running `muscle` follows:\n\n"
+        if muscle_diagnostic is not None:
+            err += f" {muscle_diagnostic['stderr']}\n\n"
         raise RuntimeError(err)
 
     if muscle_version == (0,0,0):

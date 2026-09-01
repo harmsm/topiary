@@ -9,6 +9,7 @@ import numpy as np
 import re
 
 
+@pytest.mark.smoke
 def test_create_nicknames(test_dataframes):
 
     df = test_dataframes["good-df"]

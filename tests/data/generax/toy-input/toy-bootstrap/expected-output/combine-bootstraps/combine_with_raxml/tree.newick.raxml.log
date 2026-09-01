@@ -1,0 +1,36 @@
+
+RAxML-NG v. 1.1.0 released on 29.11.2021 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Apple M1 Pro, 10 cores, 16 GB RAM
+
+RAxML-NG was called at 11-Aug-2022 11:38:53 as follows:
+
+raxml-ng --support --tree /Users/harmsm/work/programming/git-clones/topiary/examples/calculation_fhcHjcBRjQ/combine-bootstraps/combine_with_raxml/tree.newick --threads 1 --bs-trees bs-trees.newick --redo
+
+Analysis options:
+  run mode: Compute bipartition support (Felsenstein Bootstrap)
+  start tree(s): user
+  random seed: 1660243133
+  SIMD kernels: SSE3
+  parallelization: coarse-grained (auto), NONE/sequential
+
+WARNING: Running in REDO mode: existing checkpoints are ignored, and all result files will be overwritten!
+
+Reading reference tree from file: /Users/harmsm/work/programming/git-clones/topiary/examples/calculation_fhcHjcBRjQ/combine-bootstraps/combine_with_raxml/tree.newick
+Reference tree size: 8
+
+Reading bootstrap trees from file: bs-trees.newick
+Loaded 4 trees with 8 taxa.
+
+Best ML tree with Felsenstein bootstrap (FBP) support values saved to: /Users/harmsm/work/programming/git-clones/topiary/examples/calculation_fhcHjcBRjQ/combine-bootstraps/combine_with_raxml/tree.newick.raxml.support
+
+Execution log saved to: /Users/harmsm/work/programming/git-clones/topiary/examples/calculation_fhcHjcBRjQ/combine-bootstraps/combine_with_raxml/tree.newick.raxml.log
+
+Analysis started: 11-Aug-2022 11:38:53 / finished: 11-Aug-2022 11:38:53
+
+Elapsed time: 0.003 seconds
+

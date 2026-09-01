@@ -8,6 +8,7 @@ import pandas as pd
 
 import ete4 as ete
 
+@pytest.mark.network
 def test_df_to_species_tree(test_dataframes,df_with_species_not_resolvable):
 
     df = test_dataframes["good-df"]

@@ -25,7 +25,6 @@ def test__annotate_species_tree(generax_data,tmpdir):
     species_tree = os.path.join(input_dir,"species_tree.newick")
     df = topiary.read_dataframe(os.path.join(input_dir,"dataframe.csv"))
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     os.mkdir("test0")
@@ -44,7 +43,6 @@ def test__annotate_species_tree(generax_data,tmpdir):
     with pytest.raises(ValueError):
         _annotate_species_tree(df,species_tree=T,out_dir="test2")
 
-    os.chdir(current_dir)
 
 @pytest.mark.run_generax
 def test__get_link_dict():
@@ -368,12 +366,12 @@ def test_run_generax(generax_data,tmpdir):
 
         cmd = run_generax(run_directory=out_dir,
                           allow_horizontal_transfer=True,
-                          num_threads=1,
                           generax_binary=GENERAX_BINARY,
                           write_to_script="run_generax.sh")
 
         # Make sure command is being constructed correctly and that it is being
-        # written properly to the script
+        # written properly to the script. With no launch prefix, generax runs
+        # directly.
         assert cmd == f"{generax_binary} --families control.txt --species-tree species_tree.newick --prefix result --rec-model UndatedDTL"
         f = open(os.path.join(out_dir,"run_generax.sh"))
         content = f.read()
@@ -383,57 +381,41 @@ def test_run_generax(generax_data,tmpdir):
         # Get horizontal transfer diff
         cmd = run_generax(run_directory=out_dir,
                           allow_horizontal_transfer=False,
-                          num_threads=1,
                           generax_binary=GENERAX_BINARY,
                           write_to_script="run_generax.sh")
 
         assert cmd == f"{generax_binary} --families control.txt --species-tree species_tree.newick --prefix result --rec-model UndatedDL"
 
-        # Validate num_threads
+        # A non-empty launch prefix is prepended verbatim (topiary does not
+        # interpret it)
         cmd = run_generax(run_directory=out_dir,
                           allow_horizontal_transfer=True,
-                          num_threads=2,
+                          generax_launch="mpirun -np 8",
                           generax_binary=GENERAX_BINARY,
                           write_to_script="run_generax.sh")
- 
-        assert cmd == f"mpirun -np 2 {generax_binary} --families control.txt --species-tree species_tree.newick --prefix result --rec-model UndatedDTL"
- 
-        # Validate num_threads in SLURM environment
-        import unittest.mock as mock
-        with mock.patch.dict(os.environ, {"SLURM_JOB_ID": "12345"}, clear=False):
-            with mock.patch("topiary.generax._generax.check_mpi_configuration"):
-                with mock.patch("topiary.generax._generax.topiary._private.mpi.get_hosts",
-                                return_value=["localhost","localhost"]):
-                    cmd = run_generax(run_directory=out_dir,
-                                      allow_horizontal_transfer=True,
-                                      num_threads=2,
-                                      generax_binary=GENERAX_BINARY,
-                                      write_to_script="run_generax.sh")
-                    
-                    assert "--mca ras ^slurm" in cmd
-                    assert "--mca plm slurm" in cmd
-                    assert "mpirun --mca ras ^slurm --mca plm slurm -np 2" in cmd
 
-        with mock.patch("topiary.generax._generax.check_mpi_configuration",
-                        side_effect=RuntimeError("fail")):
-            with pytest.raises(RuntimeError):
-                cmd = run_generax(run_directory=out_dir,
-                                  allow_horizontal_transfer=True,
-                                  num_threads=1000000,
-                                  generax_binary=GENERAX_BINARY,
-                                  write_to_script="run_generax.sh")
+        assert cmd == f"mpirun -np 8 {generax_binary} --families control.txt --species-tree species_tree.newick --prefix result --rec-model UndatedDTL"
 
+        # An arbitrary launcher works too -- the prefix is tokenized and prepended
+        cmd = run_generax(run_directory=out_dir,
+                          allow_horizontal_transfer=True,
+                          generax_launch="srun -n 4",
+                          generax_binary=GENERAX_BINARY,
+                          write_to_script="run_generax.sh")
+
+        assert cmd == f"srun -n 4 {generax_binary} --families control.txt --species-tree species_tree.newick --prefix result --rec-model UndatedDTL"
+
+        # Bad binary
         with pytest.raises(FileNotFoundError):
             cmd = run_generax(run_directory=out_dir,
                               allow_horizontal_transfer=True,
-                              num_threads=1,
                               generax_binary="not_a_binary",
                               write_to_script="run_generax.sh")
 
+        # Bad run directory
         with pytest.raises(FileNotFoundError):
             cmd = run_generax(run_directory="not_an_out_dir",
                               allow_horizontal_transfer=True,
-                              num_threads=1,
                               generax_binary=GENERAX_BINARY,
                               write_to_script="run_generax.sh")
 
@@ -444,7 +426,6 @@ def test_run_generax(generax_data,tmpdir):
         with pytest.raises(ValueError):
             cmd = run_generax(run_directory=test_file,
                               allow_horizontal_transfer=True,
-                              num_threads=1,
                               generax_binary=GENERAX_BINARY,
                               write_to_script="run_generax.sh")
 
@@ -486,7 +467,6 @@ def test_integrated_run_generax(generax_data,tmpdir):
     # Run the calculation
     cmd = run_generax(run_directory=run_directory,
                       allow_horizontal_transfer=True,
-                      num_threads=1,
                       generax_binary=GENERAX_BINARY)
 
     result_dir = os.path.join(run_directory,"result","results","reconcile")

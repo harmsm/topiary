@@ -1,0 +1,36 @@
+
+RAxML-NG v. 1.1.0 released on 29.11.2021 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Apple M1 Pro, 10 cores, 16 GB RAM
+
+RAxML-NG was called at 17-Dec-2022 12:32:50 as follows:
+
+/Users/harmsm/local/bin/raxml-ng --support --tree tree.newick --threads 1 --bs-trees bs-trees.newick --redo
+
+Analysis options:
+  run mode: Compute bipartition support (Felsenstein Bootstrap)
+  start tree(s): user
+  random seed: 1671309170
+  SIMD kernels: SSE3
+  parallelization: coarse-grained (auto), NONE/sequential
+
+WARNING: Running in REDO mode: existing checkpoints are ignored, and all result files will be overwritten!
+
+Reading reference tree from file: tree.newick
+Reference tree size: 12
+
+Reading bootstrap trees from file: bs-trees.newick
+Loaded 4 trees with 12 taxa.
+
+Best ML tree with Felsenstein bootstrap (FBP) support values saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/small-phylo/06_reconciled-tree-bootstraps_toy/working/combine_with_raxml/tree.newick.raxml.support
+
+Execution log saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/small-phylo/06_reconciled-tree-bootstraps_toy/working/combine_with_raxml/tree.newick.raxml.log
+
+Analysis started: 17-Dec-2022 12:32:50 / finished: 17-Dec-2022 12:32:50
+
+Elapsed time: 0.001 seconds
+

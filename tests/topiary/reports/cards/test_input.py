@@ -4,6 +4,7 @@ from topiary._private.supervisor import Supervisor
 import os
 import pandas as pd
 
+@pytest.mark.smoke
 def test_create_input_card(tiny_phylo, mocker):
     
     # Initialize supervisor from tiny_phylo dir
