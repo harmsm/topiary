@@ -28,7 +28,6 @@ def test_reconcile(small_phylo,tmpdir):
     prev_ml = small_phylo["01_gene-tree"]
     prev_bs = small_phylo["05_gene-tree-bootstraps_toy"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
 
@@ -294,4 +293,3 @@ def test_reconcile(small_phylo,tmpdir):
         reconcile(**kwargs)
     os.chdir("..")
 
-    os.chdir(current_dir)

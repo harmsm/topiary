@@ -13,7 +13,6 @@ def test_generate_bootstraps(tiny_phylo,tmpdir):
     df = tiny_phylo["initial-input/dataframe.csv"]
     gene_tree = tiny_phylo["final-output/gene-tree.newick"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     kwargs = {"prev_calculation":None,
@@ -43,4 +42,3 @@ def test_generate_bootstraps(tiny_phylo,tmpdir):
     assert param["calc_type"] == "ml_bootstrap"
     assert param["model"] == "JTT"
 
-    os.chdir(current_dir)

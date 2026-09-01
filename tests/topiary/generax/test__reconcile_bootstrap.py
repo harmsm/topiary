@@ -165,7 +165,6 @@ def test__build_replicate_dirs(small_phylo,tmpdir):
     species_tree = small_phylo["final-output/species-tree.newick"]
     bootstrap_directory = small_phylo["05_gene-tree-bootstraps_toy/output/bootstrap_replicates"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     kwargs_template = {"df":df,
@@ -241,4 +240,3 @@ def test__build_replicate_dirs(small_phylo,tmpdir):
             if k in should_be_same:
                 assert ref_check[k] == this_check[k]
 
-    os.chdir(current_dir)

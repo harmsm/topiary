@@ -342,8 +342,6 @@ def test__construct_args(test_dataframes,tmpdir):
                                         manual_num_cores=1)
 
 
-
-
     all_args, num_threads = _construct_args(sequence_list,
                                 blast_args=blast_args,
                                 block_size=5,
@@ -497,7 +495,6 @@ def test__local_blast_thread_function(test_dataframes,
                                       tmpdir):
 
     # Move into temporary directory
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Make a blast database
@@ -539,7 +536,6 @@ def test__local_blast_thread_function(test_dataframes,
     for f in xml_files:
         os.remove(f)
 
-    os.chdir(cwd)
 
 @pytest.mark.skipif(os.name == "nt",reason="blast cannot be installed via conda on windows")
 @pytest.mark.run_blast
@@ -552,7 +548,6 @@ def test_local_blast(test_dataframes,
     # test file. 
 
     # Move into temporary directory
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Make a blast database
@@ -568,4 +563,3 @@ def test_local_blast(test_dataframes,
 
     assert len(sequence) == len(query_hits)
 
-    os.chdir(cwd)

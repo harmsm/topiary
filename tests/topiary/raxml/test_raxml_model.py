@@ -32,7 +32,6 @@ def test__parse_raxml_info_for_aic():
 def test_find_best_model(tiny_phylo,tmpdir):
 
     df = tiny_phylo["initial-input/dataframe.csv"]
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     model_matrices = ["LG","JTT"]
@@ -75,4 +74,3 @@ def test_find_best_model(tiny_phylo,tmpdir):
     assert out_json["model"] == best_model
     assert out_json["calc_status"] == "complete"
 
-    os.chdir(current_dir)

@@ -32,7 +32,6 @@ def test_integrated_minimal_ali_to_anc(tiny_phylo,tmpdir):
                                                os.path.basename(e)))
 
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     # -------------------------------------------------------------------------
@@ -101,4 +100,3 @@ def test_integrated_minimal_ali_to_anc(tiny_phylo,tmpdir):
                                        "output",
                                        "reconciled-tree_supports.newick"))
 
-    os.chdir(current_dir)

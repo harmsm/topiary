@@ -43,17 +43,50 @@ opt-in via custom flags (see `tests/conftest.py`), and can be combined:
 - `--run-generax` — tests that shell out to GeneRax
 - `--run-blast` — tests that run local/remote BLAST
 - `--run-ncbi-server` — tests that hit the live NCBI server
+- `--run-network` — tests that need live internet (Open Tree of Life, NCBI FTP,
+  CDN fetches in report generation)
 
-`bash run_all_tests.sh` runs the full suite (flake8, completeness check, coverage
+Tests that are **not** behind any opt-in flag have outbound connections blocked
+by the `block_network` autouse fixture in `tests/conftest.py`. Tests carrying
+`network`, `run_ncbi_server`, `run_blast`, `run_generax`, or `run_raxml` are
+exempt (`_OPT_IN_MARKERS`) — the caller explicitly asked for them, so their
+network use is declared rather than hidden.
+
+If a test starts failing with `NetworkAccessBlocked`, it has picked up a hidden
+dependency on a remote service: either mock the call, or mark it
+`@pytest.mark.network` (which makes it opt-in via `--run-network`). Do not "fix"
+it by removing the guard.
+
+Worth knowing: `run_generax` / `run_raxml` tests reach the Open Tree of Life API
+even though they look purely local — setting up a GeneRax run annotates the
+species tree from OTL. So `--run-generax` needs the internet, not just the
+binary.
+
+The working directory is likewise restored after every test by the `restore_cwd`
+autouse fixture, so tests may `os.chdir` freely without a manual restore. Don't
+add `current_dir = os.getcwd()` / `os.chdir(current_dir)` pairs back.
+
+`--fd-report` tracks file descriptors opened and not closed by each test and
+prints the worst offenders at the end of the session. It never fails a test; it
+exists to locate the fd exhaustion seen when running the whole suite.
+
+`bash run_all_tests.sh` runs the full suite (flake8, test audit, coverage
 with all of the above opt-in flags enabled, badge/report generation). This is slow
 and touches the network/external binaries, so it should generally **not** be run by
 Claude — but it's the reference for the exact test invocation syntax (including
 which `--run-*` flags to pass) if that's needed.
 
+Coverage settings live in `[tool.coverage.*]` in `pyproject.toml` — `source` is
+pinned to `src/topiary` and `branch = true`. Do not pass `--branch` or `--source`
+on the command line; the config already handles it. Reports land in
+`reports/coverage/` and `reports/htmlcov/`.
+
 Tests mirror the `src/topiary` package layout under `tests/topiary/` (e.g.
 `src/topiary/quality/shrink.py` ↔ `tests/topiary/quality/test_shrink.py`).
-`tests/completeness_crawler.py` flags source functions that have no corresponding
-test.
+`tests/audit_tests.py` reports tests that pass without verifying anything —
+`pass`-bodied stubs, tests with no assertion, and tests silently shadowed by a
+duplicate function name. Run it as `./tests/audit_tests.py tests`; the
+`--max-stub` / `--max-noassert` flags turn it into a gate.
 
 ## Architecture
 

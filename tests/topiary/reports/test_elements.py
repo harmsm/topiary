@@ -40,7 +40,6 @@ def _load_check_html(some_html):
 
 def test_create_output_directory(tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     create_output_directory("test")
@@ -54,11 +53,10 @@ def test_create_output_directory(tmpdir):
     assert os.path.isdir("test")
     assert os.path.isdir(os.path.join("test",".assets"))
 
-    os.chdir(cwd)
 
+@pytest.mark.network
 def test_create_main_html(tmpdir):
     
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     def _check_default(kwarg):
@@ -111,8 +109,6 @@ def test_create_main_html(tmpdir):
 
     # This check makes sure the elements are nested correctly
     _load_check_html(f"{s}{e}")
-
-    os.chdir(cwd)
 
 
 def test_df_to_table():

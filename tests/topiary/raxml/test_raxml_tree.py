@@ -13,7 +13,6 @@ def test_generate_ml_tree(tiny_phylo,tmpdir):
 
     df = tiny_phylo["initial-input/dataframe.csv"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     kwargs = {"prev_calculation":None,
@@ -105,4 +104,3 @@ def test_generate_ml_tree(tiny_phylo,tmpdir):
     assert param["calc_type"] == "ml_bootstrap"
     assert param["model"] == "LG"
 
-    os.chdir(current_dir)

@@ -73,7 +73,6 @@ def test_get_proteome_ids():
 @pytest.mark.run_ncbi_server
 def test__get_records(tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Human assembly ids that should be stable
@@ -88,13 +87,10 @@ def test__get_records(tmpdir):
     output = _get_records(["NOT_AN_ID"])
     assert len(output) == 0
 
-    os.chdir(cwd)
-
 
 @pytest.mark.run_ncbi_server
 def test_get_proteome(tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     with pytest.raises(ValueError):
@@ -108,4 +104,3 @@ def test_get_proteome(tmpdir):
     output1 = get_proteome(taxid=83333)
     assert os.path.isfile(output1)
 
-    os.chdir(cwd)

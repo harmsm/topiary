@@ -19,6 +19,7 @@ import re
 import string
 import warnings
 
+@pytest.mark.network
 def test__validate_ott_or_species():
 
     # Nothing in
@@ -75,6 +76,7 @@ def test__validate_ott_or_species():
     assert len(ott_list) == 0
 
 
+@pytest.mark.network
 def test_species_to_ott():
 
     input_species_list = ["Homo sapiens",
@@ -255,6 +257,7 @@ def test__parse_tnrs_matches():
     assert result["msg"].startswith("No exact match")
 
 
+@pytest.mark.network
 def test_species_to_ott_batch_context():
     """
     opentree's TNRS infers a taxonomic context from the batch of names sent to
@@ -280,6 +283,7 @@ def test_species_to_ott_batch_context():
             assert results[s]["num_matches"] == 1
 
 
+@pytest.mark.network
 def test_species_to_ott_warns_on_unmatched():
 
     # A species that cannot be matched should not vanish silently
@@ -296,6 +300,7 @@ def test_species_to_ott_warns_on_unmatched():
     assert ott_list[0] == 770315
 
 
+@pytest.mark.network
 def test_species_to_ott_strains():
     # Test strain stripping
     input_species_list = ["Escherichia coli (strain K12)",
@@ -321,6 +326,7 @@ def test_species_to_ott_strains():
     assert "Vibrio cholerae" in species_list[3]
 
 
+@pytest.mark.network
 def test_ott_to_species_tree():
 
     input_ott = [770315,276534,565131,356221]
@@ -405,6 +411,7 @@ def test_ott_to_species_tree():
     assert results["unknown_ids"][0] == 9999999999999999999999
     assert len(results["not_monophyletic"]) == 0
 
+@pytest.mark.network
 def test_ott_to_resolvable():
 
     some_good_ott = [770315,276534,565131,356221]
@@ -451,6 +458,7 @@ def test_ott_to_resolvable():
             ott_to_resolvable(b)
 
 
+@pytest.mark.network
 def test_ott_to_mrca():
 
     vert = [770315, 153563, 1005914]           #["Homo sapiens","Gallus gallus","Danio rerio"]
@@ -630,6 +638,7 @@ def test_tree_to_taxa_order():
     assert isinstance(out_order,list)
     assert len(out_order) == 8
 
+@pytest.mark.network
 def test_sort_df_by_taxa(for_real_inference):
 
     df = topiary.read_dataframe(for_real_inference["small-pre-redundancy.csv"])

@@ -25,7 +25,6 @@ def test__annotate_species_tree(generax_data,tmpdir):
     species_tree = os.path.join(input_dir,"species_tree.newick")
     df = topiary.read_dataframe(os.path.join(input_dir,"dataframe.csv"))
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     os.mkdir("test0")
@@ -44,7 +43,6 @@ def test__annotate_species_tree(generax_data,tmpdir):
     with pytest.raises(ValueError):
         _annotate_species_tree(df,species_tree=T,out_dir="test2")
 
-    os.chdir(current_dir)
 
 @pytest.mark.run_generax
 def test__get_link_dict():

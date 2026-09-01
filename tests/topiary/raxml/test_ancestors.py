@@ -24,7 +24,6 @@ def test__parse_raxml_anc_output():
 
 def test__get_bad_columns(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     bad_file = ["",""]
@@ -40,8 +39,6 @@ def test__get_bad_columns(tmpdir):
 
     observed_bad = _get_bad_columns("bad-file.phy")
     assert np.array_equal(observed_bad,expected_bad)
-
-    os.chdir(current_dir)
 
 
 @pytest.mark.run_raxml

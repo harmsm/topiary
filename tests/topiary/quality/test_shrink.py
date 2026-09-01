@@ -15,6 +15,7 @@ import os
 def test_shrink_in_species():
     pass
 
+@pytest.mark.network
 def test_shrink_redundant(for_real_inference):
 
     df = topiary.read_dataframe(for_real_inference["small-pre-redundancy.csv"])
@@ -100,6 +101,7 @@ def test_shrink_redundant(for_real_inference):
 def test_shrink_aligners():
     pass
 
+@pytest.mark.network
 @pytest.mark.skipif(os.name == "nt",reason="muscle cannot be installed via conda on windows")
 def test_shrink_dataset(for_real_inference,tmpdir):
 

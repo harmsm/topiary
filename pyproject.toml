@@ -73,4 +73,29 @@ markers = [
     "run_raxml: marks tests as involving raxml",
     "run_blast: marks tests as involving blast",
     "run_ncbi_server: marks tests as accessing the NCBI server",
+    "network: marks tests that require live internet access",
 ]
+
+[tool.coverage.run]
+# Measure topiary only. Without this, coverage.py instruments everything it
+# imports -- including installed dependencies (e.g. an editable ete4 checkout)
+# and the test files themselves -- which makes the reported total meaningless.
+source = ["src/topiary"]
+branch = true
+
+[tool.coverage.report]
+# Belt and braces: even if something outside src/topiary sneaks into the data
+# file, keep it out of the report.
+include = ["src/topiary/*"]
+omit = ["*/__pycache__/*"]
+show_missing = true
+exclude_also = [
+    # Script entry points are exercised via the console scripts, not by import.
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.html]
+directory = "reports/htmlcov"
+
+[tool.coverage.xml]
+output = "reports/coverage/coverage.xml"

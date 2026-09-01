@@ -13,6 +13,7 @@ import pandas as pd
 import re
 
 
+@pytest.mark.network
 def test_read_seed(seed_dataframes,user_seed_dataframes):
 
     def _validate_output(out):

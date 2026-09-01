@@ -22,7 +22,6 @@ def test_Supervisor(tiny_phylo,tmpdir):
     species_tree = tiny_phylo["initial-input/species-tree.newick"]
     reconciled_tree = tiny_phylo["final-output/reconciled-tree.newick"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -87,11 +86,9 @@ def test_Supervisor(tiny_phylo,tmpdir):
     assert sv.previous_entries is None
     assert len(sv.run_parameters["events"]) == 1
 
-    os.chdir(current_dir)
 
 def test_Supervisor__load_existing(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
     sv = Supervisor()
 
@@ -113,11 +110,9 @@ def test_Supervisor__load_existing(tmpdir):
 
     sv._load_existing()
 
-    os.chdir(current_dir)
 
 def test_Supervisor__increment(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -141,7 +136,6 @@ def test_Supervisor__increment(tmpdir):
     assert len(sv.previous_entries) == 1
     assert sv.previous_entries[0]["something"] == "else"
 
-    os.chdir(current_dir)
 
 def test_Supervisor_create_calc_dir(tiny_phylo,tmpdir):
 
@@ -150,7 +144,6 @@ def test_Supervisor_create_calc_dir(tiny_phylo,tmpdir):
     species_tree = tiny_phylo["initial-input/species-tree.newick"]
     reconciled_tree = tiny_phylo["final-output/reconciled-tree.newick"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -244,11 +237,9 @@ def test_Supervisor_create_calc_dir(tiny_phylo,tmpdir):
     assert os.path.isfile(os.path.join(sv.input_dir,"gene-tree.newick"))
     assert sv.gene_tree == os.path.join(sv.input_dir,"gene-tree.newick")
 
-    os.chdir(current_dir)
 
 def test_Supervisor_check_required(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -268,11 +259,9 @@ def test_Supervisor_check_required(tmpdir):
     with pytest.raises(ValueError):
         sv.check_required(required_values=["this","an","not a file"])
 
-    os.chdir(current_dir)
 
 def test_Supervisor_copy_output_to_output(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -338,11 +327,8 @@ def test_Supervisor_copy_output_to_output(tmpdir):
     assert len(new_txt) == 3
 
 
-    os.chdir(current_dir)
-
 def test_Supervisor_stash(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -411,7 +397,6 @@ def test_Supervisor_stash(tmpdir):
     assert os.path.isdir(os.path.join(sv.output_dir,"stash_d"))
     assert os.path.isfile(os.path.join(sv.output_dir,"stash_d","file.txt"))
 
-    os.chdir(current_dir)
 
 def test_Supervisor_write_json():
 
@@ -421,7 +406,6 @@ def test_Supervisor_write_json():
 
 def test_Supervisor_event(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -517,11 +501,9 @@ def test_Supervisor_event(tmpdir):
     assert p["events"][0]["time"] == evt["time"]
     assert p["events"][0]["keyword"] == evt["keyword"]
 
-    os.chdir(current_dir)
 
 def test_Supervisor_finalize(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -557,13 +539,11 @@ def test_Supervisor_finalize(tmpdir):
     # This tests return-to-starting directory after crash functionality
     assert os.getcwd() == sv.starting_dir
 
-    os.chdir(current_dir)
 
 def test_Supervisor_alignment(tiny_phylo,tmpdir):
 
     df_csv = tiny_phylo["initial-input/dataframe.csv"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -572,13 +552,11 @@ def test_Supervisor_alignment(tiny_phylo,tmpdir):
     sv.create_calc_dir("test0","test0",df=df_csv)
     assert sv.alignment == os.path.join(sv.input_dir,"alignment.phy")
 
-    os.chdir(current_dir)
 
 def test_Supervisor_df(tiny_phylo,tmpdir):
 
     df_csv = tiny_phylo["initial-input/dataframe.csv"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -587,13 +565,11 @@ def test_Supervisor_df(tiny_phylo,tmpdir):
     sv.create_calc_dir("test0","test0",df=df_csv)
     assert issubclass(type(sv.df),pd.DataFrame)
 
-    os.chdir(current_dir)
 
 def test_Supervisor_gene_tree(tiny_phylo,tmpdir):
 
     gene_tree = tiny_phylo["final-output/gene-tree.newick"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -602,13 +578,11 @@ def test_Supervisor_gene_tree(tiny_phylo,tmpdir):
     sv.create_calc_dir("test0","test0",gene_tree=gene_tree)
     assert sv.gene_tree == os.path.join(sv.input_dir,"gene-tree.newick")
 
-    os.chdir(current_dir)
 
 def test_Supervisor_species_tree(tiny_phylo,tmpdir):
 
     species_tree = tiny_phylo["initial-input/species-tree.newick"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -618,13 +592,11 @@ def test_Supervisor_species_tree(tiny_phylo,tmpdir):
     sv.create_calc_dir("test0","test0",species_tree=species_tree)
     assert sv.species_tree == os.path.join(sv.input_dir,"species-tree.newick")
 
-    os.chdir(current_dir)
 
 def test_Supervisor_reconciled_tree(tiny_phylo,tmpdir):
 
     reconciled_tree = tiny_phylo["final-output/reconciled-tree.newick"]
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -634,11 +606,9 @@ def test_Supervisor_reconciled_tree(tiny_phylo,tmpdir):
     sv.create_calc_dir("test0","test0",reconciled_tree=reconciled_tree)
     assert sv.reconciled_tree == os.path.join(sv.input_dir,"reconciled-tree.newick")
 
-    os.chdir(current_dir)
 
 def test_Supervisor_calc_dir(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -647,11 +617,9 @@ def test_Supervisor_calc_dir(tmpdir):
     sv.create_calc_dir("test0","test0")
     assert sv.calc_dir == os.path.abspath("test0")
 
-    os.chdir(current_dir)
 
 def test_Supervisor_model(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -660,11 +628,9 @@ def test_Supervisor_model(tmpdir):
     sv.create_calc_dir("test0","test0",model="JTT")
     assert sv.model == "JTT"
 
-    os.chdir(current_dir)
 
 def test_Supervisor_calc_type(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -673,12 +639,9 @@ def test_Supervisor_calc_type(tmpdir):
     sv.create_calc_dir("test0",calc_type="testy")
     assert sv.calc_type == "testy"
 
-    os.chdir(current_dir)
-
 
 def test_Supervisor_previous_entries(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -693,11 +656,9 @@ def test_Supervisor_previous_entries(tmpdir):
     assert sv.previous_entries[0]["calc_dir"] == os.path.relpath(os.path.abspath("test0"),
                                                                 os.path.abspath("test1"))
 
-    os.chdir(current_dir)
 
 def test_Supervisor_run_parameters(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -707,11 +668,9 @@ def test_Supervisor_run_parameters(tmpdir):
     sv.create_calc_dir("test0",calc_type="testy")
     assert len(sv.run_parameters) > 4
 
-    os.chdir(current_dir)
 
 def test_Supervisor_seed(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -722,12 +681,9 @@ def test_Supervisor_seed(tmpdir):
     sv.create_calc_dir("test0",calc_type="testy")
     assert this_seed == sv.seed
 
-    os.chdir(current_dir)
-
 
 def test_Supervisor_status(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -736,11 +692,9 @@ def test_Supervisor_status(tmpdir):
     sv.create_calc_dir("test0",calc_type="testy")
     assert sv.status == "running"
 
-    os.chdir(current_dir)
 
 def test_Supervisor_update(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -772,11 +726,9 @@ def test_Supervisor_update(tmpdir):
     with pytest.raises(RuntimeError):
         sv.update("key_after_finalize",False)
 
-    os.chdir(current_dir)
 
 def test_Supervisor_input_dir(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -785,12 +737,9 @@ def test_Supervisor_input_dir(tmpdir):
     sv.create_calc_dir("test0","test0")
     assert sv.input_dir == os.path.abspath(os.path.join("test0","input"))
 
-    os.chdir(current_dir)
-
 
 def test_Supervisor_output_dir(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -799,11 +748,9 @@ def test_Supervisor_output_dir(tmpdir):
     sv.create_calc_dir("test0","test0")
     assert sv.output_dir == os.path.abspath(os.path.join("test0","output"))
 
-    os.chdir(current_dir)
 
 def test_Supervisor_starting_dir(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -812,11 +759,9 @@ def test_Supervisor_starting_dir(tmpdir):
     sv.create_calc_dir("test0","test0")
     assert sv.starting_dir == os.path.abspath(tmpdir)
 
-    os.chdir(current_dir)
 
 def test_Supervisor_working_dir(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -825,11 +770,9 @@ def test_Supervisor_working_dir(tmpdir):
     sv.create_calc_dir("test0","test0")
     assert sv.working_dir == os.path.abspath(os.path.join("test0","working"))
 
-    os.chdir(current_dir)
 
 def test_Supervisor_tree_prefix(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     sv = Supervisor()
@@ -847,4 +790,3 @@ def test_Supervisor_tree_prefix(tmpdir):
     assert sv.tree_prefix is None
     sv.finalize()
 
-    os.chdir(current_dir)

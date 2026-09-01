@@ -8,9 +8,9 @@ from topiary._private.ftp import calc_md5
 import os
 import sys
 
+@pytest.mark.network
 def test__ftp_thread(tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     _ftp_thread(file_name="GCF_000001405.40_GRCh38.p14_assembly_report.txt",
@@ -19,8 +19,8 @@ def test__ftp_thread(tmpdir):
                 kwargs={})
     assert os.path.isfile("GCF_000001405.40_GRCh38.p14_assembly_report.txt")
 
-    os.chdir(cwd)
 
+@pytest.mark.network
 def test_ftp_download(tmpdir):
 
     def _get_creation_time(file_name):
@@ -32,7 +32,6 @@ def test_ftp_download(tmpdir):
 
         return creation_time
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Download
@@ -70,7 +69,6 @@ def test_ftp_download(tmpdir):
     if creation_time is not None:
         assert new_creation_time != creation_time
 
-    os.chdir(cwd)
 
 def test_calc_md5(ftp_test_files,tmpdir):
 

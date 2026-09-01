@@ -16,7 +16,6 @@ import time
 
 def test_run_cleanly(tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     # Make sure we can send in args, kwargs, and get return values
@@ -49,7 +48,6 @@ def test_run_cleanly(tmpdir):
     test_function_chdir()
     assert os.path.abspath(os.getcwd()) == os.path.abspath(os.path.join(tmpdir,"stupid"))
 
-    os.chdir(cwd)
 
     
 
@@ -70,7 +68,6 @@ def test_gen_seed():
 
 def test_create_new_dir(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     dir_name = create_new_dir()
@@ -87,11 +84,9 @@ def test_create_new_dir(tmpdir):
 
     create_new_dir("cool_dir",overwrite=True)
 
-    os.chdir(current_dir)
 
 def test_copy_input_file(tmpdir,test_dataframes):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     test_file = "test_file_to_copy.txt"
@@ -128,8 +123,6 @@ def test_copy_input_file(tmpdir,test_dataframes):
     os.mkdir(os.path.join("target_dir","input"))
     copy_input_file(test_file,os.path.join("target_dir","input"))
     assert os.path.isfile(os.path.join("target_dir","input",test_file))
-
-    os.chdir(current_dir)
 
 
 def test__follow_log_subproc_wrapper():
@@ -177,7 +170,6 @@ def test_launch(tmpdir,programs):
 
 def test_rmtree(tmpdir):
 
-    current_dir = os.getcwd()
     os.chdir(tmpdir)
 
     os.mkdir("testdir")
@@ -201,4 +193,3 @@ def test_rmtree(tmpdir):
     # fail. Kind of incomplete as a test. 
 
 
-    os.chdir(current_dir)

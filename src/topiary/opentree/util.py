@@ -9,6 +9,18 @@ import opentree
 from opentree import OT, taxonomy_helpers
 import dendropy as dp
 
+# The opentree client keeps every API response forever: each call appends a
+# record to OT.ws.call_history, and each record holds the requests.Response
+# object, which pins the underlying socket open. Nothing ever releases them, so
+# a process leaks one file descriptor per Open Tree of Life call and eventually
+# dies with "Too many open files".
+#
+# That bites real runs -- seed_to_alignment makes an OTL call per species block
+# -- and not just the test suite. topiary never reads call_history, so turn the
+# recording off. See tests/topiary/opentree/test_ott_leak.py for the regression
+# test.
+OT.ws._store_api_calls = False
+
 import pandas as pd
 import numpy as np
 

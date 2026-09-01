@@ -8,6 +8,7 @@ import numpy as np
 
 import re
 
+@pytest.mark.network
 def test_get_df_ott(test_dataframes):
 
 

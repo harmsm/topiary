@@ -314,31 +314,47 @@ def launch(cmd,
         # Launch as a multiprocessing process that will return its output to a
         # multiprocessing queue.
         queue = mp.Queue()
-        
-        
         main_process = mp.Process(target=_follow_log_subproc_wrapper,
                                   args=(cmd,subprocess.PIPE,queue,os.environ.copy()))
         main_process.start()
 
-        # If queue is not empty, the job has finished and put its return value
-        # into the queue
-        while queue.empty():
+        try:
 
-            # Try to open log every second
-            try:
-                f = open(log_file,"r")
+            # If queue is not empty, the job has finished and put its return
+            # value into the queue
+            while queue.empty():
 
-                # Use follow generator function to catch lines as the come out
-                for line in _follow_log_generator(f,queue):
-                    print(line,flush=True,end="")
-                f.close()
+                # Try to open log every second
+                try:
+                    f = open(log_file,"r")
 
-            except FileNotFoundError:
-                time.sleep(1)
+                    # Use follow generator function to catch lines as the come out
+                    try:
+                        for line in _follow_log_generator(f,queue):
+                            print(line,flush=True,end="")
+                    finally:
+                        f.close()
 
-        # Wait for main process to complete and get return
-        ret = queue.get()
-        main_process.join()
+                except FileNotFoundError:
+                    time.sleep(1)
+
+            # Wait for main process to complete and get return
+            ret = queue.get()
+            main_process.join()
+
+        finally:
+
+            # A Queue holds a pipe pair and a feeder thread; a Process holds a
+            # sentinel fd. Neither is released until the garbage collector
+            # happens to run, so a caller that invokes launch() many times
+            # (a test session, a bootstrap crawl) steadily leaks file
+            # descriptors until the process hits its limit.
+            queue.close()
+            queue.join_thread()
+            if main_process.is_alive():
+                main_process.terminate()
+            main_process.join()
+            main_process.close()
 
     # Check for error on return
     if ret.returncode != 0:

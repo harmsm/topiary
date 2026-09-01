@@ -27,7 +27,6 @@ def test__read_md5_file(ftp_test_files):
 @pytest.mark.run_ncbi_server
 def test_ncbi_ftp_download(ftp_test_files,tmpdir):
 
-    cwd = os.getcwd()
     os.chdir(tmpdir)
 
     test_url = ["ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14",
@@ -54,4 +53,3 @@ def test_ncbi_ftp_download(ftp_test_files,tmpdir):
                           num_attempts=-1)
 
 
-    os.chdir(cwd)
