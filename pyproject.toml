@@ -67,7 +67,26 @@ exclude = ["tests*"]
 topiary = ["reports/assets/*"]
 
 [tool.pytest.ini_options]
-filterwarnings = ["ignore:invalid escape sequence:DeprecationWarning"]
+filterwarnings = [
+    # A warning that escapes a test is a failure. If a test expects a warning,
+    # assert on it with pytest.warns(...) instead of letting it print -- that
+    # turns noise into a checked contract.
+    #
+    # If a *dependency* starts emitting a deprecation warning on some platform,
+    # add a narrow ignore for that specific warning here. Do not delete the
+    # "error" line to make it pass.
+    "error",
+
+    # ete4 parses newick files with `data = open(data).read()` and lets
+    # refcounting close the handle. Under CPython the file is closed
+    # immediately, so this is third-party noise rather than a descriptor leak
+    # (confirmed: fd counts stay flat -- see tests/BASELINE.md). Fixing it
+    # would mean rewriting every ete4 call site in topiary to pass strings.
+    # Use `pytest --fd-report` to hunt real descriptor leaks; this filter does
+    # not hide those.
+    "ignore::ResourceWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+]
 markers = [
     "run_generax: marks tests as involving generax",
     "run_raxml: marks tests as involving raxml",

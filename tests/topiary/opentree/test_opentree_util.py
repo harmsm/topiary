@@ -110,7 +110,10 @@ def test_species_to_ott():
     assert len(ott_list) == 0
     assert len(species_list) == 0
 
-    ott_list, species_list, results = species_to_ott(["Not really a species"])
+    # An unresolvable name warns the user and yields ott None. The warning is
+    # part of the contract, so assert on it rather than letting it escape.
+    with pytest.warns(UserWarning,match="could not be assigned"):
+        ott_list, species_list, results = species_to_ott(["Not really a species"])
     assert len(ott_list) == 1
     assert len(species_list) == 1
     assert ott_list[0] is None
@@ -136,8 +139,9 @@ def test_species_to_ott():
     assert ott_list[0] == 490099
     assert ott_list[1] == 19017
 
-    # This is a fuzzy match and should fail
-    ott_list, species_list, results = species_to_ott(["Neosciurus carolinensis"])
+    # This is a fuzzy match and should fail -- warning included
+    with pytest.warns(UserWarning,match="could not be assigned"):
+        ott_list, species_list, results = species_to_ott(["Neosciurus carolinensis"])
     assert results["Neosciurus carolinensis"]["msg"].startswith("No exact match")
 
 

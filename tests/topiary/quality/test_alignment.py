@@ -32,19 +32,24 @@ def test_score_alignment(test_dataframes, mocker):
         
     out_df = score_alignment(df.copy(), silent=True)
     
-    # Test with all gaps column
+    # Test with all gaps column. Every column is gaps-only and gets dropped, so
+    # there are no columns left to take a fraction of -- fx_in_sparse is an
+    # undefined 0/0 and comes back NaN by design.
     df_gaps = df.copy()
     df_gaps["alignment"] = ["---"] * len(df)
     out_df = score_alignment(df_gaps)
     assert "fx_in_sparse" in out_df.columns
+    assert np.all(pd.isna(out_df.loc[out_df.keep,"fx_in_sparse"]))
     
     # Test with no sparse columns
     out_df = score_alignment(df.copy(), sparse_column_cutoff=1.0)
     assert np.all(out_df.fx_in_sparse.dropna() == 0)
     
-    # Test with all sparse columns
+    # Test with all sparse columns. There are no dense columns, so
+    # fx_missing_dense is likewise an undefined 0/0 and comes back NaN.
     out_df = score_alignment(df.copy(), sparse_column_cutoff=0.0)
     assert "fx_in_sparse" in out_df.columns
+    assert np.all(pd.isna(out_df.loc[out_df.keep,"fx_missing_dense"]))
 
     # Test align_trim index forcing (front_index == back_index)
     score_alignment(df.copy(), align_trim=(0.0, 0.000001))

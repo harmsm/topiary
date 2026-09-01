@@ -380,29 +380,3 @@ def block_subprocess(request):
         yield
     finally:
         subprocess.Popen = real_popen
-
-
-@pytest.fixture(autouse=True)
-def block_oversubscribe(request):
-    """
-    Ensure that TOPIARY_BLOCK_MPI_OVERSUBSCRIBE is set for heavy tasks
-    (run_generax) unless they are in the mpi test directory.
-    """
-
-    # If this is a run_generax test
-    if "run_generax" in request.keywords:
-
-        # If it is NOT in the mpi test directory
-        if "tests/topiary/_private/mpi" not in str(request.path):
-
-            # Set environment variable to block oversubscribe
-            os.environ["TOPIARY_BLOCK_MPI_OVERSUBSCRIBE"] = "1"
-            yield
-            
-            # Clean up
-            if "TOPIARY_BLOCK_MPI_OVERSUBSCRIBE" in os.environ:
-                del os.environ["TOPIARY_BLOCK_MPI_OVERSUBSCRIBE"]
-            
-            return
-
-    yield

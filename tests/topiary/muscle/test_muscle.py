@@ -240,3 +240,27 @@ def test_align_dataframe_keeps_named_output_file(mocker, tmpdir):
 
     # A user-specified output file is not treated as temporary
     assert os.path.isfile("kept.fasta")
+
+
+def test_align_cleans_up_temp_input_when_muscle_fails(mocker, tmpdir):
+    """
+    A muscle failure must not leave topiary-tmp_* scratch files behind in the
+    caller's working directory.
+    """
+
+    os.chdir(tmpdir)
+
+    df = pd.DataFrame({"name": ["A"],
+                       "species": ["Homo sapiens"],
+                       "sequence": ["MAST"],
+                       "keep": [True],
+                       "uid": ["aaaaaaaaaa"]})
+
+    mocker.patch("topiary.muscle.muscle._run_muscle",
+                 side_effect=RuntimeError("muscle fell over"))
+
+    with pytest.raises(RuntimeError):
+        align(df, silent=True)
+
+    leftover = [f for f in os.listdir(".") if f.startswith("topiary-tmp_")]
+    assert leftover == []

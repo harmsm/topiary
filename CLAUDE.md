@@ -101,6 +101,29 @@ add `current_dir = os.getcwd()` / `os.chdir(current_dir)` pairs back.
 prints the worst offenders at the end of the session. It never fails a test; it
 exists to locate the fd exhaustion seen when running the whole suite.
 
+### CI
+
+`.github/workflows/python-app.yml` is split by tier:
+
+| job | what it needs | matrix | parallel? |
+| --- | --- | --- | --- |
+| `unit` | a pip install, nothing else | 2 OS x 3 python | yes |
+| `smoke` | conda (muscle, blast) | 2 OS x 3 python | yes |
+| `integration` | compiled RAxML-NG + GeneRax + live network | 1 config per push, full matrix nightly | no, serialized |
+
+Only `integration` is serialized (`max-parallel: 1` plus a repo-wide
+concurrency group) — it contends for NCBI and Open Tree of Life, and running
+several at once gets the runner rate-limited. That contention is why the *whole*
+workflow used to be serialized; now it only costs the one job that causes it.
+
+The `integration` job runs the entire suite rather than `-m integration`. That
+is deliberate: it is the only job that exercises every test in a single process,
+which is where cross-test contamination shows up (the file-descriptor
+exhaustion in tests/BASELINE.md was invisible to any single test file).
+
+`--run-ncbi-server` is nightly-only. NCBI rate-limits unauthenticated traffic,
+so hitting it on every push gets the runner throttled.
+
 `bash run_all_tests.sh` runs the full suite (flake8, test audit, coverage
 with all of the above opt-in flags enabled, badge/report generation). This is slow
 and touches the network/external binaries, so it should generally **not** be run by
@@ -111,6 +134,26 @@ Coverage settings live in `[tool.coverage.*]` in `pyproject.toml` — `source` i
 pinned to `src/topiary` and `branch = true`. Do not pass `--branch` or `--source`
 on the command line; the config already handles it. Reports land in
 `reports/coverage/` and `reports/htmlcov/`.
+
+### Warnings
+
+`filterwarnings = ["error", ...]` in `pyproject.toml`: **a warning that escapes a
+test fails the test.** If a test expects a warning, assert on it —
+
+```python
+with pytest.warns(UserWarning,match="could not be assigned"):
+    ott_list, species_list, results = species_to_ott(["Not a species"])
+```
+
+— which turns noise into a checked contract. If a *dependency* starts warning on
+some platform, add a narrow ignore for that specific warning; don't delete the
+`"error"` line.
+
+Two ignores are in place, both for the same third-party pattern: ete4 parses
+newick with `open(path).read()` and lets refcounting close the handle, which
+raises `ResourceWarning` (and pytest's `PytestUnraisableExceptionWarning`
+wrapper). It is noise, not a descriptor leak — fd counts stay flat. Use
+`pytest --fd-report` to hunt real leaks; these filters don't hide those.
 
 `run_all_tests.sh` enforces a **coverage floor of 92%** (`--fail-under=92`).
 Ratchet it up as coverage improves; never lower it to make a change pass.

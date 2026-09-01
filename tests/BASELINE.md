@@ -405,3 +405,102 @@ unit tests, and are the natural next target:
   74%   18 missed  pipeline/alignment_to_ancestors.py
   74%   17 missed  pipeline/seed_to_alignment.py
 ```
+
+
+## Stage 5: CI
+
+The workflow is split by tier. Measured locally, running each job's exact
+command:
+
+```
+unit          310 passed    9.5s   pip only -- no conda, no external binaries
+smoke          89 passed     28s   conda (muscle, blast); no compile step
+integration   442 passed    170s   compiled raxml-ng + generax + network
+```
+
+The `unit` job needing nothing but `pip install .[test]` is not an assumption --
+it was verified by building a clean venv with the conda binaries removed from
+PATH and running the whole job (flake8, the audit gate, and 310 tests) green.
+Only 4 smoke tests need an external binary (3 need muscle, 1 needs toyplot's
+reportlab PNG backend), which is why `smoke` takes conda but skips the compile.
+
+### What changed and why
+
+- **`max-parallel: 1` and the repo-wide concurrency group are gone from `unit`
+  and `smoke`.** They exist now only on `integration`, which is the job that
+  actually contends for NCBI and Open Tree of Life. Six matrix jobs used to run
+  end to end, each compiling or restoring RAxML-NG and GeneRax, to work around
+  contention that only one tier causes.
+- **Only `integration` compiles the external binaries.** That was the expensive
+  step in every one of the six old jobs.
+- **`pip install .[dev]` fixed to `.[test]`.** `pyproject.toml` defines `test`
+  and `docs`; there is no `dev` extra, so that line silently installed nothing
+  and the workflow relied on a separate explicit pip install right after it.
+- **`--run-network` added.** After Stage 1 the 19 network tests are opt-in, so
+  without this flag CI would silently stop running them.
+- **`--run-ncbi-server` is nightly-only**, to avoid NCBI throttling on every push.
+- **flake8 and the audit gate moved into the fast `unit` job**, so a lint error
+  or a test that verifies nothing fails in about two minutes rather than after
+  the full serialized run.
+- **Coverage floor enforced in the nightly job** (`--fail-under=92`), the only
+  run that exercises every flag.
+- **`TOPIARY_MPI_OVERSUBSCRIBE` removed.** CI set it; nothing in the repo ever
+  read it. Its counterpart `TOPIARY_BLOCK_MPI_OVERSUBSCRIBE` was set and unset
+  by a conftest fixture that nothing read either, guarding an empty, untracked
+  `tests/topiary/_private/mpi/` directory. Both are vestiges of the MPI support
+  topiary no longer has; the fixture and the directory are gone.
+
+### Test data left in the repo, deliberately
+
+The plan floated moving the largest `tests/data` payloads (two ~15 MB proteome
+archives, a 10 MB BLAST XML) behind a download-and-cache fixture to shrink the
+119 MB repo. **Not done, and it should not be.** It would put a live network
+dependency back into the test suite -- the exact class of problem Stage 1 spent
+its time removing, and the thing that made CI flaky in the first place. A slow
+clone is a much cheaper problem than a suite that fails when a remote host is
+down. If repo size becomes pressing, git-lfs keeps the inputs local to the test
+run and is the better trade.
+
+
+## Warnings
+
+The suite emits **zero warnings**, and `pyproject.toml` sets
+`filterwarnings = ["error", ...]` so it stays that way.
+
+What was there before:
+
+- **`UserWarning` from `opentree/util.py`** (5 occurrences) — "N of M species
+  could not be assigned an ott id". Entirely expected: the tests deliberately
+  feed unresolvable species names. Now asserted with
+  `pytest.warns(UserWarning,match="could not be assigned")` instead of printed,
+  which makes the warning a checked part of the contract rather than noise.
+
+- **`RuntimeWarning: invalid value encountered in divide`** at
+  `quality/alignment.py:242` and `:246` (3 occurrences). Both are 0/0 on a
+  degenerate alignment: the first when every column was gaps-only and got
+  dropped, the second when every column is sparse so there are no dense columns.
+  NaN is the correct answer for an undefined fraction *and* is already the
+  sentinel those two columns use — `score_alignment` initializes both to
+  `np.nan` and fills in only the kept rows, and `polish.py`'s comparisons treat
+  NaN conservatively (a NaN row is never dropped). So the division is now
+  wrapped in `np.errstate(invalid="ignore")` with a comment, and
+  `test_score_alignment` asserts the NaN rather than leaving it incidental.
+
+- **A dead filter.** `"ignore:invalid escape sequence:DeprecationWarning"` was
+  in `pyproject.toml` and no longer matched anything; removed.
+
+### What `error` deliberately does not cover
+
+`ResourceWarning` and `pytest.PytestUnraisableExceptionWarning` are ignored.
+Both come from ete4 reading newick files as `data = open(data).read()`, leaving
+the handle to refcounting. Under CPython the file closes immediately, so this is
+style noise rather than a leak — consistent with the flat descriptor counts
+measured in Stage 1. Silencing them is not hiding a real problem, and
+`--fd-report` remains the tool for actual descriptor leaks. Turning them into
+errors would mean rewriting every ete4 call site in topiary to read files itself,
+which is churn in core tree I/O for no behavioural gain.
+
+Note that `"error"` applies to dependency warnings too, so a numpy or pandas
+deprecation on a platform not tested here will fail CI. That is the intended
+trade: the fix is a one-line targeted ignore, and the warning is telling you
+something real about a dependency you use.

@@ -26,7 +26,8 @@ def test_get_df_ott(test_dataframes):
     # False
     tmp_df = df.drop(columns="ott")
     tmp_df.loc[tmp_df.index[0],"species"] = "Not a species"
-    out_df = get_df_ott(tmp_df)
+    with pytest.warns(UserWarning,match="could not be assigned"):
+        out_df = get_df_ott(tmp_df)
     assert pd.isnull(out_df.loc[out_df.index[0],"ott"])
     assert out_df.loc[out_df.index[0],"species"] == "Not a species"
     expected_keep = np.ones(len(out_df),dtype=bool)
@@ -37,7 +38,8 @@ def test_get_df_ott(test_dataframes):
     # False
     tmp_df = df.drop(columns="ott")
     tmp_df.loc[:,"species"] = "Not a species"
-    out_df = get_df_ott(tmp_df)
+    with pytest.warns(UserWarning,match="could not be assigned"):
+        out_df = get_df_ott(tmp_df)
     assert np.sum(pd.isnull(out_df.loc[:,"ott"])) == len(tmp_df)
     assert np.sum(out_df.loc[:,"species"] == "Not a species") == len(tmp_df)
     expected_keep = np.zeros(len(out_df),dtype=bool)
@@ -51,7 +53,8 @@ def test_get_df_ott(test_dataframes):
     # bad ott if we request it. 
     tmp_df = df.drop(columns="ott")
     tmp_df.loc[:,"species"] = "Not a species"
-    out_df = get_df_ott(tmp_df,keep_anyway=True)
+    with pytest.warns(UserWarning,match="could not be assigned"):
+        out_df = get_df_ott(tmp_df,keep_anyway=True)
     assert np.sum(pd.isnull(out_df.loc[:,"ott"])) == len(tmp_df)
     assert np.sum(out_df.loc[:,"species"] == "Not a species") == len(tmp_df)
     expected_keep = np.ones(len(out_df),dtype=bool)
