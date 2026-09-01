@@ -1,0 +1,36 @@
+
+RAxML-NG v. 1.1.0 released on 29.11.2021 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz, 28 cores, 125 GB RAM
+
+RAxML-NG was called at 04-Aug-2022 16:08:48 as follows:
+
+raxml-ng --support --tree /gpfs/projects/harmslab/harms/topi.2/small/alignment_to_ancestors_hpDashaDmQ/04_bootstraps/combine-bootstraps/tree.newick --threads auto{1} --bs-trees alignment.phy.raxml.bootstraps --redo
+
+Analysis options:
+  run mode: Compute bipartition support (Felsenstein Bootstrap)
+  start tree(s): user
+  random seed: 1659654528
+  SIMD kernels: AVX2
+  parallelization: coarse-grained (auto), NONE/sequential
+
+WARNING: Running in REDO mode: existing checkpoints are ignored, and all result files will be overwritten!
+
+Reading reference tree from file: /gpfs/projects/harmslab/harms/topi.2/small/alignment_to_ancestors_hpDashaDmQ/04_bootstraps/combine-bootstraps/tree.newick
+Reference tree size: 14
+
+Reading bootstrap trees from file: alignment.phy.raxml.bootstraps
+Loaded 1000 trees with 14 taxa.
+
+Best ML tree with Felsenstein bootstrap (FBP) support values saved to: /gpfs/projects/harmslab/harms/topi.2/small/alignment_to_ancestors_hpDashaDmQ/04_bootstraps/combine-bootstraps/tree.newick.raxml.support
+
+Execution log saved to: /gpfs/projects/harmslab/harms/topi.2/small/alignment_to_ancestors_hpDashaDmQ/04_bootstraps/combine-bootstraps/tree.newick.raxml.log
+
+Analysis started: 04-Aug-2022 16:08:48 / finished: 04-Aug-2022 16:08:48
+
+Elapsed time: 0.018 seconds
+

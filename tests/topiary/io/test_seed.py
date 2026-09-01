@@ -199,7 +199,21 @@ def offline_seed(mocker,seed_dataframes):
 
     mocker.patch("topiary.get_df_ott",side_effect=_fake_get_df_ott)
 
+    # merge_and_annotate re-downloads sequences from Entrez for any hit it does
+    # not fully trust. That call runs inside a multiprocessing pool, so on Linux
+    # (fork) it inherits the network guard and dies with a confusing
+    # PicklingError, while on macOS (spawn) it does not inherit the guard and
+    # silently makes a real network call. Mock it so neither happens.
+    mocker.patch("topiary.ncbi.blast.merge.get_sequences",
+                 side_effect=lambda accessions,**kwargs: list(_sequences_for(accessions)))
+
     return seed_file
+
+
+def _sequences_for(accessions):
+    """A stand-in protein sequence per requested accession."""
+
+    return ["MLPFLFFSTLFSSIFTEAQKQYWVCNSSDASISYTYCDKMQ" for _ in accessions]
 
 
 def _real_blast_hits(ncbi_blast_server_output,n=5,species=None):
@@ -286,12 +300,6 @@ def test_df_from_seed_drops_synthetic_sequences(mocker,offline_seed,ncbi_blast_s
                             species="synthetic construct")
 
     mocker.patch("topiary.ncbi.ncbi_blast",return_value=[hits])
-
-    # Rewriting the titles means merge_and_annotate no longer trusts the
-    # sequences in the hits and tries to re-download them from Entrez. Hand it
-    # the sequences it already has instead of going to NCBI.
-    mocker.patch("topiary.ncbi.blast.merge.get_sequences",
-                 return_value=list(hits["sequence"]))
 
     df, _, _, _ = df_from_seed(offline_seed,ncbi_blast_db="nr")
 

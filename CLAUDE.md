@@ -83,6 +83,11 @@ by the `block_network` autouse fixture in `tests/conftest.py`. Tests carrying
 exempt (`_OPT_IN_MARKERS`) — the caller explicitly asked for them, so their
 network use is declared rather than hidden.
 
+The guard patches the parent process. On fork platforms (Linux) child processes
+inherit it; on spawn platforms (macOS) they do not, so a test that reaches the
+network only from a `multiprocessing` worker will pass locally on a Mac and fail
+in Linux CI. Mock at the boundary rather than relying on the guard to catch it.
+
 If a test starts failing with `NetworkAccessBlocked`, it has picked up a hidden
 dependency on a remote service: either mock the call, or mark it
 `@pytest.mark.network` (which makes it opt-in via `--run-network`). Do not "fix"
@@ -157,6 +162,16 @@ wrapper). It is noise, not a descriptor leak — fd counts stay flat. Use
 
 `run_all_tests.sh` enforces a **coverage floor of 92%** (`--fail-under=92`).
 Ratchet it up as coverage improves; never lower it to make a change pass.
+
+Test fixtures under `tests/data` must be **committed**. `.gitignore` has a
+blanket `*.log` with a `!tests/data/**/*.log` negation for exactly this reason —
+a test reading an uncommitted file passes locally and fails on a fresh checkout.
+`run_all_tests.sh` fails if anything under `tests/data` is untracked. To check a
+change the way CI sees it:
+
+```bash
+git checkout-index -a -f --prefix=/tmp/clean/ && cd /tmp/clean && pytest tests -m unit
+```
 
 Tests mirror the `src/topiary` package layout under `tests/topiary/` (e.g.
 `src/topiary/quality/shrink.py` ↔ `tests/topiary/quality/test_shrink.py`).

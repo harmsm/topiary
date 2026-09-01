@@ -1,0 +1,45 @@
+
+RAxML-NG v. 1.1.0 released on 29.11.2021 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Apple M1 Pro, 10 cores, 16 GB RAM
+
+RAxML-NG was called at 15-Aug-2022 13:54:00 as follows:
+
+raxml-ng --start --msa alignment.phy --model LG --seed 12345 --threads 10 --tree pars{1}
+
+Analysis options:
+  run mode: Starting tree generation
+  start tree(s): parsimony (1)
+  random seed: 12345
+  SIMD kernels: SSE3
+  parallelization: coarse-grained (auto), PTHREADS (10 threads), thread pinning: OFF
+
+[00:00:00] Reading alignment from file: alignment.phy
+[00:00:00] Loaded alignment with 8 taxa and 13 sites
+
+Alignment comprises 1 partitions and 13 patterns
+
+Partition 0: noname
+Model: LG
+Alignment sites / patterns: 13 / 13
+Gaps: 0.00 %
+Invariant sites: 15.38 %
+
+
+NOTE: Binary MSA file created: alignment.phy.raxml.rba
+
+[00:00:00] Generating 1 parsimony starting tree(s) with 8 taxa
+
+All starting trees saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/working/max-parsimony/alignment.phy.raxml.startTree
+
+
+Execution log saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/working/max-parsimony/alignment.phy.raxml.log
+
+Analysis started: 15-Aug-2022 13:54:00 / finished: 15-Aug-2022 13:54:00
+
+Elapsed time: 0.001 seconds
+

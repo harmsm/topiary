@@ -16,6 +16,21 @@ mkdir reports/badges
 echo "Running flake8, aggressive"
 flake8 src/topiary tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics > reports/flake.txt
 
+echo "Checking for test data that exists locally but is not in git"
+# A test that reads a file which is on disk here but not committed passes
+# locally and fails on a fresh checkout -- i.e. in CI. This has happened
+# (a blanket *.log rule in .gitignore hid 108 raxml log fixtures), so check.
+untracked_data=$(comm -23 \
+    <(find tests/data -type f | sort) \
+    <(git ls-files tests/data | sort) \
+    | grep -vE '(\.DS_Store|\.ipynb_checkpoints/)' || true)
+if [[ -n "${untracked_data}" ]]; then
+    echo "FAIL: test data on disk but not tracked by git."
+    echo "Tests reading these pass here and fail on a fresh checkout:"
+    echo "${untracked_data}"
+    exit 1
+fi
+
 echo "Auditing tests that verify nothing"
 # Reports stub (`pass`-bodied) tests, tests with no assertion, and tests
 # silently shadowed by a duplicate function name. As of Stage 3 all three are

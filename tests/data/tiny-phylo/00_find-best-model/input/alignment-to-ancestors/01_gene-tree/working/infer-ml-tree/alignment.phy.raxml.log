@@ -1,0 +1,128 @@
+
+RAxML-NG v. 1.2.2-master released on 30.04.2024 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth, Julia Haag, Anastasis Togkousidis.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Apple M1 Pro, 10 cores, 16 GB RAM
+
+RAxML-NG was called at 08-Mar-2026 20:46:13 as follows:
+
+/Users/harmsm/miniconda3/envs/topiary/bin/raxml-ng --search --msa alignment.phy --model rtREV --seed 6161974455 --threads auto{10}
+
+Analysis options:
+  run mode: ML tree search
+  start tree(s): random (10) + parsimony (10)
+  random seed: 6161974455
+  tip-inner: OFF
+  pattern compression: ON
+  per-rate scalers: OFF
+  site repeats: ON
+  logLH epsilon: general: 10.000000, brlen-triplet: 1000.000000
+  fast spr radius: AUTO
+  spr subtree cutoff: 1.000000
+  fast CLV updates: ON
+  branch lengths: proportional (ML estimate, algorithm: NR-FAST)
+  SIMD kernels: SSE3
+  parallelization: coarse-grained (auto), PTHREADS (auto)
+
+[00:00:00] Reading alignment from file: alignment.phy
+[00:00:00] Loaded alignment with 8 taxa and 13 sites
+
+Alignment comprises 1 partitions and 13 patterns
+
+Partition 0: noname
+Model: RTREV
+Alignment sites / patterns: 13 / 13
+Gaps: 0.00 %
+Invariant sites: 15.38 %
+
+
+NOTE: Binary MSA file created: alignment.phy.raxml.rba
+
+Parallelization scheme autoconfig: 10 worker(s) x 1 thread(s)
+
+[00:00:00] Generating 10 random starting tree(s) with 8 taxa
+[00:00:00] Generating 10 parsimony starting tree(s) with 8 taxa
+Parallel parsimony with 10 threads
+Parallel reduction/worker buffer size: 1 KB  / 0 KB
+
+[00:00:00] Data distribution: max. partitions/sites/weight per thread: 1 / 13 / 260
+[00:00:00] Data distribution: max. searches per worker: 2
+
+Starting ML tree search with 20 distinct starting trees
+
+[00:00:00 -255.033744] Initial branch length optimization
+[00:00:00 -198.952330] Model parameter optimization (eps = 10.000000)
+[00:00:00 -198.952328] AUTODETECT spr round 1 (radius: 5)
+[00:00:00 -135.129169] SPR radius for FAST iterations: 5 (autodetect)
+[00:00:00 -135.129169] Model parameter optimization (eps = 3.000000)
+[00:00:00 -135.085503] FAST spr round 1 (radius: 5)
+[00:00:00 -135.080022] Model parameter optimization (eps = 1.000000)
+[00:00:00 -135.079899] SLOW spr round 1 (radius: 5)
+[00:00:00] [worker #5] ML tree search #6, logLikelihood: -135.079874
+[00:00:00] [worker #6] ML tree search #7, logLikelihood: -135.079874
+[00:00:00] [worker #4] ML tree search #5, logLikelihood: -135.079874
+[00:00:00] [worker #7] ML tree search #8, logLikelihood: -135.079874
+[00:00:00] [worker #3] ML tree search #4, logLikelihood: -135.079874
+[00:00:00] [worker #2] ML tree search #3, logLikelihood: -135.079874
+[00:00:00 -135.079875] Model parameter optimization (eps = 0.100000)
+[00:00:00] [worker #9] ML tree search #10, logLikelihood: -135.079874
+
+[00:00:00] [worker #0] ML tree search #1, logLikelihood: -135.079874
+
+[00:00:00] [worker #1] ML tree search #2, logLikelihood: -135.079874
+[00:00:00] [worker #8] ML tree search #9, logLikelihood: -135.079874
+[00:00:00 -171.574849] Initial branch length optimization
+[00:00:00 -136.163818] Model parameter optimization (eps = 10.000000)
+[00:00:00] [worker #5] ML tree search #16, logLikelihood: -135.079874
+[00:00:00 -136.163818] AUTODETECT spr round 1 (radius: 5)
+[00:00:00] [worker #6] ML tree search #17, logLikelihood: -135.079875
+[00:00:00 -135.153694] SPR radius for FAST iterations: 5 (autodetect)
+[00:00:00 -135.153694] Model parameter optimization (eps = 3.000000)
+[00:00:00] [worker #7] ML tree search #18, logLikelihood: -135.079874
+[00:00:00 -135.099893] FAST spr round 1 (radius: 5)
+[00:00:00] [worker #4] ML tree search #15, logLikelihood: -135.079875
+[00:00:00 -135.080695] Model parameter optimization (eps = 1.000000)
+[00:00:00 -135.080022] SLOW spr round 1 (radius: 5)
+[00:00:00] [worker #1] ML tree search #12, logLikelihood: -135.079875
+[00:00:00] [worker #2] ML tree search #13, logLikelihood: -135.079875
+[00:00:00] [worker #8] ML tree search #19, logLikelihood: -135.079875
+[00:00:00] [worker #9] ML tree search #20, logLikelihood: -135.079874
+[00:00:00 -135.079878] Model parameter optimization (eps = 0.100000)
+
+[00:00:00] [worker #0] ML tree search #11, logLikelihood: -135.079875
+
+[00:00:00] [worker #3] ML tree search #14, logLikelihood: -135.079875
+
+Optimized model parameters:
+
+   Partition 0: noname
+   Rate heterogeneity: NONE
+   Base frequencies (model): 0.064600 0.045300 0.037600 0.042200 0.011400 0.060600 0.060700 0.063900 0.027300 0.067900 0.101800 0.075100 0.015000 0.028700 0.068100 0.048800 0.062200 0.025100 0.031800 0.061900 
+   Substitution rates (model): 34.000000 51.000000 10.000000 439.000000 32.000000 81.000000 135.000000 30.000000 1.000000 45.000000 38.000000 235.000000 1.000000 97.000000 460.000000 258.000000 5.000000 55.000000 197.000000 35.000000 30.000000 92.000000 221.000000 10.000000 41.000000 90.000000 24.000000 18.000000 593.000000 57.000000 7.000000 24.000000 102.000000 64.000000 13.000000 47.000000 29.000000 384.000000 128.000000 236.000000 79.000000 94.000000 320.000000 35.000000 15.000000 123.000000 1.000000 49.000000 33.000000 294.000000 148.000000 16.000000 28.000000 21.000000 1.000000 78.000000 542.000000 61.000000 91.000000 1.000000 5.000000 20.000000 1.000000 1.000000 55.000000 136.000000 55.000000 1.000000 1.000000 6.000000 70.000000 1.000000 48.000000 124.000000 104.000000 110.000000 16.000000 156.000000 70.000000 1.000000 75.000000 117.000000 55.000000 131.000000 295.000000 372.000000 18.000000 387.000000 33.000000 54.000000 309.000000 158.000000 1.000000 68.000000 225.000000 146.000000 10.000000 45.000000 36.000000 70.000000 34.000000 1.000000 21.000000 141.000000 1.000000 1.000000 52.000000 95.000000 82.000000 17.000000 1.000000 35.000000 68.000000 1.000000 3.000000 30.000000 37.000000 7.000000 17.000000 152.000000 7.000000 23.000000 21.000000 3.000000 34.000000 51.000000 76.000000 116.000000 141.000000 44.000000 183.000000 49.000000 48.000000 307.000000 1.000000 385.000000 34.000000 375.000000 64.000000 10.000000 4.000000 72.000000 39.000000 26.000000 1048.000000 23.000000 581.000000 179.000000 22.000000 24.000000 25.000000 47.000000 64.000000 112.000000 134.000000 14.000000 43.000000 77.000000 110.000000 6.000000 1.000000 19.000000 247.000000 1.000000 1.000000 131.000000 111.000000 74.000000 236.000000 11.000000 20.000000 69.000000 182.000000 1017.000000 92.000000 134.000000 62.000000 9.000000 14.000000 25.000000 671.000000 14.000000 31.000000 39.000000 1.000000 34.000000 196.000000 176.000000 26.000000 59.000000 
+
+
+Final LogLikelihood: -135.079874
+
+AIC score: 296.159748 / AICc score: 660.159748 / BIC score: 303.504089
+Free parameters (model + branch lengths): 13
+
+WARNING: Number of free parameters (K=13) is larger than alignment size (n=13).
+         This might lead to overfitting and compromise tree inference results!
+
+
+WARNING: Best ML tree contains 1 near-zero branches!
+
+Best ML tree with collapsed near-zero branches saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/input/alignment-to-ancestors/01_gene-tree/working/infer-ml-tree/alignment.phy.raxml.bestTreeCollapsed
+Best ML tree saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/input/alignment-to-ancestors/01_gene-tree/working/infer-ml-tree/alignment.phy.raxml.bestTree
+All ML trees saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/input/alignment-to-ancestors/01_gene-tree/working/infer-ml-tree/alignment.phy.raxml.mlTrees
+Optimized model saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/input/alignment-to-ancestors/01_gene-tree/working/infer-ml-tree/alignment.phy.raxml.bestModel
+
+Execution log saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/input/alignment-to-ancestors/01_gene-tree/working/infer-ml-tree/alignment.phy.raxml.log
+
+Analysis started: 08-Mar-2026 20:46:13 / finished: 08-Mar-2026 20:46:13
+
+Elapsed time: 0.053 seconds
+

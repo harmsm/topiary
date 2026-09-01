@@ -1,0 +1,36 @@
+
+RAxML-NG v. 1.2.2-master released on 30.04.2024 by The Exelixis Lab.
+Developed by: Alexey M. Kozlov and Alexandros Stamatakis.
+Contributors: Diego Darriba, Tomas Flouri, Benoit Morel, Sarah Lutteropp, Ben Bettisworth, Julia Haag, Anastasis Togkousidis.
+Latest version: https://github.com/amkozlov/raxml-ng
+Questions/problems/suggestions? Please visit: https://groups.google.com/forum/#!forum/raxml
+
+System: Apple M1 Pro, 10 cores, 16 GB RAM
+
+RAxML-NG was called at 08-Mar-2026 20:46:25 as follows:
+
+/Users/harmsm/miniconda3/envs/topiary/bin/raxml-ng --support --tree tree.newick --threads 1 --bs-trees alignment.phy.raxml.bootstraps --redo
+
+Analysis options:
+  run mode: Compute bipartition support (Felsenstein Bootstrap)
+  start tree(s): user
+  random seed: 1773027985
+  SIMD kernels: SSE3
+  parallelization: coarse-grained (auto), NONE/sequential
+
+WARNING: Running in REDO mode: existing checkpoints are ignored, and all result files will be overwritten!
+
+Reading reference tree from file: tree.newick
+Reference tree size: 8
+
+Reading bootstrap trees from file: alignment.phy.raxml.bootstraps
+Loaded 350 trees with 8 taxa.
+
+Best ML tree with Felsenstein bootstrap (FBP) support values saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/input/alignment-to-ancestors/05_gene-tree-bootstraps/working/01_combine-bootstraps/tree.newick.raxml.support
+
+Execution log saved to: /Users/harmsm/work/programming/git-clones/topiary/tests/data/tiny-phylo/00_find-best-model/input/alignment-to-ancestors/05_gene-tree-bootstraps/working/01_combine-bootstraps/tree.newick.raxml.log
+
+Analysis started: 08-Mar-2026 20:46:25 / finished: 08-Mar-2026 20:46:25
+
+Elapsed time: 0.003 seconds
+

@@ -4,6 +4,23 @@ import tempfile
 import socket
 import subprocess
 
+from netguard import NetworkAccessBlocked
+from netguard import is_local_address
+
+# Markers that mean "the caller explicitly opted into external access". A test
+# behind any of these is only collected when its flag is passed, so its use of
+# the network is a stated cost, not a hidden one -- the guard leaves it alone.
+#
+# run_generax and run_raxml are in this list because several of them really do
+# reach the Open Tree of Life API: setting up a GeneRax run annotates the
+# species tree from OTL. That is surprising, but it is not *hidden*, and
+# blocking it would just break --run-generax in CI.
+_OPT_IN_MARKERS = frozenset(["network",
+                             "run_ncbi_server",
+                             "run_blast",
+                             "run_generax",
+                             "run_raxml"])
+
 # pytester lets tests/test_harness.py run throwaway pytest sessions to verify
 # the autouse fixtures below actually contain cross-test contamination.
 pytest_plugins = ["pytester"]
@@ -238,52 +255,6 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         terminalreporter.write_line(f"  +{grew:<4} {nodeid}")
 
 
-class NetworkAccessBlocked(Exception):
-    """
-    A test that is not marked `network` tried to open an outbound connection.
-    """
-
-    pass
-
-
-# Addresses a test may always reach: loopback, and anything on the local
-# machine. multiprocessing uses AF_UNIX sockets for its Manager and Queue
-# plumbing, so those must stay open or thread_manager tests cannot run.
-_LOCAL_HOSTS = frozenset(["127.0.0.1", "::1", "localhost", "0.0.0.0", ""])
-
-# Markers that mean "the caller explicitly opted into external access". A test
-# behind any of these is only collected when its flag is passed, so its use of
-# the network is a stated cost, not a hidden one -- the guard leaves it alone.
-#
-# run_generax and run_raxml are in this list because several of them really do
-# reach the Open Tree of Life API: setting up a GeneRax run annotates the
-# species tree from OTL. That is surprising, but it is not *hidden*, and
-# blocking it would just break --run-generax in CI.
-_OPT_IN_MARKERS = frozenset(["network",
-                             "run_ncbi_server",
-                             "run_blast",
-                             "run_generax",
-                             "run_raxml"])
-
-
-def _is_local_address(sock, address):
-    """
-    True if `address` is loopback or a local unix socket.
-    """
-
-    if getattr(sock, "family", None) == socket.AF_UNIX:
-        return True
-
-    # AF_UNIX addresses are plain paths
-    if isinstance(address, (str, bytes)):
-        return True
-
-    if isinstance(address, (tuple, list)) and len(address) > 0:
-        return address[0] in _LOCAL_HOSTS
-
-    return False
-
-
 @pytest.fixture(autouse=True)
 def block_network(request):
     """
@@ -315,7 +286,7 @@ def block_network(request):
     real_connect_ex = socket.socket.connect_ex
 
     def guarded_connect(self, address, *args, **kwargs):
-        if _is_local_address(self, address):
+        if is_local_address(self, address):
             return real_connect(self, address, *args, **kwargs)
         raise NetworkAccessBlocked(
             f"{request.node.nodeid} tried to connect to {address!r}.\n"
@@ -324,7 +295,7 @@ def block_network(request):
             f"--run-network is given). Otherwise, mock the call.")
 
     def guarded_connect_ex(self, address, *args, **kwargs):
-        if _is_local_address(self, address):
+        if is_local_address(self, address):
             return real_connect_ex(self, address, *args, **kwargs)
         raise NetworkAccessBlocked(
             f"{request.node.nodeid} tried to connect to {address!r}.")

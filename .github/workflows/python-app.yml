@@ -158,14 +158,14 @@ jobs:
       uses: actions/cache@v4
       with:
         path: bin-cache/generax
-        key: ${{ runner.os }}-generax-${{ steps.get-hashes.outputs.generax_hash }}
+        key: ${{ runner.os }}-generax-${{ steps.get-hashes.outputs.generax_hash }}-${{ hashFiles('dependencies/compile-generax.sh') }}
 
     - name: cache raxml-ng
       id: cache-raxml
       uses: actions/cache@v4
       with:
         path: bin-cache/raxml-ng
-        key: ${{ runner.os }}-raxml-${{ steps.get-hashes.outputs.raxml_hash }}
+        key: ${{ runner.os }}-raxml-${{ steps.get-hashes.outputs.raxml_hash }}-${{ hashFiles('dependencies/compile-raxml-ng.sh') }}
 
     - name: install topiary and external binaries
       shell: bash -l {0}
@@ -175,25 +175,59 @@ jobs:
 
         mkdir -p bin-cache
 
-        # compile generax if not cached
-        if [ ! -f bin-cache/generax ]; then
-            cd dependencies
-            conda run -n topiary bash compile-generax.sh
-            cp $CONDA_PREFIX/bin/generax ../bin-cache/
-            cd ..
-        else
-            cp bin-cache/generax $CONDA_PREFIX/bin/
-        fi
+        # Does this binary actually run here? Uses topiary's own checker, which
+        # distinguishes "not in PATH" from "present but crashes".
+        validate () {
+            python - "$1" <<'PYEOF'
+        import sys
+        from topiary._private import installed
+        checker = {"raxml-ng": installed.check_raxml,
+                   "generax": installed.check_generax}[sys.argv[1]]
+        _, version, _ = checker()
+        # (-2,-2,-2) not found; (-1,-1,-1) found but does not run
+        sys.exit(1 if tuple(version) in ((-1,-1,-1),(-2,-2,-2)) else 0)
+        PYEOF
+        }
 
-        # compile raxml if not cached
-        if [ ! -f bin-cache/raxml-ng ]; then
-            cd dependencies
-            conda run -n topiary bash compile-raxml-ng.sh
-            cp $CONDA_PREFIX/bin/raxml-ng ../bin-cache/
-            cd ..
-        else
-            cp bin-cache/raxml-ng $CONDA_PREFIX/bin/
-        fi
+        # A cached binary is only usable if it runs on *this* runner. GitHub
+        # runners are heterogeneous, and a binary built on a machine with a
+        # newer instruction set dies with SIGILL on an older one -- which the
+        # cache key cannot see. So validate before trusting the cache, and
+        # rebuild on the spot if it does not run. Compiling on the machine that
+        # will run it is always correct.
+        install_or_build () {
+            name="$1"
+            script="$2"
+
+            if [ -f "bin-cache/$name" ]; then
+                cp "bin-cache/$name" "$CONDA_PREFIX/bin/"
+                if validate "$name"; then
+                    echo "$name: cached binary runs on this runner"
+                    return 0
+                fi
+                echo "::warning::$name from cache does not run on this runner (likely built on a different CPU); rebuilding"
+                rm -f "bin-cache/$name" "$CONDA_PREFIX/bin/$name"
+            fi
+
+            ( cd dependencies && conda run -n topiary bash "$script" )
+            cp "$CONDA_PREFIX/bin/$name" bin-cache/
+        }
+
+        install_or_build generax compile-generax.sh
+        install_or_build raxml-ng compile-raxml-ng.sh
+
+    # Fail here, with topiary's own diagnostic, rather than through a dozen
+    # confusing test failures further down.
+    - name: verify the external stack
+      shell: bash -l {0}
+      run: |
+        topiary-check-installed
+        python -c "
+        from topiary._private import installed
+        installed.validate_stack([{'program':'raxml-ng','min_version':(1,1,0),'must_pass':True},
+                                  {'program':'generax','min_version':(2,0,0),'must_pass':True}])
+        print('external stack OK')
+        "
 
     # --run-ncbi-server is deliberately left out of the per-push run: NCBI
     # rate-limits unauthenticated traffic, and hitting it on every push gets

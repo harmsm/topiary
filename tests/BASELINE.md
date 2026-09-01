@@ -504,3 +504,96 @@ Note that `"error"` applies to dependency warnings too, so a numpy or pandas
 deprecation on a platform not tested here will fail CI. That is the intended
 trade: the fix is a one-line targeted ignore, and the warning is telling you
 something real about a dependency you use.
+
+
+## CI failures after the Stage 5 rollout, and what they were
+
+Three separate causes; two were mine.
+
+### 1. `test__parse_raxml_info_for_aic` -- KeyError in every environment
+
+`.gitignore` had a blanket `*.log` (boilerplate, under a "# Django stuff:"
+heading), so **108 raxml/generax log files under `tests/data` were never
+committed**. They exist only on machines that generated them. The Stage 4 test I
+wrote against a "real raxml log from the committed test data" was reading a file
+that is not, in fact, committed -- it passed locally and KeyError'd on a fresh
+checkout.
+
+Fixed by negating the rule for test fixtures (`!tests/data/**/*.log`) and
+committing the 108 files (576 KB). `run_all_tests.sh` now fails if anything
+under `tests/data` is on disk but untracked, so this cannot recur silently.
+
+**Lesson, and it is the same one as Stage 1:** verify against what CI actually
+gets. `git checkout-index -a -f --prefix=<dir>` exports exactly the tracked
+files; running the suite there catches this class of bug in seconds.
+
+### 2. `test_df_from_seed` -- PicklingError on Linux only
+
+`merge_and_annotate` calls `get_sequences`, which downloads from Entrez inside a
+multiprocessing pool. My Stage 3 test mocked it in one of the three df_from_seed
+tests but not the main one.
+
+The reason it only failed on Linux is worth recording. The network guard patches
+`socket.connect` in the parent process:
+
+- **Linux** defaults to the `fork` start method, so a worker inherits the patch,
+  hits the guard, and multiprocessing tries to pickle `NetworkAccessBlocked`
+  back to the parent.
+- **macOS** defaults to `spawn`, so a worker does *not* inherit the patch and
+  the call goes out to the real network and succeeds. The test had been quietly
+  making real Entrez calls on macOS the whole time.
+
+So the Linux failure was the guard working correctly and reporting a genuine
+problem. Two fixes: the mock moved into the shared `offline_seed` fixture so all
+three tests are hermetic, and `NetworkAccessBlocked` moved out of `conftest.py`
+into `tests/netguard.py`.
+
+That second one matters because there are two `conftest.py` files in this repo
+and pytest imports both under the module name `conftest`, so an exception
+defined in one has an ambiguous `__module__` and cannot be pickled:
+
+```
+PicklingError: Can't pickle <class 'conftest.NetworkAccessBlocked'>:
+attribute lookup NetworkAccessBlocked on conftest failed
+```
+
+A real violation now reports the test name and the address it tried to reach,
+instead of that.
+
+**Known limitation:** the guard covers the main process and, on fork platforms,
+its children. On spawn platforms (macOS, and Windows) a child process re-imports
+cleanly and is *not* guarded. A test that reaches the network only from a worker
+process will therefore pass on macOS. Linux CI is the backstop.
+
+### 3. Nine raxml failures -- a cached binary that cannot run
+
+`check_raxml` reported `killed by signal SIGILL`: raxml-ng was present but died
+on an illegal instruction. generax on the same runner was fine (2.1.3). One
+environment problem, nine test failures.
+
+The compile script already disables SIMD and native arch, so the likely cause is
+the cache: the key was `${{ runner.os }}-raxml-<upstream HEAD>`, which encodes
+neither the CPU of the machine that built the binary nor the contents of the
+compile script. GitHub runners are heterogeneous, so a binary built on a machine
+with a newer instruction set is restored onto an older one and dies. It also
+means changing the build flags never invalidates the cache.
+
+This is a strong candidate for the original "sporadic failures in github
+workflows" complaint: it depends on which runner happens to populate the cache.
+
+Three fixes:
+
+- **Validate the cached binary before trusting it.** The workflow now runs
+  topiary's own `check_raxml`/`check_generax` against the restored binary and
+  rebuilds on the spot if it does not run. Compiling on the machine that will
+  run it is always correct.
+- **Cache keys include `hashFiles()` of the compile script**, so build-flag
+  changes invalidate the cache.
+- **A `verify the external stack` step** fails the job with topiary's own
+  diagnostic before the tests run. Note that `topiary-check-installed` exits 0
+  even on a broken stack -- it is a diagnostic, not a gate -- so the step calls
+  `validate_stack` directly.
+
+All of this was exercised locally against a stub binary that dies with SIGILL
+and against a PATH with the binaries absent: both are detected, and the healthy
+case still passes.
