@@ -12,6 +12,7 @@ import pandas as pd
 
 import datetime, os
 
+@pytest.mark.smoke
 def test__get_genome_url(esummary_assembly_records):
 
     # If parsing and sorting is doing what we think, we should get the following

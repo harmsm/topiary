@@ -22,6 +22,7 @@ def test__validate_seq_writer():
     return None
 
 
+@pytest.mark.smoke
 def test_write_fasta(test_dataframes,tmpdir):
 
     def _check_output_file(out_file,num_columns,check_length=None):
@@ -174,6 +175,7 @@ def test_write_fasta(test_dataframes,tmpdir):
     # IMPROVE TEST
     # NEED TO TEST TAXONOMIC ORDERING
 
+@pytest.mark.smoke
 def test_write_phy(test_dataframes,tmpdir):
 
     def _check_output_file(out_file,check_length=None):
@@ -320,6 +322,7 @@ def test_write_phy(test_dataframes,tmpdir):
     io.write_phy(df,out_file,overwrite=True)
 
 
+@pytest.mark.smoke
 def test_read_fasta_into(test_dataframes,tmpdir):
 
     df = test_dataframes["good-df"].copy()

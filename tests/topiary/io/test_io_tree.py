@@ -121,6 +121,7 @@ def test__synchronize_tree_rooting():
                 count += 1
     assert count == 1
 
+@pytest.mark.smoke
 def test_load_trees(tiny_phylo):
 
     # Reconciled trees
@@ -234,6 +235,7 @@ def test_load_trees_unrooted(tmpdir):
     assert len(T.children) == 2 # Should be binary rooted now
 
 
+@pytest.mark.smoke
 def test_write_trees(small_phylo,tmpdir):
     cwd = os.getcwd()
     os.chdir(tmpdir)
@@ -345,6 +347,7 @@ def test_synchronize_rooting_edge_cases():
     T_list, root_on = _synchronize_tree_rooting([t], "gene")
     assert len(T_list) == 1
 
+@pytest.mark.smoke
 def test_write_trees_extended(small_phylo,tmpdir):
     os.chdir(tmpdir)
     T = load_trees(small_phylo["06_reconciled-tree-bootstraps/output"],prefix="reconciled")

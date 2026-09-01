@@ -156,6 +156,7 @@ def _claim_worker(args):
     return won
 
 
+@pytest.mark.smoke
 def test_claim_replicate_concurrent(tmpdir, monkeypatch):
     monkeypatch.chdir(tmpdir)
     names = [f"{i:05d}" for i in range(1, 41)]
@@ -393,6 +394,7 @@ def _setup_worker(args):
     return (calc_dir, is_leader)
 
 
+@pytest.mark.smoke
 def test_elect_setup_concurrent(tmpdir, monkeypatch):
     monkeypatch.chdir(tmpdir)
     os.mkdir("parent")

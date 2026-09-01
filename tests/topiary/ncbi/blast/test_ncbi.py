@@ -14,6 +14,7 @@ import pandas as pd
 
 import copy
 
+@pytest.mark.smoke
 def test__prepare_for_blast(test_dataframes):
 
     default_kwargs = get_public_param_defaults(ncbi_blast,_pfb)
@@ -242,6 +243,7 @@ def test__prepare_for_blast(test_dataframes):
     sequence_list, blast_kwargs, return_singleton = _pfb(**kwargs)
     assert blast_kwargs["extra_kwarg"] == 7
 
+@pytest.mark.smoke
 def test__construct_args(test_dataframes):
 
     # Create some normal looking inputs to feed into _construct_args
@@ -526,6 +528,7 @@ def test__construct_args(test_dataframes):
                                         keep_blast_xml=False,
                                         manual_num_cores=None)
 
+@pytest.mark.smoke
 def test__combine_hits(ncbi_blast_server_output):
 
     # This is a set of two dataframes that have three and two outputs,

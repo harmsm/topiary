@@ -6,6 +6,7 @@ import shutil
 import pandas as pd
 import numpy as np
 
+@pytest.mark.smoke
 def test_create_ancestor_card(tiny_phylo, tmpdir, mocker):
     
     # Use actual tiny_phylo dir as ancestor_directory

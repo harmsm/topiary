@@ -4,6 +4,7 @@ from topiary.quality.alignment import score_alignment
 import numpy as np
 import pandas as pd
 
+@pytest.mark.smoke
 def test_score_alignment(test_dataframes, mocker):
     
     # Use a fresh copy for each test case to avoid side effects

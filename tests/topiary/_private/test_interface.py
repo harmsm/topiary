@@ -85,6 +85,7 @@ def test_create_new_dir(tmpdir):
     create_new_dir("cool_dir",overwrite=True)
 
 
+@pytest.mark.smoke
 def test_copy_input_file(tmpdir,test_dataframes):
 
     os.chdir(tmpdir)
@@ -139,6 +140,7 @@ def test__follow_log_generator():
     return None
 
 
+@pytest.mark.smoke
 def test_launch(tmpdir,programs):
     """
     Test the launcher.

@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import copy, re
 
+@pytest.mark.smoke
 def test__prepare_for_blast(test_dataframes):
 
 
@@ -307,6 +308,7 @@ def test__calc_hit_post_prob():
     assert np.isclose(pp[1],0)
 
 
+@pytest.mark.smoke
 def test__make_recip_blast_calls(test_dataframes,recip_blast_hit_dfs):
 
     # --------------------------------------------------------------------------

@@ -6,6 +6,7 @@ from topiary._private.ftp import calc_md5
 
 import os
 
+@pytest.mark.smoke
 def test__read_md5_file(ftp_test_files):
 
     # Make sure we can read an md5checksums file

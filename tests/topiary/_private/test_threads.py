@@ -54,6 +54,7 @@ def _function_to_thread(value,some_option=False,lock=None):
 
     return value
 
+@pytest.mark.smoke
 def test_thread_manager():
 
     kwargs_list = [{"value":2,"some_option":False},

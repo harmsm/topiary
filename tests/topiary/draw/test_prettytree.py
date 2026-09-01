@@ -288,11 +288,16 @@ def test_PrettyTree_draw_nodes_errors():
     pt2 = prettytree.PrettyTree(T=T)
     pt2.draw_nodes(plot_ancestors=False, plot_leaves=False, plot_root=False)
 
+@pytest.mark.smoke
 def test_PrettyTree_render_formats(tmpdir):
+
+    # Rendering png/pdf goes through toyplot's reportlab backend, which shells
+    # out -- hence smoke rather than unit.
+
     tree = "((A:1.0,B:1.0):1.0,C:1.0);"
     pt = prettytree.PrettyTree(T=tree)
-    
-    for ext in ["pdf", "svg", "png"]:
+
+    for ext in ["pdf", "svg", "png", "html"]:
         output = tmpdir.join(f"test.{ext}")
         pt.render(str(output))
         assert output.exists()
@@ -403,13 +408,3 @@ def test_PrettyTree_draw_scale_bar_even_more():
     pt.draw_scale_bar(bar_length=1.0) 
     pt.draw_scale_bar(bar_length=0.0)
 
-def test_PrettyTree_render_formats(tmpdir):
-    tree = "((A:1.0,B:1.0):1.0,C:1.0);"
-    pt = prettytree.PrettyTree(T=tree)
-    
-    # Render different formats (1001-1004)
-    # We don't need to check content, just that it doesn't crash
-    pt.render(os.path.join(tmpdir, "test.png"))
-    pt.render(os.path.join(tmpdir, "test.svg"))
-    pt.render(os.path.join(tmpdir, "test.pdf"))
-    pt.render(os.path.join(tmpdir, "test.html"))

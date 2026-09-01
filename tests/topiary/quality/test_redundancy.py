@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing
 
+@pytest.mark.smoke
 def test__get_quality_scores(test_dataframes):
 
     # Get copy of the dataframe -- we're going to hack it
@@ -100,6 +101,7 @@ def test__construct_args():
     assert np.array_equal(kwargs_list[0]["i_block"],(0,4))
     assert np.array_equal(kwargs_list[0]["j_block"],(0,4))
 
+@pytest.mark.smoke
 def test__compare_seqs(test_dataframes):
 
     A_seq = "TEST"
@@ -191,6 +193,7 @@ def test__redundancy_thread_function():
     assert keep_array[2] == 1
 
 
+@pytest.mark.smoke
 def test_remove_redundancy(test_dataframes):
 
     df = test_dataframes["good-df"].copy()
@@ -299,6 +302,7 @@ def test_remove_redundancy(test_dataframes):
     out_df = remove_redundancy(df=df,cutoff=0.2)
     assert np.sum(out_df.keep) == 1
 
+@pytest.mark.smoke
 def test_find_redundancy_cutoff(test_dataframes):
     df = test_dataframes["good-df"].copy()
     

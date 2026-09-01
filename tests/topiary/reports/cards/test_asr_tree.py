@@ -5,6 +5,7 @@ from topiary.io.tree import load_trees
 import os
 import shutil
 
+@pytest.mark.smoke
 def test_create_asr_tree_card(tiny_phylo, tmpdir, mocker):
     
     # Initialize supervisor from tiny_phylo dir

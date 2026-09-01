@@ -36,6 +36,37 @@ pytest tests/topiary/quality
 pytest tests/topiary/io/test_dataframes.py::test_specific_case
 ```
 
+### Test tiers
+
+Every test carries exactly one tier marker. Use these to pick how much you want
+to run:
+
+| tier | what it means | count | time |
+| --- | --- | ---: | ---: |
+| `unit` | hermetic: no network, no subprocess, no external binary | 226 | ~4s |
+| `smoke` | real data and real file I/O, deterministic | 77 | ~25s |
+| `integration` | needs an external binary or a live service | 56 | ~3min |
+
+```
+pytest tests -m unit           # fast feedback loop -- use this while iterating
+pytest tests -m smoke
+pytest tests                   # unit + smoke (integration is gated by flags)
+```
+
+How the tier is assigned:
+
+- `integration` is **derived**, never written by hand — a test carrying any of
+  the `--run-*`/`network` markers gets it automatically, so the two can never
+  disagree.
+- `smoke` is **explicit** (`@pytest.mark.smoke`), because "uses real data and
+  takes a moment" is a judgement call.
+- `unit` is the **default** for anything unmarked.
+
+Because `unit` is the default, it is enforced rather than trusted: the
+`block_subprocess` autouse fixture makes a `unit` test that shells out fail with
+`SubprocessBlocked`. If you hit that, the test belongs in `smoke` (or behind a
+`--run-*` flag if it needs a real binary) — don't remove the guard.
+
 By default, pytest **skips** tests that hit external tools/servers. These are
 opt-in via custom flags (see `tests/conftest.py`), and can be combined:
 

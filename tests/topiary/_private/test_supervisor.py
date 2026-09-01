@@ -15,6 +15,7 @@ import pathlib
 import ete4 as ete
 import time
 
+@pytest.mark.smoke
 def test_Supervisor(tiny_phylo,tmpdir):
 
     df_csv = tiny_phylo["initial-input/dataframe.csv"]
@@ -137,6 +138,7 @@ def test_Supervisor__increment(tmpdir):
     assert sv.previous_entries[0]["something"] == "else"
 
 
+@pytest.mark.smoke
 def test_Supervisor_create_calc_dir(tiny_phylo,tmpdir):
 
     df_csv = tiny_phylo["initial-input/dataframe.csv"]
@@ -540,6 +542,7 @@ def test_Supervisor_finalize(tmpdir):
     assert os.getcwd() == sv.starting_dir
 
 
+@pytest.mark.smoke
 def test_Supervisor_alignment(tiny_phylo,tmpdir):
 
     df_csv = tiny_phylo["initial-input/dataframe.csv"]
@@ -553,6 +556,7 @@ def test_Supervisor_alignment(tiny_phylo,tmpdir):
     assert sv.alignment == os.path.join(sv.input_dir,"alignment.phy")
 
 
+@pytest.mark.smoke
 def test_Supervisor_df(tiny_phylo,tmpdir):
 
     df_csv = tiny_phylo["initial-input/dataframe.csv"]
@@ -566,6 +570,7 @@ def test_Supervisor_df(tiny_phylo,tmpdir):
     assert issubclass(type(sv.df),pd.DataFrame)
 
 
+@pytest.mark.smoke
 def test_Supervisor_gene_tree(tiny_phylo,tmpdir):
 
     gene_tree = tiny_phylo["final-output/gene-tree.newick"]
@@ -579,6 +584,7 @@ def test_Supervisor_gene_tree(tiny_phylo,tmpdir):
     assert sv.gene_tree == os.path.join(sv.input_dir,"gene-tree.newick")
 
 
+@pytest.mark.smoke
 def test_Supervisor_species_tree(tiny_phylo,tmpdir):
 
     species_tree = tiny_phylo["initial-input/species-tree.newick"]
@@ -593,6 +599,7 @@ def test_Supervisor_species_tree(tiny_phylo,tmpdir):
     assert sv.species_tree == os.path.join(sv.input_dir,"species-tree.newick")
 
 
+@pytest.mark.smoke
 def test_Supervisor_reconciled_tree(tiny_phylo,tmpdir):
 
     reconciled_tree = tiny_phylo["final-output/reconciled-tree.newick"]

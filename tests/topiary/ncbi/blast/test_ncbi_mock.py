@@ -68,6 +68,7 @@ def test__ncbi_blast_thread_function(mocker,tmpdir):
     mock_qblast.side_effect = [mock_handle]
     assert _ncbi_blast_thread_function(this_query, num_tries_allowed=1, keep_blast_xml=False, lock=lock) is None
 
+@pytest.mark.smoke
 def test_ncbi_blast(mocker):
     
     mocker.patch("topiary.ncbi.blast.ncbi.threads.get_num_threads", return_value=2)

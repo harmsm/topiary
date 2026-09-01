@@ -2,6 +2,7 @@ import pytest
 import os
 import tempfile
 import socket
+import subprocess
 
 # pytester lets tests/test_harness.py run throwaway pytest sessions to verify
 # the autouse fixtures below actually contain cross-test contamination.
@@ -84,6 +85,28 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "network" in item.keywords:
                 item.add_marker(skipper)
+
+    # Assign every test exactly one tier marker: unit, smoke, or integration.
+    #
+    # `integration` is derived, never hand-written: a test that needs an
+    # external binary or a live service is already behind an opt-in flag, and
+    # deriving the tier from that flag means the two can never disagree.
+    #
+    # `smoke` is written in the source, because "uses real data / real file
+    # I/O and takes a moment" is a judgement, not something collection can see.
+    #
+    # `unit` is the default. A new test is hermetic and fast until someone says
+    # otherwise -- and the block_subprocess fixture below enforces that, so an
+    # unlabelled test that shells out fails instead of quietly slowing the
+    # fast suite down.
+    for item in items:
+
+        if len(set(item.keywords) & _OPT_IN_MARKERS) > 0:
+            item.add_marker(pytest.mark.integration)
+        elif "smoke" in item.keywords:
+            pass
+        else:
+            item.add_marker(pytest.mark.unit)
 
     # If this is a windows box, skip any test with run_generax or run_raxml
     # decorators.
@@ -314,6 +337,49 @@ def block_network(request):
     finally:
         socket.socket.connect = real_connect
         socket.socket.connect_ex = real_connect_ex
+
+
+class SubprocessBlocked(Exception):
+    """
+    A test in the `unit` tier tried to launch an external process.
+    """
+
+    pass
+
+
+@pytest.fixture(autouse=True)
+def block_subprocess(request):
+    """
+    Keep the `unit` tier honest by making it impossible to shell out.
+
+    A tier is only useful if it means something. `unit` claims "hermetic and
+    fast"; without enforcement that claim decays the first time someone adds a
+    test that quietly runs muscle. Blocking subprocess creation turns that from
+    a slow fast-suite into an immediate, named failure.
+
+    A test that legitimately needs to run something external belongs in `smoke`
+    (mark it `@pytest.mark.smoke`) or, if it needs a real external binary,
+    behind one of the --run-* flags.
+    """
+
+    if "unit" not in request.keywords:
+        yield
+        return
+
+    real_popen = subprocess.Popen
+
+    def guarded_popen(*args, **kwargs):
+        cmd = args[0] if args else kwargs.get("args")
+        raise SubprocessBlocked(
+            f"{request.node.nodeid} is in the `unit` tier but tried to run "
+            f"{cmd!r}.\nMark it @pytest.mark.smoke, or put it behind a "
+            f"--run-* flag if it needs an external binary.")
+
+    subprocess.Popen = guarded_popen
+    try:
+        yield
+    finally:
+        subprocess.Popen = real_popen
 
 
 @pytest.fixture(autouse=True)

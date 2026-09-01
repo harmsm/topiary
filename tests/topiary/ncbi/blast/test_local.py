@@ -37,6 +37,7 @@ def _blast_args_to_keys(blast_args):
 
     return out_dict      
 
+@pytest.mark.smoke
 def test__prepare_for_blast(test_dataframes,tmpdir):
 
     # Make a fake blast db so code passes "file exists" check
@@ -226,6 +227,7 @@ def test__prepare_for_blast(test_dataframes,tmpdir):
     blast_kwargs = _blast_args_to_keys(blast_args)
     assert blast_kwargs["-extra_kwarg"] == "7"
 
+@pytest.mark.smoke
 def test__construct_args(test_dataframes,tmpdir):
 
     # Make a fake blast db so code passes "file exists" check
@@ -466,6 +468,7 @@ def test__construct_args(test_dataframes,tmpdir):
                                         num_threads=b,
                                         manual_num_cores=None)
 
+@pytest.mark.smoke
 def test__combine_hits(local_blast_output):
 
     # This is a set of two dataframes that have three and two outputs,

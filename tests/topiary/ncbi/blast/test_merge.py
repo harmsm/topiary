@@ -48,6 +48,7 @@ def test__check_merge():
         assert to_merge[i] == expected[i]
 
 
+@pytest.mark.smoke
 def test_merge_blast_df(recip_blast_hit_dfs):
 
     blast_dfs = recip_blast_hit_dfs["ncbi"]

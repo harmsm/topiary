@@ -1,3 +1,4 @@
+import pytest
 
 
 import sys
@@ -6,6 +7,7 @@ import subprocess
 
 from topiary.cli_scripts.check_installed import main
 
+@pytest.mark.smoke
 def test_main():
 
     # simple test. Make sure it runs. We test validation stack directly

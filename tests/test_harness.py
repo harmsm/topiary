@@ -12,6 +12,51 @@ import os
 import pytest
 
 
+# The tier-assignment and subprocess-guard logic from tests/conftest.py, cut
+# down to just the parts under test. Kept as a literal (rather than importing
+# the real conftest) so pytester sessions are isolated from this session's
+# options and markers.
+_TIER_CONFTEST = '''
+import pytest, subprocess
+
+_OPT_IN_MARKERS = frozenset(["network","run_ncbi_server","run_blast",
+                             "run_generax","run_raxml"])
+
+def pytest_configure(config):
+    for m in ("unit","smoke","integration","network","run_ncbi_server",
+              "run_blast","run_generax","run_raxml"):
+        config.addinivalue_line("markers", m + ": test marker")
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        if len(set(item.keywords) & _OPT_IN_MARKERS) > 0:
+            item.add_marker(pytest.mark.integration)
+        elif "smoke" in item.keywords:
+            pass
+        else:
+            item.add_marker(pytest.mark.unit)
+
+class SubprocessBlocked(Exception):
+    pass
+
+@pytest.fixture(autouse=True)
+def block_subprocess(request):
+    if "unit" not in request.keywords:
+        yield
+        return
+    real_popen = subprocess.Popen
+    def guarded_popen(*args, **kwargs):
+        cmd = args[0] if args else kwargs.get("args")
+        raise SubprocessBlocked(
+            f"{request.node.nodeid} is in the `unit` tier but tried to run {cmd!r}.")
+    subprocess.Popen = guarded_popen
+    try:
+        yield
+    finally:
+        subprocess.Popen = real_popen
+'''
+
+
 def test_cwd_is_restored_after_a_test_that_fails_mid_chdir(pytester):
     """
     A test that chdirs away and then fails before its restore line must not
@@ -122,3 +167,82 @@ def test_the_real_conftest_restored_cwd():
         pytest.skip("companion test did not run")
 
     assert os.getcwd() == expected
+
+
+def test_every_test_gets_exactly_one_tier(pytester):
+    """
+    Every collected test must land in exactly one of unit / smoke /
+    integration. Two tiers on one test, or none, means the selection commands
+    in CLAUDE.md silently run the wrong set.
+    """
+
+    pytester.makeconftest(_TIER_CONFTEST)
+
+    pytester.makepyfile("""
+        import pytest
+
+        def test_plain():
+            pass
+
+        @pytest.mark.smoke
+        def test_marked_smoke():
+            pass
+
+        @pytest.mark.run_generax
+        def test_needs_generax():
+            pass
+    """)
+
+    for tier in ("unit", "smoke", "integration"):
+        result = pytester.runpytest("--collect-only", "-q", "-m", tier)
+        result.stdout.fnmatch_lines([f"1/3 tests collected (2 deselected)*"])
+
+    # And no test carries two tiers at once.
+    for pair in ("unit and smoke", "unit and integration", "smoke and integration"):
+        result = pytester.runpytest("--collect-only", "-q", "-m", pair)
+        result.stdout.fnmatch_lines(["*no tests collected (3 deselected)*"])
+
+
+def test_unit_tier_cannot_shell_out(pytester):
+    """
+    The `unit` tier claims to be hermetic. Enforce it: a unit test that spawns
+    a subprocess must fail rather than quietly making the fast suite slow.
+    """
+
+    pytester.makeconftest(_TIER_CONFTEST)
+
+    pytester.makepyfile("""
+        import subprocess
+
+        def test_sneaky_subprocess():
+            subprocess.Popen(["echo", "hello"])
+    """)
+
+    result = pytester.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.fnmatch_lines(["*is in the `unit` tier but tried to run*"])
+
+
+@pytest.mark.smoke
+def test_smoke_tier_may_shell_out(pytester):
+    """
+    The counterpart: the guard must not fire outside the unit tier.
+
+    Marked smoke itself: pytester runs the inner session in-process, so if this
+    outer test were in the unit tier its own guard would patch subprocess.Popen
+    and the inner test would fail for the wrong reason.
+    """
+
+    pytester.makeconftest(_TIER_CONFTEST)
+
+    pytester.makepyfile("""
+        import pytest, subprocess
+
+        @pytest.mark.smoke
+        def test_allowed_subprocess():
+            p = subprocess.Popen(["echo", "hello"])
+            p.wait()
+    """)
+
+    result = pytester.runpytest()
+    result.assert_outcomes(passed=1)

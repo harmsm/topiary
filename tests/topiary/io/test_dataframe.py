@@ -7,6 +7,7 @@ import pandas as pd
 import warnings
 import os
 
+@pytest.mark.smoke
 def test_read_dataframe(dataframe_good_files,test_dataframes):
     """
     Test read dataframe function.
@@ -47,6 +48,7 @@ def test_read_dataframe(dataframe_good_files,test_dataframes):
     with pytest.raises(FileNotFoundError):
         read_dataframe("not_really_a_file.txt")
 
+@pytest.mark.smoke
 def test_write_dataframe(test_dataframes,tmpdir):
 
     df = test_dataframes["good-df"]

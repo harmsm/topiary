@@ -102,19 +102,42 @@ From `./tests/audit_tests.py tests`:
   `test_ncbi_blast` — headline entry points of the package.
 - **18 assertion-free** — the body does real work but nothing can make it
   fail. Mostly `draw/test_prettytree.py` and `reports/test_elements.py`.
-- **1 shadowed** — `test_PrettyTree_render_formats` is defined twice in
-  `tests/topiary/draw/test_prettytree.py` (lines 291 and 406). Python keeps
-  the second. The shadowed first definition is the one that actually asserts
-  (`assert output.exists()`); the version that runs asserts nothing. Left
-  as-is in Stage 0 because fixing it changes what executes — it belongs to
-  Stage 3.
+- **1 shadowed** — `test_PrettyTree_render_formats` was defined twice in
+  `tests/topiary/draw/test_prettytree.py`. Python kept the second; the
+  shadowed first definition was the one that actually asserted
+  (`assert output.exists()`). **Fixed in Stage 2**, which forced the issue: the
+  tier marker landed on the shadowed copy, leaving the running copy classified
+  `unit`, where the subprocess guard caught it shelling out through toyplot's
+  reportlab backend. The two are now merged into one asserting `smoke` test
+  covering pdf/svg/png/html. The audit now reports 0 shadowed.
 
 Stage 3 drives stub and assertion-free toward zero. Ratchet the limits down as
 that happens:
 
 ```bash
-./tests/audit_tests.py tests --max-stub 29 --max-noassert 18
+./tests/audit_tests.py tests --max-stub 29 --max-noassert 17
 ```
+
+## Test tiers (Stage 2)
+
+Every test carries exactly one tier. `integration` is derived from the
+`--run-*`/`network` markers, `smoke` is explicit, `unit` is the default and is
+enforced by a subprocess guard rather than trusted.
+
+```
+unit          226 tests     4.4s     hermetic
+smoke          77 tests    25.2s     real data, real file I/O
+integration    56 tests   185.0s     external binary or live service
+```
+
+The tiers were assigned by measurement, not by reading code: a throwaway pytest
+plugin recorded per-test duration, whether `subprocess.Popen` was called, and
+which data fixtures were requested, over a full all-flags run. Anything with an
+opt-in marker became `integration`; of the rest, anything that spawned a
+process, took over 0.25s, or pulled a real-data fixture became `smoke`.
+
+`tests/integration-tests/` is gone — its single test was hermetic despite the
+directory name and now lives at `tests/topiary/test_ete4_asr_integration.py`.
 
 ## Hidden dependencies — status after Stage 1
 

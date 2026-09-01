@@ -387,6 +387,7 @@ def test_construct_sizemap():
         construct_sizemap(prop=(0,1), size=(5,10), prop_span=5)
 
 
+@pytest.mark.smoke
 def test_create_name_dict(for_real_inference):
 
     df = topiary.read_dataframe(for_real_inference["small-pre-redundancy.csv"])

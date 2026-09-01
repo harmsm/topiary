@@ -17,6 +17,7 @@ def test__draw_histogram():
     assert len(ax.patches) > 0
     plt.close(fig)
 
+@pytest.mark.smoke
 def test_plot_ancestor_data():
     # Create dummy ancestral dataframe
     sites = np.arange(10)

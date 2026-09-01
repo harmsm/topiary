@@ -27,6 +27,7 @@ class _FakeReturn:
         self.stdout = stdout
         self.stderr = stderr
 
+@pytest.mark.smoke
 def test__version_checker():
 
     # Good check -- should work
@@ -82,6 +83,7 @@ def test__version_checker():
     assert d is None
 
 
+@pytest.mark.smoke
 @pytest.mark.skipif(os.name == "nt",
                     reason="signal-based process death is not portable to Windows")
 def test__version_checker_signal():
@@ -138,6 +140,7 @@ def test__format_diagnostic():
     d = {"returncode":-4,"signal":"SIGILL","stdout":"","stderr":""}
     assert "SIGILL" in _format_diagnostic(d)
 
+@pytest.mark.smoke
 def test_check_muscle():
 
     binary, version, diagnostic = check_muscle()
@@ -179,6 +182,7 @@ def test_check_raxml():
     if version == (0,0,0):
         raise RuntimeError("raxml-ng is installed but we cannot parse its version string!")
 
+@pytest.mark.smoke
 def test_check_blastp():
 
     binary, version, diagnostic = check_blastp()
@@ -192,6 +196,7 @@ def test_check_blastp():
     if version == (0,0,0):
         raise RuntimeError("blastp is installed but we cannot parse its version string!")
 
+@pytest.mark.smoke
 def test_check_makeblastdb():
 
     binary, version, diagnostic = check_makeblastdb()
@@ -205,6 +210,7 @@ def test_check_makeblastdb():
     if version == (0,0,0):
         raise RuntimeError("makeblastdb is installed but we cannot parse its version string!")
 
+@pytest.mark.smoke
 def test_check_git():
 
     binary, version, diagnostic = check_git()
@@ -258,6 +264,7 @@ def test__compare_versions():
     assert out is True
 
 
+@pytest.mark.smoke
 def test_validate_stack():
 
     # not an amazing test, but at least checks core logic of whether or not

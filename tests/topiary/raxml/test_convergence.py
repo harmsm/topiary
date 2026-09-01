@@ -10,6 +10,7 @@ import pandas as pd
 import os
 import shutil
 
+@pytest.mark.smoke
 def test__parse_convergence_file(raxml_output):
 
     c, df = _parse_convergence_file(raxml_output["bs-trees.log_converged"])

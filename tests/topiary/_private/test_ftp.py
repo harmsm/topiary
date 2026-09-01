@@ -70,6 +70,7 @@ def test_ftp_download(tmpdir):
         assert new_creation_time != creation_time
 
 
+@pytest.mark.smoke
 def test_calc_md5(ftp_test_files,tmpdir):
 
     assert calc_md5(ftp_test_files["GCF_000001405.40_GRCh38.p14_assembly_report.txt.gz"]) == "edbd21ee24986ce383fb54d2a7f93708"

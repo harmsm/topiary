@@ -19,6 +19,7 @@ import time
 import subprocess
 
 
+@pytest.mark.smoke
 def test__launch_replicate_env(tmpdir, monkeypatch):
 
     monkeypatch.chdir(tmpdir)
@@ -85,6 +86,7 @@ def test__compute_replicate_timeout():
     assert _compute_replicate_timeout([1.0,1.0,1.0],3,config) == 10.0
 
 
+@pytest.mark.smoke
 def test__terminate_process(tmpdir,monkeypatch):
 
     monkeypatch.chdir(tmpdir)
@@ -103,6 +105,7 @@ def test__terminate_process(tmpdir,monkeypatch):
     assert proc.poll() is not None
 
 
+@pytest.mark.smoke
 def test__launch_replicate(tmpdir,monkeypatch):
 
     monkeypatch.chdir(tmpdir)

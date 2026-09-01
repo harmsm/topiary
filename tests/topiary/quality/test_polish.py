@@ -18,6 +18,7 @@ def test__get_cutoff():
     with pytest.raises(ValueError):
         _get_cutoff(x, avg_bin_contents=0)
 
+@pytest.mark.smoke
 def test_polish_alignment(test_dataframes, mocker):
     
     df = test_dataframes["good-df"].copy()

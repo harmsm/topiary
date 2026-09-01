@@ -8,6 +8,7 @@ from topiary.ncbi.blast.read import read_blast_xml
 
 import os, shutil, re
 
+@pytest.mark.smoke
 def test__clean_xml(user_xml_files):
 
     for f in user_xml_files:
@@ -26,6 +27,7 @@ def test__clean_xml(user_xml_files):
     assert re.search("CREATE_VIEW",cleaned) is None
 
 
+@pytest.mark.smoke
 def test__xml_file_to_records(user_xml_files):
 
     # Basically wrapper for biopython reader. Make sure it reads some real
@@ -41,6 +43,7 @@ def test__xml_file_to_records(user_xml_files):
         for o in out[:1]:
             assert len(list(o.alignments)) == expected_length
 
+@pytest.mark.smoke
 def test_check_for_cpu_limit(xml):
 
     with pytest.raises(FileNotFoundError):
@@ -50,6 +53,7 @@ def test_check_for_cpu_limit(xml):
     assert check_for_cpu_limit(xml["cpu-limit.xml"])
     assert not check_for_cpu_limit(xml["nr_clustered.xml"])
 
+@pytest.mark.smoke
 def test_records_to_df(user_xml_files):
 
     for f in user_xml_files:
@@ -69,6 +73,7 @@ def test_records_to_df(user_xml_files):
         else:
             assert len(df) > expected_length
 
+@pytest.mark.smoke
 def test_read_blast_xml(xml,tmpdir,user_xml_files):
 
     # Pass in a single xml file, not in a list

@@ -5,6 +5,7 @@ from topiary._private import animation
 
 import time
 
+@pytest.mark.smoke
 def test_WaitingAnimation():
 
     # Not really testing animation output, but am testing threading. This test
