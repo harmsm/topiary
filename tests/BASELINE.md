@@ -597,3 +597,49 @@ Three fixes:
 All of this was exercised locally against a stub binary that dies with SIGILL
 and against a PATH with the binaries absent: both are detected, and the healthy
 case still passes.
+
+
+## Nightly coverage failure: 0% with all 451 tests passing
+
+Symptom: the nightly integration job passed every test, then failed with
+`Coverage failure: total of 0 is less than fail-under=92` and 0% for every file,
+preceded by `CoverageWarning: No data was collected`.
+
+**Cause: `source = ["src/topiary"]` only works for an editable install.** It
+tells coverage to measure files *at that path*. `pip install -e .` makes
+src/topiary the import location, so it works locally. CI installs non-editable,
+so the code that executes lives in site-packages, nothing under src/topiary is
+ever traced, and the total is 0%.
+
+This was mine twice over: the config dates from Stage 0, and Stage 5 added the
+coverage run to a job that installs non-editable, which is what exposed it.
+
+Fixed by measuring the *package* rather than a directory:
+
+```toml
+[tool.coverage.run]
+source_pkgs = ["topiary"]
+
+[tool.coverage.paths]
+source = ["src/topiary", "*/site-packages/topiary"]
+```
+
+`source_pkgs` follows the package wherever it is imported from; the `paths`
+alias reports site-packages files under their source-tree names so both install
+modes produce identical output. Verified by running the full flag set against a
+non-editable install: 451 passed, 8944 statements, 92%, floor passes -- the same
+numbers as the editable install.
+
+### The failure mode was hard to read, so it now self-diagnoses
+
+Reporting 0% looks like coverage collapsed, not like coverage watched the wrong
+copy of the code. `tests/check_coverage_collected.py` runs before the floor
+check in both `run_all_tests.sh` and the nightly job, and explains the likely
+cause.
+
+One trap worth recording: **counting measured files does not detect this.** With
+a directory-based `source`, coverage writes every file it finds under that
+directory into the data file even when none of them ran -- the broken run still
+reports 97 "measured" files, all with zero executed lines. The first version of
+this check counted files and passed happily on the broken data. It now counts
+executed lines.

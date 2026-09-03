@@ -135,10 +135,16 @@ and touches the network/external binaries, so it should generally **not** be run
 Claude — but it's the reference for the exact test invocation syntax (including
 which `--run-*` flags to pass) if that's needed.
 
-Coverage settings live in `[tool.coverage.*]` in `pyproject.toml` — `source` is
-pinned to `src/topiary` and `branch = true`. Do not pass `--branch` or `--source`
-on the command line; the config already handles it. Reports land in
+Coverage settings live in `[tool.coverage.*]` in `pyproject.toml` —
+`source_pkgs = ["topiary"]` and `branch = true`. Do not pass `--branch` or
+`--source` on the command line; the config already handles it. Reports land in
 `reports/coverage/` and `reports/htmlcov/`.
+
+**Use `source_pkgs`, not `source = ["src/topiary"]`.** A directory only matches
+when topiary is installed editable. CI installs non-editable, where the code
+runs from site-packages, so a directory-based source traces nothing and reports
+0% for everything. `tests/check_coverage_collected.py` guards against that
+regression and runs before the floor check.
 
 ### Warnings
 

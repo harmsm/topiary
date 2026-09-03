@@ -244,5 +244,10 @@ jobs:
       run: |
         coverage run -m pytest tests \
           --run-raxml --run-generax --run-blast --run-ncbi-server --run-network -q
+
+        # Did coverage watch the code the tests actually imported? Without this
+        # a mismatch shows up as 0% everywhere and looks like a regression.
+        ./tests/check_coverage_collected.py
+
         coverage report
         coverage report --fail-under=92
