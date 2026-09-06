@@ -47,6 +47,12 @@ coverage erase
 coverage run -m pytest tests --run-network --run-raxml --run-generax --run-blast --run-ncbi-server --junit-xml=reports/junit/junit.xml
 
 echo "Generating reports"
+
+# Before trusting any number: did coverage actually watch the code the tests
+# imported? If not, everything reports 0% and the floor check below fails with
+# a misleading message.
+./tests/check_coverage_collected.py || exit 1
+
 coverage report > reports/coverage/coverage.txt
 
 # Coverage floor. Set to the measured value at the end of Stage 4; ratchet it

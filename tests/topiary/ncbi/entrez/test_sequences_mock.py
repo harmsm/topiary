@@ -9,8 +9,10 @@ from topiary.ncbi.entrez.sequences import _get_sequences_thread_function
 
 def test__get_sequences_thread_function_logic(mocker):
     
-    import topiary.ncbi.entrez.sequences
-    topiary.ncbi.entrez.sequences.topiary.ncbi.NCBI_REQUEST_FREQ = 0
+    # See the note in test_ncbi_mock.py: patch.object restores the throttle at
+    # teardown, a bare assignment leaks it into every later test.
+    import topiary.ncbi
+    mocker.patch.object(topiary.ncbi,"NCBI_REQUEST_FREQ",0)
     
     mock_efetch = mocker.patch("Bio.Entrez.efetch")
     mock_handle = mocker.MagicMock()

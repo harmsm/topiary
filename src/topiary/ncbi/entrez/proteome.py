@@ -121,6 +121,7 @@ def get_proteome_ids(taxid=None,species=None):
     for ref_filter in filters:
 
         query_text = f"txid{taxid}[ORGN] AND {ref_filter}"
+        topiary.ncbi.rate_limit()
         esearch_handle = Entrez.esearch(db="assembly",
                                         retmax=50,
                                         term=query_text,
@@ -160,6 +161,7 @@ def _get_records(id_list):
 
     # Get summary data for these records.
     esummary_query = ",".join(id_list)
+    topiary.ncbi.rate_limit()
     esummary_handle = Entrez.esummary(db="assembly",id=esummary_query)
     try:
         esummary_record = Entrez.read(esummary_handle,validate=False)

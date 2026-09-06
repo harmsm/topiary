@@ -102,19 +102,28 @@ markers = [
 # Measure topiary only. Without this, coverage.py instruments everything it
 # imports -- including installed dependencies (e.g. an editable ete4 checkout)
 # and the test files themselves -- which makes the reported total meaningless.
-source = ["src/topiary"]
+#
+# Use source_pkgs (the importable package) rather than source (a directory).
+# A directory only works when topiary is installed editable, so that src/topiary
+# *is* the import location. CI installs non-editable, where the code executing
+# lives in site-packages, nothing under src/topiary is ever traced, and coverage
+# reports "No data was collected" and 0% for every file. source_pkgs follows the
+# package wherever it is imported from.
+source_pkgs = ["topiary"]
 branch = true
 
 [tool.coverage.report]
-# Belt and braces: even if something outside src/topiary sneaks into the data
-# file, keep it out of the report.
-include = ["src/topiary/*"]
 omit = ["*/__pycache__/*"]
 show_missing = true
 exclude_also = [
     # Script entry points are exercised via the console scripts, not by import.
     "if __name__ == .__main__.:",
 ]
+
+[tool.coverage.paths]
+# Report site-packages paths as source-tree paths, so an editable and a
+# non-editable install produce the same file names (and can be combined).
+source = ["src/topiary", "*/site-packages/topiary"]
 
 [tool.coverage.html]
 directory = "reports/htmlcov"
