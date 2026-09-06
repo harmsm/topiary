@@ -7,10 +7,12 @@
 #                matrix in parallel and gives feedback in a couple of minutes.
 #   smoke        real data and real file I/O. Needs muscle/blast from conda,
 #                but not the compiled RAxML-NG or GeneRax.
-#   integration  needs the compiled binaries *and* live network access (BLAST,
-#                NCBI, and Open Tree of Life -- note that --run-generax and
+#   integration  needs the compiled binaries *and* live network access (local
+#                BLAST and Open Tree of Life -- note that --run-generax and
 #                --run-raxml both reach OTL, because setting up a GeneRax run
-#                annotates the species tree from it).
+#                annotates the species tree from it). The live NCBI Entrez
+#                tests (--run-ncbi-server) are deliberately excluded; see the
+#                nightly step.
 #
 # Only `integration` is serialized. It contends for external services, which
 # was the reason the whole workflow used to run with max-parallel: 1.
@@ -229,9 +231,8 @@ jobs:
         print('external stack OK')
         "
 
-    # --run-ncbi-server is deliberately left out of the per-push run: NCBI
-    # rate-limits unauthenticated traffic, and hitting it on every push gets
-    # the runner throttled. The nightly job below covers it.
+    # --run-ncbi-server is deliberately left out of CI entirely -- see the
+    # nightly step below for why.
     - name: run integration tests
       if: github.event_name != 'schedule'
       shell: bash -l {0}
@@ -242,12 +243,56 @@ jobs:
       if: github.event_name == 'schedule'
       shell: bash -l {0}
       run: |
+        # NOTE: --run-ncbi-server is deliberately absent.
+        #
+        # Those tests query the live NCBI Entrez server, which rate-limits
+        # unauthenticated traffic to ~3 requests/second per IP. GitHub runners
+        # share IP space, so CI reliably gets HTTP 429 "Too Many Requests" --
+        # and serializing does not help, because the limit is per IP per unit
+        # time, not per concurrent job.
+        #
+        # This was already decided once: 5840a38 added mocked equivalents and
+        # ff068f1 removed the flag from CI. It was re-added by mistake during
+        # the workflow split and is removed again here. The logic is covered by
+        # tests/topiary/ncbi/entrez/*_mock.py, and dropping the flag keeps the
+        # suite above the coverage floor.
+        #
+        # To run these against the live server, do it locally:
+        #     pytest tests --run-ncbi-server
+        # Setting NCBI_API_KEY raises the limit to ~10 req/s if you need it.
+        # Capture pytest's status rather than letting it end the step, so the
+        # coverage checks below always run. Otherwise a test failure hides
+        # whether coverage collected anything, and the two get conflated.
+        set +e
         coverage run -m pytest tests \
-          --run-raxml --run-generax --run-blast --run-ncbi-server --run-network -q
+          --run-raxml --run-generax --run-blast --run-network -q
+        pytest_status=$?
+        set -e
 
+        echo "::group::coverage"
         # Did coverage watch the code the tests actually imported? Without this
         # a mismatch shows up as 0% everywhere and looks like a regression.
         ./tests/check_coverage_collected.py
-
         coverage report
         coverage report --fail-under=92
+        echo "::endgroup::"
+
+        exit $pytest_status
+
+    # A handful of real NCBI calls, to catch the API changing shape underneath
+    # us -- everything else mocks NCBI, so drift would otherwise surface as a
+    # broken user run rather than a red build.
+    #
+    # Restricted to one configuration so the nightly makes ~7 NCBI requests in
+    # total rather than 7 per matrix job, which is what got us rate limited.
+    # The tests themselves skip (not fail) on HTTP 429 or any other transport
+    # error, so a busy NCBI cannot turn this red.
+    - name: NCBI API drift check
+      if: >-
+        github.event_name == 'schedule'
+        && matrix.os == 'ubuntu-latest'
+        && matrix.python-version == '3.13'
+      shell: bash -l {0}
+      run: |
+        pytest tests/topiary/ncbi/entrez/test_ncbi_api_drift.py \
+          --run-ncbi-server -v

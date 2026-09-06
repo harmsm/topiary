@@ -117,17 +117,41 @@ exists to locate the fd exhaustion seen when running the whole suite.
 | `integration` | compiled RAxML-NG + GeneRax + live network | 1 config per push, full matrix nightly | no, serialized |
 
 Only `integration` is serialized (`max-parallel: 1` plus a repo-wide
-concurrency group) — it contends for NCBI and Open Tree of Life, and running
-several at once gets the runner rate-limited. That contention is why the *whole*
-workflow used to be serialized; now it only costs the one job that causes it.
+concurrency group) — it is the only job that reaches a live service (Open Tree
+of Life), so it is the only one that can contend for one. That contention is why
+the *whole* workflow used to be serialized; now it only costs the one job that
+could cause it.
 
 The `integration` job runs the entire suite rather than `-m integration`. That
 is deliberate: it is the only job that exercises every test in a single process,
 which is where cross-test contamination shows up (the file-descriptor
 exhaustion in tests/BASELINE.md was invisible to any single test file).
 
-`--run-ncbi-server` is nightly-only. NCBI rate-limits unauthenticated traffic,
-so hitting it on every push gets the runner throttled.
+`--run-ncbi-server` is **not run in CI at all**. Those tests query the live NCBI
+Entrez server, which rate-limits unauthenticated traffic to ~3 requests/second
+per IP; GitHub runners share IP space, so CI reliably gets HTTP 429. Serializing
+does not help — the limit is per IP per unit time, not per concurrent job. The
+logic is covered by `tests/topiary/ncbi/entrez/*_mock.py`. Run them against the
+live server locally (`pytest tests --run-ncbi-server`); `NCBI_API_KEY` raises the
+limit to ~10 req/s.
+
+All Entrez call sites go through `topiary.ncbi.rate_limit()`, which waits only
+for the remaining part of the interval since the last request. Add it before any
+new Entrez call. (`ncbi/entrez/sequences.py` and `ncbi/blast/ncbi.py` are the
+exception: they fan out over a multiprocessing pool and pass a lock down to the
+workers, so they do their own throttling.)
+
+**The one exception to "no NCBI in CI":** `tests/topiary/ncbi/entrez/test_ncbi_api_drift.py`
+makes ~7 real calls to catch NCBI changing the *shape* of its responses, which
+mocked tests cannot see. It runs nightly on a single matrix configuration only.
+Its two rules keep it from reintroducing flakiness:
+
+- It asserts on response **structure** — the specific keys topiary reads — never
+  on values NCBI is entitled to change.
+- A transport failure (429, 5xx, timeout, DNS) is a **skip**, not a failure.
+  Only a response that parses differently than topiary expects fails.
+
+If it fails, the message names the missing field and where topiary reads it.
 
 `bash run_all_tests.sh` runs the full suite (flake8, test audit, coverage
 with all of the above opt-in flags enabled, badge/report generation). This is slow

@@ -44,8 +44,12 @@ def test__ncbi_blast_thread_function(mocker,tmpdir):
     # every run drops *_ncbi-blast-result.xml files into the repo root.
     os.chdir(tmpdir)
 
+    # Drop the NCBI throttle so the test does not actually sleep. Use
+    # patch.object rather than assigning: a bare assignment is never undone, so
+    # every test that runs afterwards in the same session silently loses the
+    # rate limit too.
     import topiary.ncbi
-    topiary.ncbi.NCBI_REQUEST_FREQ = 0
+    mocker.patch.object(topiary.ncbi,"NCBI_REQUEST_FREQ",0)
 
     mock_qblast = mocker.patch("Bio.Blast.NCBIWWW.qblast")
     mock_handle = mocker.MagicMock()

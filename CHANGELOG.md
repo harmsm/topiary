@@ -84,6 +84,12 @@ links against it.
   long run would die with `OSError: [Errno 24] Too many open files`. topiary now
   turns that recording off. **This is the most likely bug to have affected a
   real analysis.**
+- **NCBI requests were only throttled in two of five places.** `topiary.ncbi`
+  documents a request-rate limit (3/s, or 10/s with `NCBI_API_KEY`) but applied
+  it only in `entrez/sequences.py` and `blast/ncbi.py`. `entrez/taxid.py`,
+  `entrez/mrca.py` and both call sites in `entrez/proteome.py` went unthrottled,
+  so a run over many species could get HTTP 429 from NCBI. All Entrez calls now
+  go through a shared `topiary.ncbi.rate_limit()`.
 - **Three Entrez handles were never closed** (`ncbi/entrez/mrca.py`,
   `taxid.py`, and two in `proteome.py`), leaking a socket per call in the same
   way.

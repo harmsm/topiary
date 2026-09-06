@@ -57,6 +57,7 @@ def get_taxid(species_list):
     search_term = " OR ".join(species_list)
 
     # Access Entrez and download
+    topiary.ncbi.rate_limit()
     handle = Entrez.esearch(db="taxonomy",
                             retmax=len(species_list)*2,
                             term=search_term,

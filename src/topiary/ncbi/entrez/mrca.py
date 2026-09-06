@@ -37,6 +37,7 @@ def get_mrca_taxid(species_list):
         return int(taxids[0])
 
     # Fetch lineages for all taxids
+    topiary.ncbi.rate_limit()
     handle = Entrez.efetch(db="taxonomy", id=",".join(taxids), retmode="xml")
     try:
         records = Entrez.read(handle)
