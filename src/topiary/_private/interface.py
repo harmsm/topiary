@@ -38,8 +38,19 @@ def run_cleanly(func):
         except Exception as e:
             os.chdir(current_dir)
             err = f"\n\nCaught exception in function '{func.__name__}'. Returning to starting\n"
-            err += "directory and cleaning up. Check error stack for cause of\n"
-            err += "this error.\n\n"
+            err += "directory and cleaning up.\n\n"
+
+            # Repeat the underlying error here rather than only chaining it.
+            # The cause carries the external program's own output (see
+            # launch()), and as a chained exception that lands in a separate
+            # traceback block -- which is easy to lose when a failure is read
+            # from a truncated CI log, copied out of a terminal, or seen in a
+            # notebook that shows only the final message. Saying "check the
+            # error stack" is no help to someone holding the message but not
+            # the stack.
+            err += "Cause:\n\n"
+            err += f"{type(e).__name__}: {e}\n"
+
             raise WrappedFunctionException(err) from e
     
         return value

@@ -49,6 +49,25 @@ def test_run_cleanly(tmpdir):
     test_function_chdir()
     assert os.path.abspath(os.getcwd()) == os.path.abspath(os.path.join(tmpdir,"stupid"))
 
+    # The wrapper must repeat the underlying error in its own message, not just
+    # chain it. When an external program crashes, launch() puts that program's
+    # output into the cause -- and a chained exception is a separate traceback
+    # block, so anyone reading a truncated log or a notebook's final line sees
+    # only "something failed" without it.
+    @run_cleanly
+    def test_function_crash_with_detail():
+        raise RuntimeError("ERROR: raxml-ng returned 139")
+
+    with pytest.raises(interface.WrappedFunctionException,
+                       match="ERROR: raxml-ng returned 139") as exc_info:
+        test_function_crash_with_detail()
+
+    assert "RuntimeError" in str(exc_info.value)
+    assert "test_function_crash_with_detail" in str(exc_info.value)
+
+    # ... and the original is still chained, so the full traceback survives.
+    assert isinstance(exc_info.value.__cause__,RuntimeError)
+
 
     
 
